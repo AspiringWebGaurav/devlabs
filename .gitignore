@@ -1,0 +1,167 @@
+# DevLabs - Multi-Technology Master .gitignore
+# Prevents accidental commits of secrets, build outputs, dependencies, IDE settings, and OS metadata.
+
+# ==========================================
+# Security & Environment Credentials
+# ==========================================
+*.env
+*.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.asc
+*.keystore
+id_rsa*
+id_ed25519*
+secrets.json
+credentials.json
+service-account*.json
+.aws/
+.gcp/
+
+# ==========================================
+# Dependencies & Package Managers
+# ==========================================
+# Node.js / JavaScript / TypeScript
+node_modules/
+jspm_packages/
+.npm/
+.yarn/
+.pnpm-store/
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+
+# Go
+vendor/
+*.exe
+*.exe.manifest
+*.dll
+*.so
+*.dylib
+
+# Rust
+target/
+
+# Java / Kotlin / Gradle / Maven
+.gradle/
+build/
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# C / C++ / CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+*.o
+*.obj
+*.a
+*.lib
+
+# ==========================================
+# Build Artifacts & Generated Files
+# ==========================================
+.next/
+out/
+.nuxt/
+.vuepress/dist
+.cache/
+.parcel-cache/
+.turbo/
+dist/
+build/
+coverage/
+
+# ==========================================
+# Logs & Temporary Files
+# ==========================================
+*.log
+logs/
+*.sqlite
+*.sqlite3
+*.db
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*~
+
+# ==========================================
+# IDE & Editor Specific Metadata
+# ==========================================
+# VS Code (keep shared settings if needed, ignore workspace states)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (IntelliJ, WebStorm, PyCharm, etc.)
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Visual Studio
+.vs/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ==========================================
+# Operating System Files
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ==========================================
+# Local Dev & Testing Scratch Files
+# ==========================================
+scratch/
+local_scratch/
+*.local
