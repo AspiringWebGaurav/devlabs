@@ -96,7 +96,7 @@ When new experiments, PoCs, or prototypes are added to DevLabs, they must follow
 devlabs/
 ├── .agents/                 # Workspace agent governance and workflow rules
 │   ├── AGENTS.md            # Primary agent directive
-│   └── rules/               # Specific rule modules (workflow, security, etc.)
+│   └── rules/               # Specific rule modules (workflow, security, telemetry, etc.)
 ├── docs/                    # Architecture guides, workflow documentation
 ├── projects/                # (Future) Modular experiments & projects
 ├── .gitattributes           # Git attributes and line ending rules
@@ -106,3 +106,20 @@ devlabs/
 ```
 
 *Note: Future sub-projects inside `projects/` or top-level modules should maintain their own isolated documentation (`README.md`), configuration, and test suites while adhering to this overarching governance directive.*
+
+---
+
+## 7. Platform Telemetry & Analytics Mandate
+
+- **Vercel Web Analytics & Speed Insights Enabled**: Vercel Web Analytics and Speed Insights are permanently enabled at the Vercel project level for this repository (`devlabs.eu.cc`).
+- **Telemetry Standard**: All AI agents and developers must treat Vercel Web Analytics and Speed Insights as active platform features. When building, modifying, or creating web projects, prototypes, or micro-frontends in DevLabs, ensure compatibility with Vercel edge telemetry routes (`/_vercel/insights/script.js` and `/_vercel/speed-insights/script.js`) or official framework packages (`@vercel/analytics` and `@vercel/speed-insights`).
+
+---
+
+## 8. Version Control & Git Push Permission Mandate
+
+- **Strict Push Permission Required**: AI agents must **NEVER** execute `git push` or push commits to remote repositories (`origin main` / remote branches) automatically.
+- **Explicit Instruction Only**: Pushing to remote repositories is strictly permitted ONLY when the user explicitly requests or grants permission to push in their prompt.
+- **Commit Hygiene**: Every commit created by an AI agent or developer must use clear, professional conventional commit messages (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`) describing the exact scope and rationale.
+
+
