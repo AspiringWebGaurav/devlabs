@@ -96,7 +96,7 @@ When new experiments, PoCs, or prototypes are added to DevLabs, they must follow
 devlabs/
 ├── .agents/                 # Workspace agent governance and workflow rules
 │   ├── AGENTS.md            # Primary agent directive
-│   └── rules/               # Specific rule modules (workflow, security, telemetry, etc.)
+│   └── rules/               # Specific rule modules (workflow, security, telemetry, ui-layout, etc.)
 ├── docs/                    # Architecture guides, workflow documentation
 ├── projects/                # (Future) Modular experiments & projects
 ├── .gitattributes           # Git attributes and line ending rules
@@ -121,5 +121,15 @@ devlabs/
 - **Strict Push Permission Required**: AI agents must **NEVER** execute `git push` or push commits to remote repositories (`origin main` / remote branches) automatically.
 - **Explicit Instruction Only**: Pushing to remote repositories is strictly permitted ONLY when the user explicitly requests or grants permission to push in their prompt.
 - **Commit Hygiene**: Every commit created by an AI agent or developer must use clear, professional conventional commit messages (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`) describing the exact scope and rationale.
+
+---
+
+## 9. Edge-to-Edge Navigation & Layout Mandate
+
+- **Full-Width Header & Footer Alignment**: Primary top navigation bars (`<header>`) and page footers (`<footer>`) across web applications and prototypes in DevLabs must span **full edge-to-edge width** (`w-full`) across the screen.
+- **No Artificial Margins on Nav/Footer Containers**: Do NOT constrain navigation or footer containers inside artificial max-width wrappers (such as `max-w-7xl` or `max-w-5xl`) that leave empty space on far left and far right sides on wide screens. Main body content sections (`<main>`) can maintain readable max-widths, but navigation headers and footers MUST stretch completely edge-to-edge.
+- **Pure Edge-to-Edge Padding Control**: Keep horizontal container padding tight (`px-4 sm:px-6`) on `<header>` and `<footer>` flex layouts to prevent large inner gaps from pushing elements far inward on wide displays.
+
+
 
 
