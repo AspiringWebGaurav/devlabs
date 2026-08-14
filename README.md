@@ -1,82 +1,52 @@
-# DevLabs 🧪
+# Modern Developer Portfolio
 
-> **Public Development Laboratory for Experimental Software, Prototypes, Proof-of-Concepts, and Evolving Projects.**  
-> 🌐 Website: [devlabs.eu.cc](https://devlabs.eu.cc) | 📦 Repository: [github.com/AspiringWebGaurav/devlabs](https://github.com/AspiringWebGaurav/devlabs)
+A sleek, responsive, and minimalist developer portfolio built with Next.js 15, React 19, Tailwind CSS, Three.js, and Framer Motion.
 
----
+## 🚀 Features
 
-## 📍 Overview
-
-**DevLabs** is a dedicated public development environment built to explore, prototype, test, and refine software ideas. It serves as an open laboratory where experimental software, proof-of-concepts (PoCs), beta-stage projects, and architectural experiments are developed transparently.
-
-### Purpose & Public Transparency
-DevLabs is intentionally public so that clients, teammates, reviewers, collaborators, and recruiters can observe real-world engineering in action:
-- **Project Evolution**: Track how raw ideas evolve into structured software.
-- **Decision Transparency**: Inspect architectural trade-offs, design choices, and implementation rationale.
-- **Engineering Quality**: Observe disciplined workflow standards, commit hygiene, automated verification, and documentation quality.
+- **Dynamic Hero Section**: Integrated with Aceternity UI Spotlight, text generation animations, and interactive call-to-action.
+- **Interactive 3D Visuals**: WebGL Interactive Globe (`Three.js` / `Three-Globe`) and dynamic Shader Canvas reveal effects.
+- **Bento Grid Layout**: Sleek showcase of tech stack, interactive email copy with confetti animations, and time-zone flexibility.
+- **Recent Projects**: 3D Pin perspective cards with live links and tech badges.
+- **Client Testimonials**: Infinite horizontal marquee cards with custom glassmorphism.
+- **Moving Border Cards**: Customized interactive work experience section.
+- **Fluid & Cross-Browser**: Custom scroll-behavior, clean typography, responsive layout, and hidden scrollbars.
 
 ---
 
-## 🎯 What Belongs in DevLabs
+## 🛠️ Tech Stack
 
-DevLabs hosts diverse technical explorations across web applications, backend services, systems tools, AI experiments, and data pipelines. 
-
-- ✅ **Experimental Prototypes**: Fast-paced exploration of emerging tech stacks and concepts.
-- ✅ **Proof-of-Concepts (PoCs)**: Feasibility testing for complex algorithms, protocols, or integrations.
-- ✅ **Beta-Stage Projects**: Interactive software prototypes prepared for preliminary testing and feedback.
-- ✅ **Architectural Benchmarks**: Performance, security, and design pattern experiments.
-
----
-
-## 📊 Project Stability & Maturity Levels
-
-Every project or experiment within DevLabs indicates its current maturity level:
-
-| Level | Badge / Status | Description | Expectation |
-| :--- | :--- | :--- | :--- |
-| **01** | `Experimental` | Initial exploration, active spike, unverified logic | High churn, subject to major changes |
-| **02** | `Prototype` | Functional prototype with basic workflow | Interactive, core feature demonstrator |
-| **03** | `Beta PoC` | Feature-complete proof-of-concept ready for evaluation | Stable interfaces, verified test suite |
-| **04** | `Archived / Graduated` | Completed experiment or migrated to standalone repo | Read-only reference or production candidate |
+- **Framework**: [Next.js 15](https://nextjs.org/) (App Router, Turbopack)
+- **Core**: [React 19](https://react.dev/) & [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Animations & Motion**: [Motion](https://motion.dev/) (Framer Motion)
+- **3D Graphics & Shaders**: [Three.js](https://threejs.org/), [@react-three/fiber](https://docs.pmnd.rs/react-three-fiber), [three-globe](https://github.com/vasturiano/three-globe)
+- **Icons**: [React Icons](https://react-icons.github.io/react-icons/)
+- **Theming**: [next-themes](https://github.com/pacocoursey/next-themes)
 
 ---
 
-## ⚙️ Engineering Workflow & Governance
+## 💻 Getting Started
 
-DevLabs operates under a strict, transparent 9-stage engineering workflow enforced for human contributors and AI agents alike:
-
-```
-Understand ➔ Clarify ➔ Explore ➔ Propose ➔ Confirm ➔ Implement ➔ Verify ➔ Review ➔ Document
+### 1. Install Dependencies
+```bash
+npm install
 ```
 
-1. **Understand**: Deep inspection of existing code, context, and requirements.
-2. **Clarify**: User-first requirement gathering; resolve ambiguities before writing code.
-3. **Explore**: Evaluate technical options, tradeoffs, and architectural fit.
-4. **Propose**: Clear technical proposals for consequential changes.
-5. **Confirm**: Explicit user alignment on scope, UX, and architectural choices.
-6. **Implement**: Clean, modular, production-grade code adhering to repo conventions.
-7. **Verify**: Empirical verification via automated tests, typechecking, linting, and runtime checks.
-8. **Review**: Senior-level audit for regressions, edge cases, security, and performance.
-9. **Document**: Durable documentation reflecting actual implemented behavior.
+### 2. Run Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-Detailed rules for developers and AI agents can be found in:
-- 📖 [Engineering Workflow Guide](docs/ENGINEERING_WORKFLOW.md)
-- 🤖 [Agent Governance Directive](.agents/AGENTS.md)
-- 🛡️ [Security Policy](SECURITY.md)
+### 3. Build for Production
+```bash
+npm run build
+npm run start
+```
 
 ---
 
-## 🔒 Security Expectations
+## 🌐 Deployment
 
-DevLabs is a public repository. We maintain a zero-tolerance policy for secret exposure:
-- **No Secrets**: Credentials, private keys, tokens, and production environment variables are NEVER committed.
-- **Environment Templates**: All projects use safe `.env.example` files containing non-sensitive placeholders.
-- Security vulnerabilities or accidentally exposed credentials should be reported immediately according to our [Security Policy](SECURITY.md).
-
----
-
-## ⚖️ Licensing & Terms of Reuse
-
-**All Rights Reserved.**
-
-Unless explicitly stated otherwise within a specific sub-project directory, all content, source code, and assets within this repository are proprietary. Public visibility on GitHub or `devlabs.eu.cc` does **not** grant permission for unrestricted commercial reuse, distribution, or re-licensing without explicit written authorization from the repository owner.
+This project is optimized and ready for zero-configuration deployment on [Vercel](https://vercel.com).
