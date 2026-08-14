@@ -11,6 +11,7 @@ A sleek, responsive, and minimalist developer portfolio built with Next.js 15, R
 - **Client Testimonials**: Infinite horizontal marquee cards with custom glassmorphism.
 - **Moving Border Cards**: Customized interactive work experience section.
 - **Fluid & Cross-Browser**: Custom scroll-behavior, clean typography, responsive layout, and hidden scrollbars.
+- **Telemetry & Insights**: Native Vercel Web Analytics and Vercel Speed Insights for real-time traffic and Core Web Vitals performance tracking.
 
 ---
 
@@ -21,6 +22,7 @@ A sleek, responsive, and minimalist developer portfolio built with Next.js 15, R
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **Animations & Motion**: [Motion](https://motion.dev/) (Framer Motion)
 - **3D Graphics & Shaders**: [Three.js](https://threejs.org/), [@react-three/fiber](https://docs.pmnd.rs/react-three-fiber), [three-globe](https://github.com/vasturiano/three-globe)
+- **Analytics & Performance**: [@vercel/analytics](https://vercel.com/docs/analytics), [@vercel/speed-insights](https://vercel.com/docs/speed-insights)
 - **Icons**: [React Icons](https://react-icons.github.io/react-icons/)
 - **Theming**: [next-themes](https://github.com/pacocoursey/next-themes)
 
