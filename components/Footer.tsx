@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FaLocationArrow } from "react-icons/fa6";
 
 import { socialMedia } from "@/data";
@@ -25,22 +26,40 @@ const Footer = () => {
           />
         </a>
       </div>
-      <div className="flex mt-16 md:flex-row flex-col justify-between items-center gap-4">
-        <p className="md:text-base text-sm md:font-normal font-light">
-          Copyright © 2025 Gaurav Patil
-        </p>
+      <div className="flex mt-20 pt-8 border-t border-white/[0.08] md:flex-row flex-col justify-between items-center gap-4">
+        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 text-xs sm:text-sm text-neutral-400 font-normal">
+          <span>© {new Date().getFullYear()} Gaurav Patil</span>
+          <span className="text-neutral-600">·</span>
+          <Link
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-purple transition-colors duration-200"
+          >
+            Privacy Policy
+          </Link>
+          <span className="text-neutral-600">·</span>
+          <Link
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-purple transition-colors duration-200"
+          >
+            Terms of Service
+          </Link>
+        </div>
 
-        <div className="flex items-center md:gap-3 gap-6 lg:mr-14">
+        <div className="flex items-center gap-3">
           {socialMedia.map((info) => (
             <a
               key={info.id}
               href={info.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-10 h-10 cursor-pointer flex justify-center items-center backdrop-filter backdrop-blur-lg saturate-180 bg-opacity-75 bg-black-200 rounded-lg border border-black-300 transition-transform hover:scale-110"
+              className="w-10 h-10 cursor-pointer flex justify-center items-center rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-md hover:border-purple/50 hover:bg-purple/[0.08] transition-all duration-300 hover:scale-105 shadow-sm"
               aria-label="Social Link"
             >
-              <img src={info.img} alt="icons" width={20} height={20} />
+              <img src={info.img} alt="icons" width={18} height={18} className="opacity-80 hover:opacity-100 transition-opacity" />
             </a>
           ))}
         </div>

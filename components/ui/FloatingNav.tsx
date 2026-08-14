@@ -1,5 +1,5 @@
 "use client";
-import React, { JSX, useState } from "react";
+import React, { JSX, useState, useEffect } from "react";
 import {
   motion,
   AnimatePresence,
@@ -25,12 +25,89 @@ export const FloatingNav = ({
   // set true for the initial state so that nav bar is visible in the hero section
   const [visible, setVisible] = useState(true);
 
+  // Auto-scroll to section on direct URL load (e.g. /about, /projects)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const pathname = window.location.pathname.replace(/^\//, "");
+      if (pathname) {
+        const timeoutId = setTimeout(() => {
+          const element = document.getElementById(pathname);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth" });
+          }
+        }, 300);
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, []);
+
+  // Real-time Scroll-Spy to sync URL with visible section
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let isNavigating = false;
+    let navigatingTimeout: NodeJS.Timeout;
+
+    const handleScroll = () => {
+      if (isNavigating) return;
+
+      const scrollY = window.scrollY;
+      if (scrollY < 250) {
+        if (window.location.pathname !== "/") {
+          window.history.replaceState(null, "", "/");
+        }
+        return;
+      }
+
+      const viewportMiddle = scrollY + window.innerHeight / 3;
+      const sectionIds = ["about", "projects", "testimonials", "contact"];
+
+      let currentSection = "";
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (el) {
+          const top = el.offsetTop;
+          const height = el.offsetHeight;
+          if (viewportMiddle >= top && viewportMiddle < top + height) {
+            currentSection = id;
+            break;
+          }
+        }
+      }
+
+      if (currentSection) {
+        const targetPath = `/${currentSection}`;
+        if (window.location.pathname !== targetPath) {
+          window.history.replaceState(null, "", targetPath);
+        }
+      }
+    };
+
+    const onNavClickCustom = () => {
+      isNavigating = true;
+      clearTimeout(navigatingTimeout);
+      navigatingTimeout = setTimeout(() => {
+        isNavigating = false;
+      }, 900);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("nav-scroll-start", onNavClickCustom);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("nav-scroll-start", onNavClickCustom);
+      clearTimeout(navigatingTimeout);
+    };
+  }, []);
+
   useMotionValueEvent(scrollYProgress, "change", (current) => {
     // Check if current is not undefined and is a number
     if (typeof current === "number") {
-      const direction = current! - scrollYProgress.getPrevious()!;
+      const prev = scrollYProgress.getPrevious() ?? 0;
+      const direction = current - prev;
 
-      if (scrollYProgress.get() < 0.05) {
+      if (current < 0.05) {
         // also set true for the initial state
         setVisible(true);
       } else {
@@ -42,6 +119,22 @@ export const FloatingNav = ({
       }
     }
   });
+
+  const handleNavClick = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    link: string
+  ) => {
+    e.preventDefault();
+    const sectionId = link.replace(/^\//, "").replace(/^#/, "");
+    const element = document.getElementById(sectionId);
+    if (element) {
+      window.dispatchEvent(
+        new CustomEvent("nav-scroll-start", { detail: { link } })
+      );
+      element.scrollIntoView({ behavior: "smooth" });
+      window.history.replaceState(null, "", link);
+    }
+  };
 
   return (
     <AnimatePresence mode="wait">
@@ -72,23 +165,17 @@ export const FloatingNav = ({
       >
         {navItems.map((navItem, idx: number) => (
           <Link
-            key={`link=${idx}`}
+            key={`nav-link-${idx}-${navItem.name}`}
             href={navItem.link}
+            onClick={(e) => handleNavClick(e, navItem.link)}
             className={cn(
-              "relative dark:text-neutral-50 items-center  flex space-x-1 text-neutral-600 dark:hover:text-neutral-300 hover:text-neutral-500"
+              "relative dark:text-neutral-50 items-center flex space-x-1 text-neutral-600 dark:hover:text-neutral-300 hover:text-neutral-500"
             )}
           >
             <span className="block sm:hidden">{navItem.icon}</span>
-            {/* add !cursor-pointer */}
-            {/* remove hidden sm:block for the mobile responsive */}
-            <span className=" text-sm !cursor-pointer">{navItem.name}</span>
+            <span className="text-sm !cursor-pointer">{navItem.name}</span>
           </Link>
         ))}
-        {/* remove this login btn */}
-        {/* <button className="border text-sm font-medium relative border-neutral-200 dark:border-white/[0.2] text-black dark:text-white px-4 py-2 rounded-full">
-          <span>Login</span>
-          <span className="absolute inset-x-0 w-1/2 mx-auto -bottom-px bg-gradient-to-r from-transparent via-blue-500 to-transparent  h-px" />
-        </button> */}
       </motion.div>
     </AnimatePresence>
   );

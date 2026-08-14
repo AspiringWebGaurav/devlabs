@@ -36,8 +36,8 @@ export const BackgroundGradientAnimation = ({
   const interactiveRef = useRef<HTMLDivElement>(null);
   const curXRef = useRef(0);
   const curYRef = useRef(0);
-  const [tgX, setTgX] = useState(0);
-  const [tgY, setTgY] = useState(0);
+  const tgXRef = useRef(0);
+  const tgYRef = useRef(0);
 
   useEffect(() => {
     document.body.style.setProperty(
@@ -81,28 +81,33 @@ export const BackgroundGradientAnimation = ({
     thirdColor,
   ]);
 
+  // High-performance RAF animation loop without React re-render overhead
   useEffect(() => {
+    let animationFrameId: number;
+
     function move() {
-      if (!interactiveRef.current) {
-        return;
+      if (interactiveRef.current) {
+        curXRef.current += (tgXRef.current - curXRef.current) / 20;
+        curYRef.current += (tgYRef.current - curYRef.current) / 20;
+        interactiveRef.current.style.transform = `translate(${Math.round(
+          curXRef.current
+        )}px, ${Math.round(curYRef.current)}px)`;
       }
-      curXRef.current += (tgX - curXRef.current) / 20;
-      curYRef.current += (tgY - curYRef.current) / 20;
-      interactiveRef.current.style.transform = `translate(${Math.round(
-        curXRef.current
-      )}px, ${Math.round(curYRef.current)}px)`;
+      animationFrameId = requestAnimationFrame(move);
     }
 
-    move();
-  }, [tgX, tgY]);
+    animationFrameId = requestAnimationFrame(move);
 
-
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
 
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     if (interactiveRef.current) {
       const rect = interactiveRef.current.getBoundingClientRect();
-      setTgX(event.clientX - rect.left);
-      setTgY(event.clientY - rect.top);
+      tgXRef.current = event.clientX - rect.left;
+      tgYRef.current = event.clientY - rect.top;
     }
   };
 

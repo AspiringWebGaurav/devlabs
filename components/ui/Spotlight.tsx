@@ -9,8 +9,13 @@ type SpotlightProps = {
 export const Spotlight = ({ className, fill }: SpotlightProps) => {
   return (
     <svg
+      style={{
+        animation: "spotlightFade 1.2s ease-out 0.15s both",
+        transform: "translate(-50%, -40%) translate3d(0,0,0)",
+        willChange: "opacity",
+      }}
       className={cn(
-        "animate-spotlight pointer-events-none absolute z-[1]  h-[169%] w-[138%] lg:w-[84%] opacity-0",
+        "pointer-events-none absolute z-[1] h-[169%] w-[138%] lg:w-[84%]",
         className
       )}
       xmlns="http://www.w3.org/2000/svg"

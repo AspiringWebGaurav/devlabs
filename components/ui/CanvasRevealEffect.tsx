@@ -193,15 +193,15 @@ const ShaderMaterial = ({
 }) => {
   const { size } = useThree();
   const ref = useRef<THREE.Mesh>(null);
-  let lastFrameTime = 0;
+  const lastFrameTimeRef = useRef(0);
 
   useFrame(({ clock }) => {
     if (!ref.current) return;
     const timestamp = clock.getElapsedTime();
-    if (timestamp - lastFrameTime < 1 / maxFps) {
+    if (timestamp - lastFrameTimeRef.current < 1 / maxFps) {
       return;
     }
-    lastFrameTime = timestamp;
+    lastFrameTimeRef.current = timestamp;
 
     const material = ref.current.material as THREE.ShaderMaterial;
     if (material && material.uniforms && material.uniforms.u_time) {
@@ -283,6 +283,31 @@ const ShaderMaterial = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size.width, size.height, source]);
 
+  // Dynamically sync uniforms without rebuilding shader material
+  useEffect(() => {
+    if (!material || !material.uniforms) return;
+    for (const uniformName in uniforms) {
+      const uniform = uniforms[uniformName];
+      if (material.uniforms[uniformName]) {
+        if (uniform.type === "uniform3fv") {
+          material.uniforms[uniformName].value = (
+            uniform.value as number[][]
+          ).map((v) => new THREE.Vector3().fromArray(v));
+        } else if (uniform.type === "uniform3f") {
+          material.uniforms[uniformName].value = new THREE.Vector3().fromArray(
+            uniform.value as number[]
+          );
+        } else if (uniform.type === "uniform2f") {
+          material.uniforms[uniformName].value = new THREE.Vector2().fromArray(
+            uniform.value as number[]
+          );
+        } else {
+          material.uniforms[uniformName].value = uniform.value;
+        }
+      }
+    }
+  }, [material, uniforms]);
+
   useEffect(() => {
     return () => {
       material.dispose();
@@ -300,7 +325,11 @@ const ShaderMaterial = ({
 
 const Shader: React.FC<ShaderProps> = ({ source, uniforms, maxFps = 60 }) => {
   return (
-    <Canvas className="absolute inset-0  h-full w-full">
+    <Canvas
+      dpr={[1, 2]}
+      gl={{ powerPreference: "high-performance" }}
+      className="absolute inset-0 h-full w-full"
+    >
       <ShaderMaterial source={source} uniforms={uniforms} maxFps={maxFps} />
     </Canvas>
   );

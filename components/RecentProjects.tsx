@@ -33,22 +33,16 @@ const RecentProjects = () => {
                 {title}
               </h1>
 
-              <p
-                className="lg:text-xl lg:font-normal font-light text-sm line-clamp-2"
-                style={{
-                  color: "#BEC1DD",
-                  margin: "1vh 0",
-                }}
-              >
+              <p className="text-white-200 text-sm md:text-base font-normal line-clamp-2 my-2 leading-relaxed">
                 {des}
               </p>
 
-              <div className="flex items-center justify-between mt-7 mb-3">
+              <div className="flex items-center justify-between mt-6 mb-2">
                 <div className="flex items-center">
                   {iconLists.map((icon, index) => (
                     <div
                       key={index}
-                      className="border border-white/[.2] rounded-full bg-black lg:w-10 lg:h-10 w-8 h-8 flex justify-center items-center"
+                      className="border border-white/[.15] rounded-full bg-[#04071D] lg:w-9 lg:h-9 w-8 h-8 flex justify-center items-center shadow-sm"
                       style={{
                         transform: `translateX(-${5 * index + 2}px)`,
                       }}
@@ -63,10 +57,10 @@ const RecentProjects = () => {
                     href={link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex lg:text-xl md:text-xs text-sm text-purple"
+                    className="flex items-center gap-2 text-xs sm:text-sm text-purple hover:text-white transition-colors duration-200 font-medium group/link"
                   >
                     Check Live Site
-                    <FaLocationArrow className="ms-3" color="#CBACF9" />
+                    <FaLocationArrow className="w-3 h-3 text-purple group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform duration-200" />
                   </a>
                 </div>
               </div>

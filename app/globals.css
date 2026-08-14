@@ -92,3 +92,26 @@
     background: linear-gradient(90deg, #161a31 0%, #06091f 100%);
   }
 }
+
+@keyframes textGlideIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.93);
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes spotlightFade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
