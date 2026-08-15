@@ -100,7 +100,7 @@ const Hero = () => {
               y: indicatorY,
               scale: indicatorScale,
             }}
-            className="mt-8 sm:mt-12 flex flex-col items-center justify-center cursor-pointer group"
+            className="mt-8 sm:mt-12 flex flex-col items-center justify-center cursor-pointer group select-none"
             onClick={handleScrollToAbout}
           >
             <motion.div
@@ -110,35 +110,39 @@ const Hero = () => {
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
-              className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-white/10 bg-white/[0.03] backdrop-blur-md hover:border-purple/40 hover:bg-white/[0.06] transition-all duration-300 shadow-[0_0_15px_rgba(203,172,249,0.1)] hover:shadow-[0_0_20px_rgba(203,172,249,0.25)]"
+              className="flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-white/[0.12] bg-[#04071D]/80 backdrop-blur-xl hover:border-purple/50 hover:bg-[#0c0e23]/90 transition-all duration-300 shadow-[0_8px_24px_rgba(0,0,0,0.35),0_0_15px_rgba(203,172,249,0.12)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.45),0_0_25px_rgba(203,172,249,0.25)]"
             >
-              {/* Animated Mouse Icon */}
-              <div className="w-4 h-7 rounded-full border border-white-200/50 flex items-start justify-center p-0.5 group-hover:border-purple transition-colors">
+              {/* Animated Sleek Mouse Icon */}
+              <div className="w-4 h-6 rounded-full border-[1.5px] border-white-200/50 flex items-start justify-center pt-1 group-hover:border-purple transition-colors">
                 <motion.div
                   animate={{
-                    y: [0, 8, 0],
-                    opacity: [1, 0.3, 1],
+                    y: [0, 5, 0],
+                    opacity: [1, 0.35, 1],
                   }}
                   transition={{
                     duration: 1.5,
                     repeat: Infinity,
                     ease: "easeInOut",
                   }}
-                  className="w-1 h-1.5 rounded-full bg-purple"
+                  className="w-1 h-1.5 rounded-full bg-purple shadow-[0_0_6px_#CBACF9]"
                 />
               </div>
-              <span className="text-[11px] uppercase tracking-widest text-white-200 group-hover:text-purple transition-colors font-medium">
+
+              {/* Refined Letter-Spaced Typography */}
+              <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] text-white-200/90 group-hover:text-white transition-colors font-medium">
                 Scroll to explore
               </span>
+
+              {/* Pulsing Chevron Indicator */}
               <motion.div
-                animate={{ y: [0, 3, 0] }}
+                animate={{ y: [0, 2, 0] }}
                 transition={{
                   duration: 1.5,
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
               >
-                <FaChevronDown className="w-2.5 h-2.5 text-purple" />
+                <FaChevronDown className="w-2.5 h-2.5 text-purple/80 group-hover:text-purple transition-colors" />
               </motion.div>
             </motion.div>
           </motion.div>
