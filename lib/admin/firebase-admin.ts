@@ -6,6 +6,12 @@ let _adminApp: App | null = null;
 let _adminAuth: Auth | null = null;
 let _adminDb: Database | null = null;
 
+export function isFirebaseAdminConfigured(): boolean {
+  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+  return !!(privateKey && privateKey.trim() && clientEmail && clientEmail.trim());
+}
+
 function getInitializedAdminApp(): App {
   if (_adminApp) return _adminApp;
   if (getApps().length > 0) {
