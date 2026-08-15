@@ -24,10 +24,10 @@ function getOtpStore(): Map<string, StoredOTP> {
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-const SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_OTP_SERVICE_ID || "service_535l4zv";
-const TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_OTP_TEMPLATE_ID || "template_c4ssi9h";
-const PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_OTP_PUBLIC_KEY || "bqw25ys2kjIVhY4cD";
-const PRIVATE_KEY = process.env.EMAILJS_OTP_PRIVATE_KEY;
+const SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_OTP_SERVICE_ID || "";
+const TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_OTP_TEMPLATE_ID || "";
+const PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_OTP_PUBLIC_KEY || "";
+const PRIVATE_KEY = process.env.EMAILJS_OTP_PRIVATE_KEY || "";
 
 /**
  * Computes SHA-256 hash for OTP validation.
