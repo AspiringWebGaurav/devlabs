@@ -47,6 +47,17 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  transpilePackages: ["three", "three-globe"],
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+        ignored: ["**/node_modules", "**/.next", "**/.git"],
+      };
+    }
+    return config;
+  },
   async headers() {
     return [
       {

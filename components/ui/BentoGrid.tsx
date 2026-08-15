@@ -1,8 +1,9 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { IoCopyOutline } from "react-icons/io5";
 
-import Lottie from "lottie-react";
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 import { cn } from "@/lib/utils";
 

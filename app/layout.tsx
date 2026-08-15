@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { ThemeProvider } from "./provider";
+import { RouteProgressBar } from "@/components/ui/RouteProgressBar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,6 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://gauravpatil.online"),
   title: "Gaurav's Portfolio",
   description: "Modern, Slick and Minimalist Developer Portfolio",
 };
@@ -35,6 +37,7 @@ export default function RootLayout({
           forcedTheme="dark"
           disableTransitionOnChange
         >
+          <RouteProgressBar />
           {children}
           <Analytics />
           <SpeedInsights />

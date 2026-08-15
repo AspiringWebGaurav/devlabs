@@ -1,8 +1,12 @@
 "use client";
 import React from "react";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 
-import { CanvasRevealEffect } from "./ui/CanvasRevealEffect";
+const CanvasRevealEffect = dynamic(
+  () => import("./ui/CanvasRevealEffect").then((mod) => mod.CanvasRevealEffect),
+  { ssr: false }
+);
 
 const Approach = () => {
   return (

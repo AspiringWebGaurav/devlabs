@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "dev:turbo": "next dev --turbo",
+    "clean": "node -e \"const fs=require('fs'); fs.rmSync('.next',{recursive:true,force:true});\"",
+    "dev:clean": "npm run clean && next dev",
+    "dev:clear": "npm run clean && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
