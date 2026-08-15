@@ -11,16 +11,16 @@ const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 // In-memory fallback cache
 interface GlobalTotpCache {
-  __devlabs_totp_secret?: string;
-  __devlabs_totp_attempts?: {
+  __admin_totp_secret?: string;
+  __admin_totp_attempts?: {
     count: number;
     lockoutUntil?: number;
   };
 }
 
 const globalForTotp = globalThis as unknown as GlobalTotpCache;
-if (!globalForTotp.__devlabs_totp_attempts) {
-  globalForTotp.__devlabs_totp_attempts = { count: 0 };
+if (!globalForTotp.__admin_totp_attempts) {
+  globalForTotp.__admin_totp_attempts = { count: 0 };
 }
 
 /**
@@ -46,7 +46,7 @@ export async function getStoredTOTPSecret(): Promise<string | null> {
       if (res.ok) {
         const json = await res.json();
         if (json.result && typeof json.result === "string" && json.result.trim()) {
-          globalForTotp.__devlabs_totp_secret = json.result.trim();
+          globalForTotp.__admin_totp_secret = json.result.trim();
           return json.result.trim();
         }
       }
@@ -55,7 +55,7 @@ export async function getStoredTOTPSecret(): Promise<string | null> {
     }
   }
 
-  return globalForTotp.__devlabs_totp_secret || null;
+  return globalForTotp.__admin_totp_secret || null;
 }
 
 /**
@@ -63,7 +63,7 @@ export async function getStoredTOTPSecret(): Promise<string | null> {
  */
 export async function saveTOTPSecret(secret: string): Promise<void> {
   const cleanSecret = secret.trim();
-  globalForTotp.__devlabs_totp_secret = cleanSecret;
+  globalForTotp.__admin_totp_secret = cleanSecret;
 
   if (REDIS_URL && REDIS_TOKEN) {
     try {
@@ -89,7 +89,7 @@ export function checkTOTPAttemptStatus(): {
   attemptsLeft: number;
   lockTimeRemainingSeconds: number;
 } {
-  const state = globalForTotp.__devlabs_totp_attempts || { count: 0 };
+  const state = globalForTotp.__admin_totp_attempts || { count: 0 };
   const now = Date.now();
 
   if (state.lockoutUntil && state.lockoutUntil > now) {
@@ -121,11 +121,11 @@ export function recordFailedTOTPAttempt(): {
   isLockedOut: boolean;
   attemptsLeft: number;
 } {
-  if (!globalForTotp.__devlabs_totp_attempts) {
-    globalForTotp.__devlabs_totp_attempts = { count: 0 };
+  if (!globalForTotp.__admin_totp_attempts) {
+    globalForTotp.__admin_totp_attempts = { count: 0 };
   }
 
-  const state = globalForTotp.__devlabs_totp_attempts;
+  const state = globalForTotp.__admin_totp_attempts;
   state.count += 1;
 
   if (state.count >= MAX_TOTP_ATTEMPTS) {
@@ -143,7 +143,7 @@ export function recordFailedTOTPAttempt(): {
  * Resets TOTP attempts upon successful validation.
  */
 export function resetTOTPAttempts(): void {
-  globalForTotp.__devlabs_totp_attempts = { count: 0 };
+  globalForTotp.__admin_totp_attempts = { count: 0 };
 }
 
 /**

@@ -91,7 +91,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                   1. Authorized Administrative Identity
                 </h3>
                 <p>
-                  Access to this administrative portal is restricted exclusively to authorized Devlabs administrators. Authentication requires verified Google OAuth credentials matching <code className="bg-[#F5F5F5] px-1 py-0.5 rounded-xs font-admin-mono text-black font-semibold">gauravpatil9262@gmail.com</code> combined with second-factor dynamic email OTP and third-factor Google Authenticator (TOTP) verification.
+                  Access to this administrative portal is restricted exclusively to authorized Gaurav Portfolio administrators. Authentication requires verified Google OAuth credentials matching <code className="bg-[#F5F5F5] px-1 py-0.5 rounded-xs font-admin-mono text-black font-semibold">gauravpatil9262@gmail.com</code> combined with second-factor dynamic email OTP and third-factor Google Authenticator (TOTP) verification.
                 </p>
               </section>
 
@@ -168,7 +168,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                   3. Cookie & Session Governance
                 </h3>
                 <p>
-                  We utilize secure HTTP cookies (<code className="bg-[#F5F5F5] px-1 py-0.5 rounded-xs font-admin-mono text-black font-semibold">devlabs_admin_session</code>) scoped with <code className="bg-[#F5F5F5] px-1 py-0.5 rounded-xs font-admin-mono text-black">SameSite=Lax</code> and 8-hour expiry timestamps. No commercial trackers, third-party analytics pixels, or advertising identifiers are deployed.
+                  We utilize secure HTTP cookies (<code className="bg-[#F5F5F5] px-1 py-0.5 rounded-xs font-admin-mono text-black font-semibold">admin_session</code>) scoped with <code className="bg-[#F5F5F5] px-1 py-0.5 rounded-xs font-admin-mono text-black">SameSite=Lax</code> and 8-hour expiry timestamps. No commercial trackers, third-party analytics pixels, or advertising identifiers are deployed.
                 </p>
               </section>
 
@@ -188,7 +188,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
         {/* Footer */}
         <div className="p-4 sm:p-5 border-t border-[#F0F0F0] bg-[#FAFAFA] flex items-center justify-between">
           <span className="text-[11px] font-admin-mono text-[#737373]">
-            Devlabs Security Subsystem &bull; 2026
+            Gaurav Portfolio Security Subsystem &bull; 2026
           </span>
           <button
             onClick={onClose}

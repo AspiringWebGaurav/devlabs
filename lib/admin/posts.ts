@@ -3,7 +3,7 @@ import { AdminMetric, AdminTimeSeriesPoint, AdminActivityItem } from "@/types/ad
 import { getAllPosts } from "@/lib/blog";
 
 /**
- * Returns overview metrics modeled after Shiro's productivity/content stats.
+ * Returns overview metrics for content and productivity stats.
  */
 export async function getAdminMetrics(): Promise<AdminMetric[]> {
   const posts = await getAllPosts();
@@ -51,7 +51,7 @@ export async function getAdminMetrics(): Promise<AdminMetric[]> {
 }
 
 /**
- * Returns time-series chart data matching Shiro's team productivity graph curve.
+ * Returns time-series chart data for analytics curve.
  */
 export function getAdminAnalyticsSeries(): AdminTimeSeriesPoint[] {
   return [
@@ -81,7 +81,7 @@ export function getAdminRecentActivity(): AdminActivityItem[] {
     {
       id: "act_02",
       type: "project_updated",
-      title: "Devlabs Portfolio v4.0.0 released",
+      title: "Gaurav Portfolio v4.0.0 released",
       timestamp: "Yesterday at 6:40 PM",
       actor: "System",
       meta: "Production deployment verified",
@@ -91,7 +91,7 @@ export function getAdminRecentActivity(): AdminActivityItem[] {
       type: "login",
       title: "Admin authenticated via Google OAuth",
       timestamp: "Today at 9:15 AM",
-      actor: "admin@devlabs.io",
+      actor: "admin@gauravpatil.online",
       meta: "IP: 192.168.0.154",
     },
   ];

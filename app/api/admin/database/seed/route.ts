@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { seedDefaultDatabase } from "@/lib/admin/database";
+import { ADMIN_COOKIE_NAME } from "@/lib/admin/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
     // 1. Verify Admin Session Cookie
-    const sessionCookie = request.cookies.get("devlabs_admin_session");
+    const sessionCookie = request.cookies.get(ADMIN_COOKIE_NAME);
     if (!sessionCookie || !sessionCookie.value) {
       return NextResponse.json({ success: false, error: "Unauthorized: Admin session required." }, { status: 401 });
     }

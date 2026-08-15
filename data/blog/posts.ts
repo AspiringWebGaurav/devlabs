@@ -400,7 +400,7 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
           role: "Design System Lead"
         },
         createdAt: "3 weeks ago",
-        content: "The tip on avoiding pure #FFFFFF for body text in dark mode is so crucial. The off-white #C1C2D3 token looks incredible in devlabs.",
+        content: "The tip on avoiding pure #FFFFFF for body text in dark mode is so crucial. The off-white #C1C2D3 token looks incredible in Gaurav Portfolio.",
         likesCount: 12
       }
     ]

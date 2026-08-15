@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
 
   // Only handle admin routes
   if (pathname.startsWith("/admin")) {
-    const sessionCookie = request.cookies.get("devlabs_admin_session");
+    const sessionCookie = request.cookies.get("admin_session");
     let isAuthenticated = false;
 
     if (sessionCookie && sessionCookie.value) {
@@ -43,7 +43,7 @@ export function middleware(request: NextRequest) {
       const response = NextResponse.redirect(loginUrl);
       // Clean up stale/expired session cookie
       if (sessionCookie) {
-        response.cookies.delete("devlabs_admin_session");
+        response.cookies.delete("admin_session");
       }
       return response;
     }

@@ -42,7 +42,7 @@ export default function AdminPrivacyPage() {
             <span>Admin Privacy & Data Policy</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B]">
-            Data handling, Google Authenticator Base32 cryptographic tokens, and storage standards for Devlabs.
+            Data handling, Google Authenticator Base32 cryptographic tokens, and storage standards for Gaurav Portfolio.
           </p>
         </div>
 
@@ -80,7 +80,7 @@ export default function AdminPrivacyPage() {
               3. Cookie & Session Governance
             </h2>
             <p>
-              We utilize secure HTTP cookies (<code className="bg-[#F5F5F5] px-1.5 py-0.5 rounded-xs font-mono text-black font-semibold">devlabs_admin_session</code>) scoped with <code className="bg-[#F5F5F5] px-1.5 py-0.5 rounded-xs font-mono text-black">SameSite=Lax</code> and 8-hour expiry timestamps. No commercial trackers, third-party analytics pixels, or advertising identifiers are deployed.
+              We utilize secure HTTP cookies (<code className="bg-[#F5F5F5] px-1.5 py-0.5 rounded-xs font-mono text-black font-semibold">admin_session</code>) scoped with <code className="bg-[#F5F5F5] px-1.5 py-0.5 rounded-xs font-mono text-black">SameSite=Lax</code> and 8-hour expiry timestamps. No commercial trackers, third-party analytics pixels, or advertising identifiers are deployed.
             </p>
           </section>
 

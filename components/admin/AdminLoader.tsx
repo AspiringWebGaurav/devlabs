@@ -24,7 +24,7 @@ export const AdminLoader: React.FC<AdminLoaderProps> = ({
         <div className="fixed inset-0 bg-[linear-gradient(to_right,#E5E7EB_1px,transparent_1px),linear-gradient(to_bottom,#E5E7EB_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none z-0 opacity-70" />
       )}
 
-      {/* Shiro-Inspired Minimal Geometric Loader Frame */}
+      {/* Minimalist Geometric Loader Frame */}
       <div className="flex flex-col items-center gap-6 p-8 max-w-xs text-center relative z-10">
         {/* Animated Geometric Aperture */}
         <div className="relative w-12 h-12 flex items-center justify-center">

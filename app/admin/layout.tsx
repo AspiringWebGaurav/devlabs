@@ -45,7 +45,7 @@ export default function AdminLayout({
     router.push("/admin/login?reason=session_expired");
   }, [router]);
 
-  // Enforce Shiro Light Theme on <html> and <body> for all Admin views
+  // Enforce Clean Light Theme on <html> and <body> for all Admin views
   useEffect(() => {
     const htmlEl = document.documentElement;
     const bodyEl = document.body;

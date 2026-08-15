@@ -11,14 +11,14 @@ export interface StoredOTP {
 
 // In-memory dual-layer store to survive Next.js fast refresh
 const globalForOtp = globalThis as unknown as {
-  __devlabs_otp_store?: Map<string, StoredOTP>;
+  __admin_otp_store?: Map<string, StoredOTP>;
 };
 
 function getOtpStore(): Map<string, StoredOTP> {
-  if (!globalForOtp.__devlabs_otp_store) {
-    globalForOtp.__devlabs_otp_store = new Map<string, StoredOTP>();
+  if (!globalForOtp.__admin_otp_store) {
+    globalForOtp.__admin_otp_store = new Map<string, StoredOTP>();
   }
-  return globalForOtp.__devlabs_otp_store;
+  return globalForOtp.__admin_otp_store;
 }
 
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");

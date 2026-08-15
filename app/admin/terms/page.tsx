@@ -42,7 +42,7 @@ export default function AdminTermsPage() {
             <span>Admin Terms of Service</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B]">
-            Governance, 3-factor multi-layer security, attempt rate-limiting, and access authorization standards for Devlabs.
+            Governance, 3-factor multi-layer security, attempt rate-limiting, and access authorization standards for Gaurav Portfolio.
           </p>
         </div>
 
@@ -54,7 +54,7 @@ export default function AdminTermsPage() {
               1. Authorized Administrative Identity
             </h2>
             <p>
-              Access to this administrative portal is strictly restricted to authorized Devlabs administrators. Authentication requires verified Google OAuth credentials matching <code className="bg-[#F5F5F5] px-1.5 py-0.5 rounded-xs font-mono text-black font-semibold">gauravpatil9262@gmail.com</code> combined with second-factor dynamic email OTP and third-factor Google Authenticator (TOTP) verification.
+              Access to this administrative portal is strictly restricted to authorized Gaurav Portfolio administrators. Authentication requires verified Google OAuth credentials matching <code className="bg-[#F5F5F5] px-1.5 py-0.5 rounded-xs font-mono text-black font-semibold">gauravpatil9262@gmail.com</code> combined with second-factor dynamic email OTP and third-factor Google Authenticator (TOTP) verification.
             </p>
           </section>
 

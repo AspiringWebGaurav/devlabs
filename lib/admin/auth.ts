@@ -1,7 +1,7 @@
 import { AdminSession, AdminUser } from "@/types/admin";
 import { auth, googleProvider, signInWithPopup, signOut } from "@/lib/admin/firebase";
 
-export const ADMIN_COOKIE_NAME = "devlabs_admin_session";
+export const ADMIN_COOKIE_NAME = "admin_session";
 export const AUTHORIZED_ADMIN_EMAIL = "gauravpatil9262@gmail.com";
 export const AUTHORIZED_ADMIN_HASH = "51244b59576a3a706630b1f136520a35105bfb9bb06b0c064e171cb788549637";
 

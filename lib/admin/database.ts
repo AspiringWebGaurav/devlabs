@@ -33,12 +33,12 @@ interface RuntimeStore {
 }
 
 const globalForDb = globalThis as unknown as {
-  __devlabs_runtime_store?: RuntimeStore;
+  __admin_runtime_store?: RuntimeStore;
 };
 
 function getRuntimeStore(): RuntimeStore {
-  if (!globalForDb.__devlabs_runtime_store) {
-    globalForDb.__devlabs_runtime_store = {
+  if (!globalForDb.__admin_runtime_store) {
+    globalForDb.__admin_runtime_store = {
       posts: [...defaultPosts],
       projects: [...defaultProjects],
       messages: [
@@ -51,14 +51,14 @@ function getRuntimeStore(): RuntimeStore {
         },
       ],
       subscribers: [
-        { id: "sub_01", email: "tech@devlabs.io", subscribedAt: new Date().toISOString() },
+        { id: "sub_01", email: "contact@gauravpatil.online", subscribedAt: new Date().toISOString() },
       ],
       telemetryNodes: [],
       isPurged: false,
       lastPurgedAt: null,
     };
   }
-  return globalForDb.__devlabs_runtime_store;
+  return globalForDb.__admin_runtime_store;
 }
 
 // Timeout helper to avoid infinite hanging
@@ -240,7 +240,7 @@ export async function seedDefaultDatabase(): Promise<{
       },
     },
     subscribers: {
-      sub_01: { id: "sub_01", email: "tech@devlabs.io", subscribedAt: new Date().toISOString() },
+      sub_01: { id: "sub_01", email: "contact@gauravpatil.online", subscribedAt: new Date().toISOString() },
     },
     meta: {
       purged: false,
@@ -266,7 +266,7 @@ export async function seedDefaultDatabase(): Promise<{
       date: new Date().toISOString(),
     },
   ];
-  store.subscribers = [{ id: "sub_01", email: "tech@devlabs.io", subscribedAt: new Date().toISOString() }];
+  store.subscribers = [{ id: "sub_01", email: "contact@gauravpatil.online", subscribedAt: new Date().toISOString() }];
   store.isPurged = false;
   store.lastPurgedAt = null;
 
