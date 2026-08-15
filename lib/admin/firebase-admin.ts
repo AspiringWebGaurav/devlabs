@@ -1,9 +1,14 @@
 import { getApps, getApp, initializeApp, cert, App } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getDatabase } from "firebase-admin/database";
+import { getAuth, Auth } from "firebase-admin/auth";
+import { getDatabase, Database } from "firebase-admin/database";
 
-const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
-const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL || "";
+const projectId =
+  process.env.FIREBASE_ADMIN_PROJECT_ID ||
+  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+  "portfolio-admin";
+const clientEmail =
+  process.env.FIREBASE_ADMIN_CLIENT_EMAIL ||
+  "admin@portfolio-admin.iam.gserviceaccount.com";
 let privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY || "";
 
 // Fix multiline escaped private keys
@@ -14,7 +19,9 @@ if (privateKey) {
   }
 }
 
-const databaseURL = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "";
+const databaseURL =
+  process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
+  "https://portfolio-admin-default-rtdb.firebaseio.com";
 
 let adminApp: App;
 
@@ -30,16 +37,15 @@ if (getApps().length === 0) {
         databaseURL,
       });
     } else {
-      adminApp = initializeApp({ databaseURL });
+      adminApp = initializeApp({ projectId, databaseURL });
     }
-  } catch (error) {
-    console.error("Firebase Admin initialization error:", error);
-    adminApp = initializeApp({ databaseURL });
+  } catch {
+    adminApp = initializeApp({ projectId, databaseURL }, "admin-fallback");
   }
 } else {
   adminApp = getApp();
 }
 
-export const adminAuth = getAuth(adminApp);
-export const adminDb = getDatabase(adminApp);
+export const adminAuth: Auth = getAuth(adminApp);
+export const adminDb: Database = getDatabase(adminApp);
 export { adminApp };
