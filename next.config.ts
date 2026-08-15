@@ -37,7 +37,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' blob: data: https:",
       "font-src 'self' data: https://fonts.gstatic.com",
-      "connect-src 'self' blob: data: https://vitals.vercel-insights.com https://va.vercel-scripts.com",
+      "connect-src 'self' blob: data: ws: wss: https://vitals.vercel-insights.com https://va.vercel-scripts.com",
       "worker-src 'self' blob:",
       "frame-ancestors 'none'",
     ].join("; "),
@@ -48,6 +48,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["three", "three-globe"],
+  // Allow cross-origin dev access from local network IPs (e.g. mobile devices)
+  // @ts-ignore - Next.js 15 allowedDevOrigins option
+  allowedDevOrigins: [
+    "localhost:3000",
+    "127.0.0.1:3000",
+    "192.168.0.154:3000",
+    "192.168.0.154",
+  ],
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
