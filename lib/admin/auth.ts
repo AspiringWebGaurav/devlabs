@@ -65,9 +65,30 @@ export async function authenticateWithGooglePreOTP(): Promise<{
       };
     }
 
+    if (err?.code === "auth/unauthorized-domain") {
+      return {
+        success: false,
+        error: "Domain not authorized in Firebase. Please add this domain under Firebase Console > Authentication > Settings > Authorized domains.",
+      };
+    }
+
+    if (err?.code === "auth/invalid-api-key" || !process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+      return {
+        success: false,
+        error: "Firebase API key missing. Please add NEXT_PUBLIC_FIREBASE_* variables in Vercel Project Settings > Environment Variables.",
+      };
+    }
+
+    if (err?.code === "auth/popup-blocked") {
+      return {
+        success: false,
+        error: "Google sign-in popup was blocked by browser. Please enable popups for this site.",
+      };
+    }
+
     return {
       success: false,
-      error: "Google authentication handshake failed. Please try again.",
+      error: err?.message || "Google authentication handshake failed. Please try again.",
     };
   }
 }
