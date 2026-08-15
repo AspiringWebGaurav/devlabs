@@ -65,6 +65,7 @@ export interface BlogPost {
   publishedAt: string; // e.g. "Aug 15, 2025"
   readingTime: string; // e.g. "5 min read"
   featured?: boolean;
+  views?: number;
   content: {
     intro: string;
     sections: ArticleSection[];

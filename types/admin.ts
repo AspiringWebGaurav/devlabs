@@ -1,0 +1,56 @@
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: "superadmin" | "editor";
+  avatar?: string;
+  issuedAt?: number;
+  expiresAt?: number;
+  lastActiveAt?: number;
+}
+
+export interface AdminSession {
+  user: AdminUser | null;
+  isAuthenticated: boolean;
+  token?: string;
+  expiresInMs?: number;
+}
+
+export interface AdminMetric {
+  id: string;
+  label: string;
+  value: string | number;
+  change: string;
+  trend: "up" | "down" | "neutral";
+  category: "productivity" | "traffic" | "content" | "system";
+  detail: string;
+}
+
+export interface AdminTimeSeriesPoint {
+  date: string;
+  views: number;
+  deepFocusHours: number;
+  sessions: number;
+}
+
+export interface AdminActivityItem {
+  id: string;
+  type: "post_published" | "post_drafted" | "project_updated" | "login";
+  title: string;
+  timestamp: string;
+  actor: string;
+  meta?: string;
+}
+
+export interface AdminPostFormData {
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  category: string;
+  tags: string[];
+  coverImage: string;
+  featured: boolean;
+  published: boolean;
+  readingTime?: string;
+}

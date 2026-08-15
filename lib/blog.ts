@@ -1,16 +1,15 @@
 import { BlogPost, BlogCategory, Author } from "@/types/blog";
-import { posts as staticPosts } from "@/data/blog/posts";
+import { getActiveDbPosts } from "@/lib/admin/database";
 import { categories as staticCategories } from "@/data/blog/categories";
 import { authors as staticAuthors } from "@/data/blog/authors";
 
 /**
  * Data Access Layer (DAL) for Blog subsystem.
- * Future migration to Firestore, Supabase, or headless CMS only requires
- * updating the fetching logic inside this file.
+ * Mediates dynamic database queries and allows nuclear purge to wipe data to 0 live.
  */
 
 export async function getAllPosts(): Promise<BlogPost[]> {
-  return staticPosts;
+  return getActiveDbPosts();
 }
 
 export async function getPostBySlug(slug: string): Promise<BlogPost | null> {

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { FaPlay, FaEye, FaLayerGroup, FaArrowLeft } from "react-icons/fa";
 import { Spotlight } from "@/components/ui/Spotlight";
-import RootLoading from "@/app/loading";
+import PortfolioLoader from "@/components/portfolio/PortfolioLoader";
 import BlogListingLoading from "@/app/blog/loading";
 import ArticleDetailLoading from "@/app/blog/[slug]/loading";
 
@@ -217,7 +217,7 @@ export default function LoaderPreviewPage() {
           }}
           className="w-full my-8 rounded-3xl border border-white/[0.1] shadow-input relative flex items-center justify-center min-h-[380px]"
         >
-          <RootLoading embedded />
+          <PortfolioLoader embedded />
         </div>
       )}
 
