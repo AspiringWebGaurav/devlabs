@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 
 const NAV_LINKS = [
-  { num: "01", label: "1", href: "/admin" },
+  { num: "01", label: "Database Wipe", href: "/admin" },
 ];
 
 export const AdminSidebar: React.FC = () => {

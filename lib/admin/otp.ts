@@ -7,7 +7,10 @@ export interface StoredOTP {
   expiresAt: number; // Unix timestamp in ms
   createdAt: number;
   lastSentAt: number;
+  purpose: "login" | "wipe";
 }
+
+export type OtpTemplateMode = "login" | "wipe";
 
 // In-memory dual-layer store to survive Next.js fast refresh
 const globalForOtp = globalThis as unknown as {
@@ -44,29 +47,57 @@ export function generateCryptographicOTP(): string {
 }
 
 /**
- * Dispatches the dynamic OTP email via EmailJS REST API.
+ * Dispatches dynamic OTP email via EmailJS REST API.
+ * Supports dual distinct modes (Login 2FA - Purple vs Database Wipe - Red Danger).
  */
-export async function sendOTPViaEmailJS(
-  toEmail: string,
-  otpCode: string,
-  toName = "Administrator"
-): Promise<{ success: boolean; error?: string }> {
-  const timestamp = new Date().toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "Asia/Kolkata",
-  }) + " IST";
+export async function sendDynamicOtpEmail(params: {
+  toEmail: string;
+  otpCode: string;
+  mode: OtpTemplateMode;
+  toName?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const timestamp =
+    new Date().toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kolkata",
+    }) + " IST";
 
-  const templateParams = {
-    to_email: toEmail.trim(),
-    to_name: toName,
-    from_name: "Admin Security Subsystem",
+  const isWipe = params.mode === "wipe";
+
+  const templateParams: Record<string, string> = {
+    to_email: params.toEmail.trim(),
+    to_name: params.toName || "Administrator",
+    from_name: "GPS Security",
     reply_to: "gauravpatil5737@gmail.com",
-    otp_code: otpCode,
+    otp_code: params.otpCode,
     expires_in_minutes: "5",
     timestamp,
     year: new Date().getFullYear().toString(),
+
+    // Dynamic Theme Parameters
+    email_subject: isWipe
+      ? `CRITICAL: Database Wipe Authorization Code [${params.otpCode}]`
+      : `GPS Admin: Your Verification Code is ${params.otpCode}`,
+    preview_text: isWipe
+      ? `CRITICAL ACTION: Authorization code to permanently wipe database records is ${params.otpCode}.`
+      : `Your admin security verification code is ${params.otpCode}. Valid for 5 minutes.`,
+    action_title: isWipe ? "Confirm Database Wipe" : "Verification Code",
+    action_description: isWipe
+      ? "A request to permanently erase database records was triggered. Enter this code to confirm."
+      : "Enter this code to complete your administrator sign-in.",
+    badge_text: isWipe ? "Danger Zone" : "2FA Security",
+    accent_color: isWipe ? "#DC2626" : "#7C3AED",
+    badge_bg: isWipe ? "#FEF2F2" : "#F5F3FF",
+    badge_border: isWipe ? "#FCA5A5" : "#DDD6FE",
+    otp_bg: isWipe ? "#FEF2F2" : "#F5F3FF",
+    otp_border: isWipe ? "#EF4444" : "#C4B5FD",
+    otp_color: isWipe ? "#DC2626" : "#6D28D9",
+    timer_color: isWipe ? "#DC2626" : "#94A3B8",
+    warning_text: isWipe
+      ? "If you did not initiate this wipe, abort immediately and secure your root credentials."
+      : "If you didn't request this code, you can safely ignore this email.",
   };
 
   const payload: Record<string, unknown> = {
@@ -105,7 +136,7 @@ export async function sendOTPViaEmailJS(
       console.error("EmailJS API send error:", res.status, errText);
       return {
         success: false,
-        error: `EmailJS dispatch notice (${res.status}): ${errText || "Check credentials in EmailJS dashboard"}`,
+        error: `EmailJS dispatch error (${res.status}): ${errText || "Check credentials in EmailJS dashboard"}`,
       };
     }
 
@@ -122,10 +153,35 @@ export async function sendOTPViaEmailJS(
 }
 
 /**
+ * Backward compatibility wrapper for sendOTPViaEmailJS.
+ */
+export async function sendOTPViaEmailJS(
+  toEmail: string,
+  otpCode: string,
+  toName = "Administrator"
+): Promise<{ success: boolean; error?: string }> {
+  return sendDynamicOtpEmail({
+    toEmail,
+    otpCode,
+    mode: "login",
+    toName,
+  });
+}
+
+function getStoreKey(email: string, purpose: "login" | "wipe"): string {
+  return `${purpose}:${email.trim().toLowerCase()}`;
+}
+
+/**
  * Stores a generated OTP with a strict 5-minute (300,000ms) TTL.
  */
-export async function storeOTP(targetEmail: string, otpCode: string): Promise<void> {
+export async function storeOTP(
+  targetEmail: string,
+  otpCode: string,
+  purpose: "login" | "wipe" = "login"
+): Promise<void> {
   const normalizedEmail = targetEmail.trim().toLowerCase();
+  const storeKey = getStoreKey(normalizedEmail, purpose);
   const now = Date.now();
   const expiresAt = now + 5 * 60 * 1000; // 5 minutes
 
@@ -136,17 +192,23 @@ export async function storeOTP(targetEmail: string, otpCode: string): Promise<vo
     expiresAt,
     createdAt: now,
     lastSentAt: now,
+    purpose,
   };
 
   // 1. In-memory store
-  getOtpStore().set(normalizedEmail, otpData);
+  getOtpStore().set(storeKey, otpData);
 
   // 2. Upstash Redis store with 300s TTL (if configured)
   if (REDIS_URL && REDIS_TOKEN) {
     try {
-      await fetch(`${REDIS_URL}/set/otp_${encodeURIComponent(normalizedEmail)}/${encodeURIComponent(JSON.stringify(otpData))}?ex=300`, {
-        headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
-      });
+      await fetch(
+        `${REDIS_URL}/set/otp_${encodeURIComponent(storeKey)}/${encodeURIComponent(
+          JSON.stringify(otpData)
+        )}?ex=300`,
+        {
+          headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+        }
+      );
     } catch {
       // Memory store acts as primary fallback
     }
@@ -154,15 +216,19 @@ export async function storeOTP(targetEmail: string, otpCode: string): Promise<vo
 }
 
 /**
- * Checks if an email is on resend cooldown (45s).
+ * Checks if an email is on resend cooldown (30s).
  */
-export function getResendCooldownRemaining(targetEmail: string): number {
+export function getResendCooldownRemaining(
+  targetEmail: string,
+  purpose: "login" | "wipe" = "login"
+): number {
   const normalizedEmail = targetEmail.trim().toLowerCase();
-  const existing = getOtpStore().get(normalizedEmail);
+  const storeKey = getStoreKey(normalizedEmail, purpose);
+  const existing = getOtpStore().get(storeKey);
   if (!existing) return 0;
 
   const elapsed = (Date.now() - existing.lastSentAt) / 1000;
-  const cooldownPeriod = 45; // 45 seconds cooldown
+  const cooldownPeriod = 30; // 30 seconds cooldown
   return elapsed < cooldownPeriod ? Math.ceil(cooldownPeriod - elapsed) : 0;
 }
 
@@ -171,7 +237,8 @@ export function getResendCooldownRemaining(targetEmail: string): number {
  */
 export async function verifySubmittedOTP(
   targetEmail: string,
-  submittedCode: string
+  submittedCode: string,
+  purpose: "login" | "wipe" = "login"
 ): Promise<{
   success: boolean;
   errorCode?: "NOT_FOUND" | "EXPIRED" | "INVALID_CODE" | "MAX_ATTEMPTS";
@@ -179,20 +246,21 @@ export async function verifySubmittedOTP(
   error?: string;
 }> {
   const normalizedEmail = targetEmail.trim().toLowerCase();
+  const storeKey = getStoreKey(normalizedEmail, purpose);
   const store = getOtpStore();
-  let existing = store.get(normalizedEmail);
+  let existing = store.get(storeKey);
 
   // Fallback to Redis if memory cache missed
   if (!existing && REDIS_URL && REDIS_TOKEN) {
     try {
-      const res = await fetch(`${REDIS_URL}/get/otp_${encodeURIComponent(normalizedEmail)}`, {
+      const res = await fetch(`${REDIS_URL}/get/otp_${encodeURIComponent(storeKey)}`, {
         headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
       });
       if (res.ok) {
         const json = await res.json();
         if (json.result) {
           existing = JSON.parse(json.result);
-          if (existing) store.set(normalizedEmail, existing);
+          if (existing) store.set(storeKey, existing);
         }
       }
     } catch {
@@ -210,7 +278,7 @@ export async function verifySubmittedOTP(
 
   // 1. Check expiration
   if (Date.now() > existing.expiresAt) {
-    store.delete(normalizedEmail);
+    store.delete(storeKey);
     return {
       success: false,
       errorCode: "EXPIRED",
@@ -220,7 +288,7 @@ export async function verifySubmittedOTP(
 
   // 2. Check remaining attempts
   if (existing.attemptsLeft <= 0) {
-    store.delete(normalizedEmail);
+    store.delete(storeKey);
     return {
       success: false,
       errorCode: "MAX_ATTEMPTS",
@@ -236,10 +304,10 @@ export async function verifySubmittedOTP(
 
   if (!isMatch) {
     existing.attemptsLeft -= 1;
-    store.set(normalizedEmail, existing);
+    store.set(storeKey, existing);
 
     if (existing.attemptsLeft <= 0) {
-      store.delete(normalizedEmail);
+      store.delete(storeKey);
       return {
         success: false,
         errorCode: "MAX_ATTEMPTS",
@@ -252,15 +320,17 @@ export async function verifySubmittedOTP(
       success: false,
       errorCode: "INVALID_CODE",
       attemptsLeft: existing.attemptsLeft,
-      error: `Incorrect code. ${existing.attemptsLeft} attempt${existing.attemptsLeft === 1 ? "" : "s"} remaining.`,
+      error: `Incorrect code. ${existing.attemptsLeft} attempt${
+        existing.attemptsLeft === 1 ? "" : "s"
+      } remaining.`,
     };
   }
 
   // 4. Success: invalidate OTP immediately to prevent replay attacks
-  store.delete(normalizedEmail);
+  store.delete(storeKey);
   if (REDIS_URL && REDIS_TOKEN) {
     try {
-      fetch(`${REDIS_URL}/del/otp_${encodeURIComponent(normalizedEmail)}`, {
+      fetch(`${REDIS_URL}/del/otp_${encodeURIComponent(storeKey)}`, {
         headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
       });
     } catch {

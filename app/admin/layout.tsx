@@ -135,7 +135,10 @@ export default function AdminLayout({
 
   if (isCheckingAuth || !currentUser) {
     return (
-      <div className={`${adminSans.variable} ${adminMono.variable} font-admin-sans antialiased`}>
+      <div
+        style={{ minHeight: "100vh", backgroundColor: "#FAFAFA", width: "100%" }}
+        className={`${adminSans.variable} ${adminMono.variable} font-admin-sans antialiased`}
+      >
         <AdminLoader
           label="VERIFYING SESSION"
           sublabel="Authenticating administrator credentials..."

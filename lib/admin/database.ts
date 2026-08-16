@@ -4,19 +4,8 @@ import { BlogPost } from "@/types/blog";
 import { adminDb, isFirebaseAdminConfigured } from "@/lib/admin/firebase-admin";
 import type { DataSnapshot } from "firebase-admin/database";
 
-export interface DatabaseStats {
-  postsCount: number;
-  projectsCount: number;
-  messagesCount: number;
-  subscribersCount: number;
-  telemetryCount: number;
-  cacheKeysCount: number;
-  databaseStatus: "ONLINE" | "DEGRADED" | "OFFLINE";
-  storageUsedBytes: number;
-  lastPurgedAt: string | null;
-  isPurged: boolean;
-  redisLatencyMs: number;
-}
+import type { DatabaseStats } from "@/types/admin";
+export type { DatabaseStats };
 
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -61,7 +50,7 @@ function getRuntimeStore(): RuntimeStore {
   return globalForDb.__admin_runtime_store;
 }
 
-// Timeout helper to avoid infinite hanging
+// Timeout helper to avoid hanging
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 4000, fallback: T): Promise<T> {
   return Promise.race([
     promise,
@@ -75,7 +64,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = 4000, fallback: T): Pro
 export async function getDatabaseStats(): Promise<DatabaseStats> {
   const store = getRuntimeStore();
   let redisLatency = 0;
-  let redisKeys = store.isPurged ? 0 : 4;
+  let redisKeys = store.isPurged ? 0 : 1;
 
   // 1. Upstash Redis Telemetry
   if (REDIS_URL && REDIS_TOKEN) {
@@ -96,11 +85,11 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         redisKeys = typeof sizeData.result === "number" ? sizeData.result : 0;
       }
     } catch {
-      redisKeys = store.isPurged ? 0 : 4;
+      redisKeys = store.isPurged ? 0 : 1;
     }
   }
 
-  // 2. Query Firebase Realtime Database via Admin SDK if credentials configured
+  // 2. Query Firebase Realtime Database via Admin SDK if configured
   if (isFirebaseAdminConfigured()) {
     try {
       const snapshot = await withTimeout<DataSnapshot | null>(
@@ -117,9 +106,11 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
           const messagesCount = val.messages ? Object.keys(val.messages).length : 0;
           const subscribersCount = val.subscribers ? Object.keys(val.subscribers).length : 0;
           const telemetryCount = val.telemetry ? Object.keys(val.telemetry).length : 0;
-          const isPurged = val.meta?.purged === true || (postsCount === 0 && projectsCount === 0);
+          const isPurged =
+            val.meta?.purged === true ||
+            (postsCount === 0 && projectsCount === 0 && messagesCount === 0 && subscribersCount === 0);
 
-          const livePayloadBytes = new TextEncoder().encode(JSON.stringify(val)).length;
+          const livePayloadBytes = isPurged ? 0 : new TextEncoder().encode(JSON.stringify(val)).length;
 
           return {
             postsCount,
@@ -128,7 +119,7 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
             subscribersCount,
             telemetryCount,
             cacheKeysCount: isPurged ? 0 : redisKeys,
-            databaseStatus: "ONLINE",
+            databaseStatus: isPurged ? "OFFLINE" : "ONLINE",
             storageUsedBytes: livePayloadBytes,
             lastPurgedAt: val.meta?.lastPurgedAt || store.lastPurgedAt,
             isPurged,
@@ -142,13 +133,22 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
   }
 
   // Fallback to runtime store
-  const totalDocs =
+  const totalLiveDocs =
     store.posts.length +
     store.projects.length +
     store.messages.length +
     store.subscribers.length;
 
-  const estimatedMemoryBytes = totalDocs * 1024;
+  const liveStorePayload = {
+    posts: store.posts,
+    projects: store.projects,
+    messages: store.messages,
+    subscribers: store.subscribers,
+  };
+
+  const calculatedBytes = store.isPurged
+    ? 0
+    : new TextEncoder().encode(JSON.stringify(liveStorePayload)).length;
 
   return {
     postsCount: store.posts.length,
@@ -158,42 +158,67 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     telemetryCount: store.telemetryNodes.length,
     cacheKeysCount: store.isPurged ? 0 : redisKeys,
     databaseStatus: store.isPurged ? "OFFLINE" : "ONLINE",
-    storageUsedBytes: store.isPurged ? 0 : estimatedMemoryBytes,
+    storageUsedBytes: calculatedBytes,
     lastPurgedAt: store.lastPurgedAt,
-    isPurged: store.isPurged,
+    isPurged: store.isPurged || totalLiveDocs === 0,
     redisLatencyMs: redisLatency,
   };
 }
 
 /**
- * Nuclear Database Purge to exactly 0.
+ * Nuclear Database Purge to exactly 0 documents via Firebase Admin SDK Service Account.
  */
-export async function purgeEntireDatabase(): Promise<{
+export async function purgeEntireDatabase(options: {
+  preserveAuth?: boolean;
+} = {}): Promise<{
   success: boolean;
   purgedAt: string;
 }> {
+  const preserveAuth = options.preserveAuth !== false;
   const store = getRuntimeStore();
   const purgedAt = new Date().toISOString();
 
-  // 1. Wipe Firebase Realtime DB if Admin SDK configured
+  // 1. Wipe Firebase Realtime DB using Admin SDK Service Account Key
   if (isFirebaseAdminConfigured()) {
     try {
-      await withTimeout<void>(
-        adminDb.ref("/").set({
-          meta: {
-            purged: true,
-            lastPurgedAt: purgedAt,
-          },
-        }),
-        5000,
-        undefined
-      );
+      if (preserveAuth) {
+        // Wipe content collections only, preserving /auth
+        await withTimeout<void>(
+          Promise.all([
+            adminDb.ref("/posts").set(null),
+            adminDb.ref("/projects").set(null),
+            adminDb.ref("/messages").set(null),
+            adminDb.ref("/subscribers").set(null),
+            adminDb.ref("/telemetry").set(null),
+            adminDb.ref("/meta").set({
+              purged: true,
+              lastPurgedAt: purgedAt,
+              authPreserved: true,
+            }),
+          ]).then(() => undefined),
+          5000,
+          undefined
+        );
+      } else {
+        // Pure Total Purge
+        await withTimeout<void>(
+          adminDb.ref("/").set({
+            meta: {
+              purged: true,
+              lastPurgedAt: purgedAt,
+              authPreserved: false,
+            },
+          }),
+          5000,
+          undefined
+        );
+      }
     } catch (err) {
       console.error("Firebase Admin SDK wipe error:", err);
     }
   }
 
-  // 2. Wipe Upstash Redis Cache via REST FLUSHDB
+  // 2. Flush Redis Cache
   if (REDIS_URL && REDIS_TOKEN) {
     try {
       await withTimeout<Response | null>(

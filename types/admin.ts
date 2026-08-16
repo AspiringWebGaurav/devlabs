@@ -16,6 +16,20 @@ export interface AdminSession {
   expiresInMs?: number;
 }
 
+export interface DatabaseStats {
+  postsCount: number;
+  projectsCount: number;
+  messagesCount: number;
+  subscribersCount: number;
+  telemetryCount: number;
+  cacheKeysCount: number;
+  databaseStatus: "ONLINE" | "DEGRADED" | "OFFLINE";
+  storageUsedBytes: number;
+  lastPurgedAt: string | null;
+  isPurged: boolean;
+  redisLatencyMs: number;
+}
+
 export interface AdminMetric {
   id: string;
   label: string;
@@ -49,8 +63,6 @@ export interface AdminPostFormData {
   content: string;
   category: string;
   tags: string[];
-  coverImage: string;
-  featured: boolean;
+  readTime: string;
   published: boolean;
-  readingTime?: string;
 }

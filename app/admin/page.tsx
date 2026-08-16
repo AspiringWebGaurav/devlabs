@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { DatabaseStats } from "@/lib/admin/database";
-import { posts as defaultPosts } from "@/data/blog/posts";
-import { projects as defaultProjects } from "@/data/index";
+import type { DatabaseStats } from "@/types/admin";
 import { rtdb, ref, onValue } from "@/lib/admin/firebase";
 import {
   FaDatabase,
@@ -11,13 +9,15 @@ import {
   FaRotate,
   FaTriangleExclamation,
   FaCircleCheck,
-  FaServer,
-  FaBolt,
   FaFolderTree,
-  FaSignal,
   FaHourglassHalf,
   FaCheck,
   FaSpinner,
+  FaShieldHalved,
+  FaEnvelope,
+  FaKey,
+  FaArrowRotateRight,
+  FaCircleQuestion,
 } from "react-icons/fa6";
 
 interface ProgressState {
@@ -33,24 +33,38 @@ interface ProgressState {
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DatabaseStats>({
-    postsCount: defaultPosts.length,
-    projectsCount: defaultProjects.length,
+    postsCount: 5,
+    projectsCount: 4,
     messagesCount: 1,
-    subscribersCount: 2,
-    telemetryCount: 3,
-    cacheKeysCount: 18,
+    subscribersCount: 1,
+    telemetryCount: 0,
+    cacheKeysCount: 1,
     databaseStatus: "ONLINE",
-    storageUsedBytes: (defaultPosts.length + defaultProjects.length + 6) * 1350,
+    storageUsedBytes: 11264, // ~11 KB
     lastPurgedAt: null,
     isPurged: false,
-    redisLatencyMs: 24,
+    redisLatencyMs: 0,
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [preserveAuth, setPreserveAuth] = useState(true);
   const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Live Operation Progress Bar & Telemetry State
+  // 6-Digit OTP State & Verification
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [expiresInSeconds, setExpiresInSeconds] = useState(300);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [shakeError, setShakeError] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isWiping, setIsWiping] = useState(false);
+  const [wipeSuccess, setWipeSuccess] = useState(false);
+
+  // Live Operation Progress Bar State
   const [progress, setProgress] = useState<ProgressState>({
     active: false,
     type: "purge",
@@ -63,6 +77,59 @@ export default function AdminDashboardPage() {
   });
 
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const cooldownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const expiryTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Format seconds to mm:ss
+  const formatTime = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Trigger shake animation on error
+  const triggerShake = useCallback((msg: string) => {
+    setOtpError(msg);
+    setShakeError(true);
+    setTimeout(() => setShakeError(false), 380);
+  }, []);
+
+  // Cooldown countdown timer
+  useEffect(() => {
+    if (otpCooldown > 0) {
+      cooldownTimerRef.current = setInterval(() => {
+        setOtpCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(cooldownTimerRef.current as NodeJS.Timeout);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+    };
+  }, [otpCooldown]);
+
+  // Expiry timer when OTP is sent
+  useEffect(() => {
+    if (otpSent && expiresInSeconds > 0) {
+      expiryTimerRef.current = setInterval(() => {
+        setExpiresInSeconds((prev) => {
+          if (prev <= 1) {
+            clearInterval(expiryTimerRef.current as NodeJS.Timeout);
+            triggerShake("Authorization code expired. Please request a new code.");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (expiryTimerRef.current) clearInterval(expiryTimerRef.current);
+    };
+  }, [otpSent, expiresInSeconds, triggerShake]);
 
   // Fetch live stats from backend API
   const fetchStats = useCallback(async () => {
@@ -102,22 +169,21 @@ export default function AdminDashboardPage() {
               const projectsCount = val.projects ? Object.keys(val.projects).length : 0;
               const messagesCount = val.messages ? Object.keys(val.messages).length : 0;
               const subscribersCount = val.subscribers ? Object.keys(val.subscribers).length : 0;
-              const telemetryCount = val.telemetry ? Object.keys(val.telemetry).length : 0;
-              const isPurged = val.meta?.purged === true || (postsCount === 0 && projectsCount === 0);
-              const payloadBytes = new TextEncoder().encode(JSON.stringify(val)).length;
+              const isPurged =
+                val.meta?.purged === true ||
+                (postsCount === 0 && projectsCount === 0 && messagesCount === 0 && subscribersCount === 0);
+              const payloadBytes = isPurged ? 0 : new TextEncoder().encode(JSON.stringify(val)).length;
 
               setStats((prev) => ({
+                ...prev,
                 postsCount,
                 projectsCount,
                 messagesCount,
                 subscribersCount,
-                telemetryCount,
-                cacheKeysCount: isPurged ? 0 : prev.cacheKeysCount || 18,
-                databaseStatus: "ONLINE",
-                storageUsedBytes: payloadBytes > 0 ? payloadBytes : 0,
+                databaseStatus: isPurged ? "OFFLINE" : "ONLINE",
+                storageUsedBytes: payloadBytes,
                 lastPurgedAt: val.meta?.lastPurgedAt || prev.lastPurgedAt,
                 isPurged,
-                redisLatencyMs: prev.redisLatencyMs || 24,
               }));
             }
           }
@@ -133,6 +199,84 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
+  // Send Critical Wipe Authorization OTP
+  const handleSendWipeOtp = async () => {
+    setIsSendingOtp(true);
+    setOtpError(null);
+
+    try {
+      const res = await fetch("/api/admin/database/wipe-otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setOtpSent(true);
+        setOtpCooldown(30);
+        setExpiresInSeconds(300);
+        setOtpDigits(["", "", "", "", "", ""]);
+        setTimeout(() => {
+          otpInputRefs.current[0]?.focus();
+        }, 120);
+      } else {
+        triggerShake(data.error || "Failed to send authorization code.");
+        if (data.cooldownRemaining) {
+          setOtpCooldown(data.cooldownRemaining);
+        }
+      }
+    } catch {
+      triggerShake("Network error while sending authorization code.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // Handle 6-Digit OTP Input
+  const handleDigitChange = (index: number, value: string) => {
+    const cleanValue = value.replace(/\D/g, "");
+    const newDigits = [...otpDigits];
+    newDigits[index] = cleanValue.slice(-1);
+    setOtpDigits(newDigits);
+    setOtpError(null);
+
+    if (cleanValue && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+
+    const fullCode = newDigits.join("");
+    if (fullCode.length === 6 && !newDigits.includes("")) {
+      handleExecutePurge(fullCode);
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").trim().replace(/\D/g, "");
+    if (!pastedData) return;
+
+    const digits = pastedData.slice(0, 6).split("");
+    const newDigits = ["", "", "", "", "", ""];
+    digits.forEach((d, i) => {
+      newDigits[i] = d;
+    });
+    setOtpDigits(newDigits);
+
+    const nextIdx = Math.min(digits.length, 5);
+    otpInputRefs.current[nextIdx]?.focus();
+
+    if (digits.length === 6) {
+      handleExecutePurge(digits.join(""));
+    }
+  };
+
   // Stopwatch timer for progress calculation
   const startProgressTracking = (
     type: "purge" | "seed" | "sync",
@@ -147,7 +291,7 @@ export default function AdminDashboardPage() {
       active: true,
       type,
       title,
-      percent: 8,
+      percent: 10,
       elapsedSec: 0,
       estRemainingSec: estDurationSec,
       currentStageIndex: 0,
@@ -168,11 +312,7 @@ export default function AdminDashboardPage() {
     }, 100);
   };
 
-  const updateProgressStage = (
-    stageIndex: number,
-    percent: number,
-    stages: string[]
-  ) => {
+  const updateProgressStage = (stageIndex: number, percent: number, stages: string[]) => {
     setProgress((prev) => ({
       ...prev,
       percent,
@@ -199,10 +339,9 @@ export default function AdminDashboardPage() {
       text: successMsg,
     });
 
-    // Dismiss progress after 3 seconds
     setTimeout(() => {
       setProgress((prev) => ({ ...prev, active: false }));
-    }, 3000);
+    }, 3500);
   };
 
   const failProgress = (errorMsg: string) => {
@@ -214,78 +353,109 @@ export default function AdminDashboardPage() {
     });
   };
 
-  // Execute Nuclear Database Purge to 0 with Firebase Admin SDK & Graceful Lifecycles
-  const handleExecutePurge = async () => {
-    setShowConfirmModal(false);
-    setNotification(null);
+  // Execute Database Wipe with Strict Verification FIRST, then Progressive Staged Execution
+  const handleExecutePurge = async (codeToSubmit?: string) => {
+    const code = codeToSubmit || otpDigits.join("");
+    if (code.length !== 6) {
+      triggerShake("Please enter all 6 digits of the authorization code.");
+      return;
+    }
 
-    const stages = [
-      "1/4: Authenticating admin service account key",
-      "2/4: Wiping Realtime DB document nodes to 0",
-      "3/4: Flushing Upstash Redis cache storage",
-      "4/4: Revalidating Next.js static edge routes",
-    ];
-
-    startProgressTracking("purge", "NUCLEAR DATABASE PURGE (WIPE TO 0)", stages, 1.8);
+    setIsVerifyingOtp(true);
+    setOtpError(null);
 
     try {
-      // Stage 1: Auth Handshake
-      updateProgressStage(0, 20, stages);
-      await new Promise((r) => setTimeout(r, 250));
-
-      // Stage 2: Database Wipe via Service Account
-      updateProgressStage(1, 55, stages);
-
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const res = await fetch("/api/admin/database/purge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({
+          otpCode: code,
+          preserveAuth,
+        }),
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
-
-      // Stage 3: Cache Flush
-      updateProgressStage(2, 80, stages);
-      await new Promise((r) => setTimeout(r, 250));
-
-      // Stage 4: Sync
-      updateProgressStage(3, 95, stages);
       const data = await res.json();
-      await new Promise((r) => setTimeout(r, 200));
 
-      if (data.success) {
-        setStats({
-          postsCount: 0,
-          projectsCount: 0,
-          messagesCount: 0,
-          subscribersCount: 0,
-          telemetryCount: 0,
-          cacheKeysCount: 0,
-          databaseStatus: "ONLINE",
-          storageUsedBytes: 0,
-          lastPurgedAt: data.purgedAt || new Date().toISOString(),
-          isPurged: true,
-          redisLatencyMs: 14,
-        });
+      if (!data.success) {
+        setIsVerifyingOtp(false);
+        setOtpDigits(["", "", "", "", "", ""]);
+        setTimeout(() => {
+          otpInputRefs.current[0]?.focus();
+        }, 50);
+        triggerShake(data.error || "Verification failed: Invalid authorization code.");
+        return;
+      }
+
+      // ONLY IF VERIFIED: Transition to wipe execution journey
+      setIsVerifyingOtp(false);
+      setIsWiping(true);
+
+      const stages = [
+        "1/4: Cryptographic authorization code verified ✓",
+        "2/4: Initializing Firebase Admin Service Account Key",
+        "3/4: Executing atomic database purge (/posts, /projects, /messages, /subscribers)",
+        "4/4: Flushing Upstash Redis cache & invalidating edge routes",
+      ];
+
+      startProgressTracking("purge", "NUCLEAR DATABASE PURGE (WIPE TO 0)", stages, 2.0);
+
+      updateProgressStage(0, 25, stages);
+      await new Promise((r) => setTimeout(r, 450));
+
+      updateProgressStage(1, 55, stages);
+      await new Promise((r) => setTimeout(r, 450));
+
+      updateProgressStage(2, 85, stages);
+      await new Promise((r) => setTimeout(r, 450));
+
+      updateProgressStage(3, 100, stages);
+      await new Promise((r) => setTimeout(r, 350));
+
+      setStats({
+        postsCount: 0,
+        projectsCount: 0,
+        messagesCount: 0,
+        subscribersCount: 0,
+        telemetryCount: 0,
+        cacheKeysCount: 0,
+        databaseStatus: "OFFLINE",
+        storageUsedBytes: 0,
+        lastPurgedAt: data.purgedAt || new Date().toISOString(),
+        isPurged: true,
+        redisLatencyMs: 0,
+      });
+
+      setWipeSuccess(true);
+
+      setTimeout(() => {
+        setShowConfirmModal(false);
+        setIsWiping(false);
+        setWipeSuccess(false);
+        setOtpDigits(["", "", "", "", "", ""]);
+        setOtpSent(false);
 
         completeProgress(
-          "Nuclear Purge Completed: Entire database wiped to exactly 0 documents via Firebase Admin Service Account.",
+          preserveAuth
+            ? "Nuclear Purge Completed: Database records wiped to exactly 0. Admin session & 2FA state preserved."
+            : "Total Nuclear Purge Completed: Entire database root wiped to 0 documents.",
           stages
         );
-      } else {
-        failProgress(data.error || "Purge failed: Admin access denied.");
-      }
+      }, 1200);
     } catch (err: unknown) {
+      setIsVerifyingOtp(false);
+      setIsWiping(false);
       const error = err as Error;
-      failProgress(
+      const msg =
         error.name === "AbortError"
-          ? "Purge timed out. Check network connection."
-          : "Network error occurred while wiping database."
-      );
+          ? "Purge timed out. Please verify your connection."
+          : "Network error occurred during authorization verification.";
+      triggerShake(msg);
     }
   };
 
@@ -294,21 +464,18 @@ export default function AdminDashboardPage() {
     setNotification(null);
 
     const stages = [
-      "1/4: Initializing Admin SDK Service Account",
-      "2/4: Seeding showcase projects & markdown articles",
-      "3/4: Restoring inquiries & newsletter subscribers",
-      "4/4: Initializing Upstash Redis cache telemetry",
+      "1/3: Initializing Admin SDK Service Account",
+      "2/3: Seeding showcase projects & markdown articles",
+      "3/3: Rebuilding cache & synchronizing portfolio",
     ];
 
-    startProgressTracking("seed", "RESTORING DEFAULT SHOWCASE DATABASE", stages, 1.8);
+    startProgressTracking("seed", "RESTORING DEFAULT DATABASE RECORDS", stages, 1.6);
 
     try {
-      // Stage 1
-      updateProgressStage(0, 20, stages);
-      await new Promise((r) => setTimeout(r, 250));
+      updateProgressStage(0, 30, stages);
+      await new Promise((r) => setTimeout(r, 300));
 
-      // Stage 2
-      updateProgressStage(1, 55, stages);
+      updateProgressStage(1, 65, stages);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -321,44 +488,36 @@ export default function AdminDashboardPage() {
       });
 
       clearTimeout(timeoutId);
+      updateProgressStage(2, 95, stages);
 
-      // Stage 3
-      updateProgressStage(2, 80, stages);
-      await new Promise((r) => setTimeout(r, 250));
-
-      // Stage 4
-      updateProgressStage(3, 95, stages);
       const data = await res.json();
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 250));
 
       if (data.success) {
         setStats({
-          postsCount: defaultPosts.length,
-          projectsCount: defaultProjects.length,
+          postsCount: 5,
+          projectsCount: 4,
           messagesCount: 1,
-          subscribersCount: 2,
-          telemetryCount: 3,
-          cacheKeysCount: 18,
+          subscribersCount: 1,
+          telemetryCount: 0,
+          cacheKeysCount: 1,
           databaseStatus: "ONLINE",
-          storageUsedBytes: (defaultPosts.length + defaultProjects.length + 6) * 1350,
+          storageUsedBytes: 11264,
           lastPurgedAt: null,
           isPurged: false,
-          redisLatencyMs: 18,
+          redisLatencyMs: 0,
         });
 
-        completeProgress(
-          "Default showcase data successfully populated into live database via Firebase Admin SDK.",
-          stages
-        );
+        completeProgress("Default database records restored successfully.", stages);
       } else {
-        failProgress(data.error || "Failed to restore data.");
+        failProgress(data.error || "Failed to restore database records.");
       }
     } catch (err: unknown) {
       const error = err as Error;
       failProgress(
         error.name === "AbortError"
-          ? "Seed operation timed out. Please try again."
-          : "Failed to connect to database seed endpoint."
+          ? "Restore operation timed out."
+          : "Failed to connect to restore endpoint."
       );
     }
   };
@@ -367,95 +526,303 @@ export default function AdminDashboardPage() {
     stats.postsCount +
     stats.projectsCount +
     stats.messagesCount +
-    stats.subscribersCount +
-    stats.telemetryCount;
+    stats.subscribersCount;
+
+  const isLoaded = !stats.isPurged && totalDocs > 0;
 
   return (
-    <div className="w-full h-full px-4 sm:px-8 lg:px-10 pt-3 sm:pt-4 pb-8 space-y-6 font-admin-sans">
-      {/* Confirmation Modal */}
+    <div className="w-full h-full px-4 sm:px-8 lg:px-10 pt-3 sm:pt-4 pb-8 space-y-6 font-admin-sans max-w-5xl">
+      {/* Wipe Confirmation & Dynamic OTP Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E5E7EB] rounded-sm max-w-md w-full p-6 sm:p-8 space-y-5 shadow-xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3 text-rose-600">
-              <FaTriangleExclamation className="w-6 h-6 shrink-0" />
-              <h3 className="text-lg font-bold text-black tracking-tight">
-                Confirm Nuclear Database Purge?
-              </h3>
+          <div
+            className={`bg-white border border-[#E5E7EB] rounded-sm max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl animate-in zoom-in-95 duration-150 font-admin-sans transition-transform ${
+              shakeError ? "animate-[shake_0.38s_ease-in-out]" : ""
+            }`}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 text-rose-600 border-b border-[#F1F5F9] pb-4">
+              <div className="w-10 h-10 rounded-sm bg-rose-50 border border-rose-200 flex items-center justify-center">
+                <FaTriangleExclamation className="w-5 h-5 text-rose-600 shrink-0" />
+              </div>
+              <div>
+                <span className="text-[10px] font-admin-mono tracking-widest text-rose-600 font-bold uppercase">
+                  CRITICAL ACTION &bull; AUTHORIZATION REQUIRED
+                </span>
+                <h3 className="text-lg font-black text-black tracking-tight">
+                  Authorize Database Wipe to 0
+                </h3>
+              </div>
             </div>
 
+            {/* Warning Message */}
             <p className="text-xs sm:text-[13px] text-[#525252] leading-relaxed">
-              This action will permanently wipe <strong className="text-black">all {totalDocs} documents</strong>,
-              articles, projects, subscribers, messages, and Redis cache keys down to{" "}
-              <strong className="text-rose-600">0</strong> via Firebase Admin SDK.
+              This destructive operation will erase{" "}
+              <strong className="text-black">{totalDocs} live documents</strong> (articles, projects, messages,
+              subscribers) down to <strong className="text-rose-600">exactly 0</strong> via Firebase Admin SDK.
             </p>
 
-            <div className="p-3 bg-rose-50 border border-rose-200 text-[11px] font-admin-mono text-rose-700 rounded-sm">
-              CAUTION: Portfolio and Blog views will immediately reflect 0 items live.
+            {/* Preserve Auth Safety Checkbox */}
+            <div className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-sm space-y-2">
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={preserveAuth}
+                  onChange={(e) => setPreserveAuth(e.target.checked)}
+                  disabled={isWiping}
+                  className="mt-0.5 w-4 h-4 rounded-xs border-[#CBD5E1] text-purple-600 focus:ring-purple-500 cursor-pointer"
+                />
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-[#0F172A] flex items-center gap-1.5 font-admin-mono">
+                    <FaShieldHalved className="w-3 h-3 text-purple-600" />
+                    Preserve Admin Auth & 2FA Session (Recommended)
+                  </span>
+                  <p className="text-[11px] text-[#64748B] leading-tight">
+                    {preserveAuth
+                      ? "Keeps your admin login and 2FA session active while wiping content collections to 0."
+                      : "WARNING: Pure Total Purge. Root database will be completely wiped."}
+                  </p>
+                </div>
+              </label>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            {/* 6-Digit Email OTP Verification Section */}
+            <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-sm space-y-3 font-admin-mono">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                  <FaKey className="w-3 h-3 text-rose-600" />
+                  Authorization Code
+                </span>
+                <span className="text-[10px] text-rose-700 font-medium">gauravpatil9262@gmail.com</span>
+              </div>
+
+              {!otpSent ? (
+                <button
+                  type="button"
+                  onClick={handleSendWipeOtp}
+                  disabled={isSendingOtp || otpCooldown > 0 || isWiping}
+                  className="w-full py-2.5 px-3 bg-white border border-rose-300 hover:bg-rose-100/60 text-rose-700 text-xs font-bold rounded-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {isSendingOtp ? (
+                    <FaSpinner className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <FaEnvelope className="w-3 h-3" />
+                  )}
+                  <span>
+                    {isSendingOtp
+                      ? "Sending Code..."
+                      : otpCooldown > 0
+                      ? `Resend in ${otpCooldown}s`
+                      : "Send Authorization Code to Email"}
+                  </span>
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  {/* 6 Individual Digit Inputs with smooth autofocus & paste */}
+                  <div className="flex justify-between gap-2">
+                    {otpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => {
+                          otpInputRefs.current[idx] = el;
+                        }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        disabled={isVerifyingOtp || isWiping}
+                        onChange={(e) => handleDigitChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(idx, e)}
+                        onPaste={handlePaste}
+                        className={`w-11 h-12 text-center text-lg font-bold font-admin-mono border rounded-xs transition-all outline-none ${
+                          digit
+                            ? "border-rose-600 bg-white text-rose-900 shadow-xs ring-1 ring-rose-500/20"
+                            : "border-rose-200 bg-white text-black focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                        } disabled:opacity-50`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Timer & Resend Controls */}
+                  <div className="flex items-center justify-between text-[11px] pt-1">
+                    <span className="text-rose-700 font-medium">
+                      Expires in:{" "}
+                      <strong className="text-rose-900 font-bold">
+                        {formatTime(expiresInSeconds)}
+                      </strong>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={handleSendWipeOtp}
+                      disabled={isSendingOtp || otpCooldown > 0 || isVerifyingOtp || isWiping}
+                      className="text-rose-700 hover:text-rose-900 font-bold underline cursor-pointer disabled:opacity-40 disabled:no-underline flex items-center gap-1"
+                    >
+                      <FaArrowRotateRight className="w-2.5 h-2.5" />
+                      <span>{otpCooldown > 0 ? `Resend in ${otpCooldown}s` : "Resend code"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {otpError && (
+                <p className="text-[11px] text-rose-700 font-semibold flex items-center gap-1 pt-1">
+                  <FaTriangleExclamation className="w-3 h-3 shrink-0" />
+                  <span>{otpError}</span>
+                </p>
+              )}
+            </div>
+
+            {/* In-Modal Progress Feedback during Wipe */}
+            {isWiping && (
+              <div className="p-3.5 bg-[#111111] text-white rounded-xs space-y-2.5 font-admin-mono">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2 text-rose-400 font-bold">
+                    {wipeSuccess ? (
+                      <FaCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <FaSpinner className="w-3.5 h-3.5 animate-spin" />
+                    )}
+                    {wipeSuccess
+                      ? "WIPE COMPLETED SUCCESSFULLY!"
+                      : "EXECUTING AUTHORIZED DATABASE WIPE..."}
+                  </span>
+                  <span className="text-white font-bold">{progress.percent}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-[#262626] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-rose-600 via-rose-500 to-amber-400 transition-all duration-300"
+                    style={{ width: `${progress.percent}%` }}
+                  />
+                </div>
+                <p className="text-[10px] text-[#A3A3A3] truncate">
+                  {progress.stages[progress.currentStageIndex]?.title || "Synchronizing state..."}
+                </p>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#F1F5F9]">
               <button
-                onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2 text-xs font-admin-mono text-[#525252] hover:text-black bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-sm cursor-pointer transition-colors"
+                type="button"
+                onClick={() => {
+                  if (!isVerifyingOtp && !isWiping) {
+                    setShowConfirmModal(false);
+                    setOtpDigits(["", "", "", "", "", ""]);
+                    setOtpSent(false);
+                    setOtpError(null);
+                  }
+                }}
+                disabled={isVerifyingOtp || isWiping}
+                className="px-4 py-2 text-xs font-admin-mono text-[#525252] hover:text-black bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-sm cursor-pointer transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={handleExecutePurge}
-                className="px-4 py-2 text-xs font-admin-mono font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-sm cursor-pointer transition-colors shadow-xs"
+                type="button"
+                onClick={() => handleExecutePurge()}
+                disabled={!otpSent || otpDigits.join("").length !== 6 || isVerifyingOtp || isWiping}
+                className="px-5 py-2.5 text-xs font-admin-mono font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-sm cursor-pointer transition-colors shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                YES, WIPE DATABASE TO 0
+                {isVerifyingOtp ? (
+                  <>
+                    <FaSpinner className="w-3 h-3 animate-spin" />
+                    <span>VERIFYING CODE...</span>
+                  </>
+                ) : isWiping ? (
+                  <>
+                    <FaSpinner className="w-3 h-3 animate-spin" />
+                    <span>PURGING DATABASE...</span>
+                  </>
+                ) : (
+                  <>
+                    <FaTrashCan className="w-3 h-3" />
+                    <span>CONFIRM & WIPE TO 0</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Top Section Header */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E5E7EB]">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-admin-mono tracking-widest text-[#737373] uppercase font-medium">
-              01. OVERVIEW &bull; LIVE DATABASE TELEMETRY
+              01. OVERVIEW &bull; DATABASE WIPE
             </span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-admin-mono text-emerald-600 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              LIVE WEBSOCKET
+            <span
+              className={`inline-flex items-center gap-1 text-[10px] font-admin-mono font-bold px-2 py-0.5 rounded-full border ${
+                isLoaded
+                  ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+                  : "text-rose-600 bg-rose-50 border-rose-200"
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isLoaded ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                }`}
+              />
+              {isLoaded ? "DATABASE LOADED" : "DATABASE PURGED"}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-            Database Services.
+            Database Wipe.
           </h1>
           <p className="text-xs sm:text-sm text-[#525252] mt-1">
-            Firebase Admin SDK master control, real-time WebSocket telemetry, and nuclear wipe.
+            Firebase Admin SDK master control, real-time database state, and nuclear wipe.
           </p>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons with Info Tooltips */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={fetchStats}
-            disabled={isLoading || progress.active}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-sm bg-white border border-[#E5E5E5] hover:bg-[#F5F5F5] text-xs font-admin-mono text-[#171717] transition-all cursor-pointer shadow-xs disabled:opacity-50"
-          >
-            <FaRotate className={`w-2.5 h-2.5 ${isLoading ? "animate-spin" : ""}`} />
-            <span>{isLoading ? "Syncing..." : "Sync"}</span>
-          </button>
-          <button
-            onClick={handleRestoreDefaults}
-            disabled={progress.active}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-sm bg-white border border-[#E5E5E5] hover:bg-[#F5F5F5] text-xs font-admin-mono text-[#171717] transition-all cursor-pointer shadow-xs disabled:opacity-50"
-          >
-            <FaFolderTree className="w-2.5 h-2.5 text-[#A855F7]" />
-            <span>{progress.active && progress.type === "seed" ? "Restoring..." : "Restore Defaults"}</span>
-          </button>
+          {/* Sync Button with Info Tooltip */}
+          <div className="relative group">
+            <button
+              onClick={fetchStats}
+              disabled={isLoading || progress.active || isWiping}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-sm bg-white border border-[#E5E5E5] hover:bg-[#F5F5F5] text-xs font-admin-mono text-[#171717] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              <FaRotate className={`w-2.5 h-2.5 ${isLoading ? "animate-spin" : ""}`} />
+              <span>{isLoading ? "Syncing..." : "Sync"}</span>
+            </button>
+            <div className="absolute right-0 top-full mt-2 hidden group-hover:block z-30 w-64 p-2.5 bg-[#0F172A] text-white text-[11px] font-admin-sans rounded-sm shadow-xl border border-slate-700 pointer-events-none leading-relaxed animate-in fade-in duration-150">
+              <div className="flex items-center gap-1.5 text-sky-400 font-bold mb-1 font-admin-mono text-[10px] uppercase">
+                <FaCircleQuestion className="w-3 h-3" />
+                <span>Sync Database State</span>
+              </div>
+              Queries Firebase Realtime Database & Upstash Redis to fetch current live document counts and storage payload in real-time.
+            </div>
+          </div>
+
+          {/* Restore Defaults Button with Info Tooltip */}
+          <div className="relative group">
+            <button
+              onClick={handleRestoreDefaults}
+              disabled={progress.active || isWiping}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-sm bg-white border border-[#E5E5E5] hover:bg-[#F5F5F5] text-xs font-admin-mono text-[#171717] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              <FaFolderTree className="w-2.5 h-2.5 text-[#A855F7]" />
+              <span>
+                {progress.active && progress.type === "seed" ? "Restoring..." : "Restore Defaults"}
+              </span>
+            </button>
+            <div className="absolute right-0 top-full mt-2 hidden group-hover:block z-30 w-72 p-2.5 bg-[#0F172A] text-white text-[11px] font-admin-sans rounded-sm shadow-xl border border-slate-700 pointer-events-none leading-relaxed animate-in fade-in duration-150">
+              <div className="flex items-center gap-1.5 text-purple-400 font-bold mb-1 font-admin-mono text-[10px] uppercase">
+                <FaCircleQuestion className="w-3 h-3" />
+                <span>What Does Restore Defaults Do?</span>
+              </div>
+              Populates Firebase Realtime Database with 5 standard blog posts and 4 showcase projects (11 total documents) so your portfolio has working demonstration content after a database wipe.
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Dynamic Swiss Live Progress Bar Terminal */}
+      {/* Dynamic Live Progress Bar Terminal */}
       {progress.active && (
         <div className="p-5 sm:p-6 bg-[#111111] text-white border border-[#262626] rounded-sm space-y-4 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 font-admin-mono">
-          {/* Top Title & Live Metrics */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#262626] pb-3">
             <div className="flex items-center gap-2">
               <span
@@ -468,7 +835,6 @@ export default function AdminDashboardPage() {
               </span>
             </div>
 
-            {/* Realtime Timing Telemetry */}
             <div className="flex items-center gap-4 text-[11px] text-[#A3A3A3]">
               <div className="flex items-center gap-1.5">
                 <FaHourglassHalf className="w-3 h-3 text-[#737373]" />
@@ -489,9 +855,8 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Animated Graphic Progress Bar Track */}
           <div className="space-y-1.5">
-            <div className="w-full h-2.5 bg-[#262626] rounded-full overflow-hidden border border-[#333333] relative">
+            <div className="w-full h-2 bg-[#262626] rounded-full overflow-hidden border border-[#333333] relative">
               <div
                 className={`h-full transition-all duration-300 ease-out relative ${
                   progress.type === "purge"
@@ -499,14 +864,10 @@ export default function AdminDashboardPage() {
                     : "bg-gradient-to-r from-purple-600 via-[#A855F7] to-emerald-400"
                 }`}
                 style={{ width: `${progress.percent}%` }}
-              >
-                {/* Shimmer light effect */}
-                <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent)] animate-[shimmer_1.5s_infinite]" />
-              </div>
+              />
             </div>
           </div>
 
-          {/* Realtime Stage Ticks Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-1">
             {progress.stages.map((stage, idx) => (
               <div
@@ -551,121 +912,64 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Realtime Backend Telemetry Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-white border border-[#E5E7EB] rounded-sm flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-sm bg-[#F5F5F5] flex items-center justify-center text-black">
-              <FaDatabase className="w-3.5 h-3.5" />
+      {/* Focused Database Status Card */}
+      <div className="p-6 sm:p-8 bg-white border border-[#E5E7EB] rounded-sm space-y-6 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div
+              className={`w-12 h-12 rounded-sm flex items-center justify-center ${
+                isLoaded ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+              }`}
+            >
+              <FaDatabase className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-[10px] font-admin-mono uppercase text-[#737373]">Firebase Realtime DB</p>
-              <p className="text-xs font-semibold text-black">gaurav-portfolio-improved</p>
-            </div>
-          </div>
-          <span className="inline-flex items-center gap-1 text-[11px] font-admin-mono text-emerald-600 font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            LIVE
-          </span>
-        </div>
-
-        <div className="p-4 bg-white border border-[#E5E7EB] rounded-sm flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-sm bg-[#F5F5F5] flex items-center justify-center text-[#A855F7]">
-              <FaBolt className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-admin-mono uppercase text-[#737373]">Upstash Redis Cache</p>
-              <p className="text-xs font-semibold text-black">
-                {stats.cacheKeysCount} active keys
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-admin-mono tracking-widest text-[#737373] uppercase font-semibold">
+                  FIREBASE REALTIME DB
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 text-[10px] font-admin-mono font-bold px-2 py-0.5 rounded-full ${
+                    isLoaded
+                      ? "text-emerald-700 bg-emerald-100/70"
+                      : "text-rose-700 bg-rose-100/70"
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      isLoaded ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                    }`}
+                  />
+                  {isLoaded ? "LIVE & LOADED" : "PURGED TO 0"}
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight mt-0.5">
+                {isLoaded ? `${totalDocs} Documents Loaded` : "0 Documents (Purged)"}
+              </h2>
+              <p className="text-xs text-[#525252]">
+                {isLoaded
+                  ? `Active data payload: ${(stats.storageUsedBytes / 1024).toFixed(2)} KB in live database.`
+                  : "Database is completely empty. Portfolio and blog views currently show 0 items."}
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <span className="inline-flex items-center gap-1 text-[11px] font-admin-mono text-emerald-600 font-semibold">
-              <FaSignal className="w-2.5 h-2.5" />
-              {stats.redisLatencyMs ? `${stats.redisLatencyMs}ms` : "ACTIVE"}
-            </span>
-          </div>
-        </div>
 
-        <div className="p-4 bg-white border border-[#E5E7EB] rounded-sm flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-sm bg-[#F5F5F5] flex items-center justify-center text-black">
-              <FaServer className="w-3.5 h-3.5" />
-            </div>
+          <div className="flex items-center gap-6 sm:border-l sm:border-[#E5E7EB] sm:pl-6">
             <div>
-              <p className="text-[10px] font-admin-mono uppercase text-[#737373]">Live Payload Size</p>
-              <p className="text-xs font-semibold text-black">
+              <p className="text-[10px] font-admin-mono uppercase text-[#737373]">Live Payload</p>
+              <p className="text-lg font-bold font-admin-mono text-black">
                 {(stats.storageUsedBytes / 1024).toFixed(2)} KB
               </p>
             </div>
-          </div>
-          <span className="text-xs font-admin-mono font-bold text-black">
-            {totalDocs} Docs
-          </span>
-        </div>
-      </div>
-
-      {/* Live Collection Breakdown Counters */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-admin-mono font-bold text-black uppercase tracking-wider">
-            Live Collections & Data Nodes
-          </h3>
-          <span className="text-[11px] font-admin-mono text-[#737373]">
-            {stats.isPurged ? "Status: PURGED TO 0" : "Status: ACTIVE REPOSITORY"}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-5 bg-white border border-[#E5E7EB] rounded-sm space-y-3 shadow-xs">
-            <div className="flex items-center justify-between text-[11px] font-admin-mono text-[#737373]">
-              <span>01. ARTICLES</span>
-              <span className="px-1.5 py-0.5 bg-[#F5F5F5] rounded-xs text-[10px]">/posts</span>
+            <div>
+              <p className="text-[10px] font-admin-mono uppercase text-[#737373]">Total Docs</p>
+              <p className="text-lg font-bold font-admin-mono text-black">{totalDocs}</p>
             </div>
-            <p className="text-3xl font-black tracking-tight text-black font-admin-mono">
-              {stats.postsCount}
-            </p>
-            <p className="text-[11px] text-[#737373]">Live markdown blog articles</p>
-          </div>
-
-          <div className="p-5 bg-white border border-[#E5E7EB] rounded-sm space-y-3 shadow-xs">
-            <div className="flex items-center justify-between text-[11px] font-admin-mono text-[#737373]">
-              <span>02. PROJECTS</span>
-              <span className="px-1.5 py-0.5 bg-[#F5F5F5] rounded-xs text-[10px]">/projects</span>
-            </div>
-            <p className="text-3xl font-black tracking-tight text-black font-admin-mono">
-              {stats.projectsCount}
-            </p>
-            <p className="text-[11px] text-[#737373]">Showcase works & case studies</p>
-          </div>
-
-          <div className="p-5 bg-white border border-[#E5E7EB] rounded-sm space-y-3 shadow-xs">
-            <div className="flex items-center justify-between text-[11px] font-admin-mono text-[#737373]">
-              <span>03. MESSAGES</span>
-              <span className="px-1.5 py-0.5 bg-[#F5F5F5] rounded-xs text-[10px]">/messages</span>
-            </div>
-            <p className="text-3xl font-black tracking-tight text-black font-admin-mono">
-              {stats.messagesCount}
-            </p>
-            <p className="text-[11px] text-[#737373]">Inquiry contact records</p>
-          </div>
-
-          <div className="p-5 bg-white border border-[#E5E7EB] rounded-sm space-y-3 shadow-xs">
-            <div className="flex items-center justify-between text-[11px] font-admin-mono text-[#737373]">
-              <span>04. SUBSCRIBERS</span>
-              <span className="px-1.5 py-0.5 bg-[#F5F5F5] rounded-xs text-[10px]">/subscribers</span>
-            </div>
-            <p className="text-3xl font-black tracking-tight text-black font-admin-mono">
-              {stats.subscribersCount}
-            </p>
-            <p className="text-[11px] text-[#737373]">Registered email subscribers</p>
           </div>
         </div>
       </div>
 
-      {/* Nuclear Purge Danger Zone Card */}
+      {/* Danger Nuclear Purge Card */}
       <div className="p-6 sm:p-8 bg-white border-2 border-rose-500/80 rounded-sm space-y-4 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -676,23 +980,33 @@ export default function AdminDashboardPage() {
               </h3>
             </div>
             <p className="text-xs sm:text-[13px] text-[#525252] max-w-xl leading-relaxed">
-              Wipe all database nodes, articles, showcase projects, and messages down to{" "}
-              <strong className="text-black">exactly 0</strong> via Firebase Admin SDK. Flushes Upstash Redis cache and synchronizes live portfolio state.
+              Wipe all database records (articles, showcase projects, inquiry messages, and subscribers) down
+              to <strong className="text-black">exactly 0</strong> via Firebase Admin SDK. Protected by email
+              authorization OTP.
             </p>
           </div>
 
-          <button
-            onClick={() => setShowConfirmModal(true)}
-            disabled={progress.active}
-            className="shrink-0 inline-flex items-center gap-2 px-5 py-3 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-admin-mono font-bold uppercase tracking-wider rounded-sm transition-all cursor-pointer shadow-sm hover:shadow-md disabled:opacity-50 select-none"
-          >
-            <FaTrashCan className="w-3.5 h-3.5" />
-            <span>
-              {progress.active && progress.type === "purge"
-                ? `PURGING (${progress.percent}%)...`
-                : "PURGE DATABASE (WIPE TO 0)"}
-            </span>
-          </button>
+          <div className="relative group shrink-0">
+            <button
+              onClick={() => setShowConfirmModal(true)}
+              disabled={progress.active || isWiping}
+              className="inline-flex items-center gap-2 px-6 py-3.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-admin-mono font-bold uppercase tracking-wider rounded-sm transition-all cursor-pointer shadow-sm hover:shadow-md disabled:opacity-50 select-none"
+            >
+              <FaTrashCan className="w-3.5 h-3.5" />
+              <span>
+                {progress.active && progress.type === "purge"
+                  ? `PURGING (${progress.percent}%)...`
+                  : "PURGE DATABASE (WIPE TO 0)"}
+              </span>
+            </button>
+            <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block z-30 w-72 p-2.5 bg-[#0F172A] text-white text-[11px] font-admin-sans rounded-sm shadow-xl border border-slate-700 pointer-events-none leading-relaxed animate-in fade-in duration-150">
+              <div className="flex items-center gap-1.5 text-rose-400 font-bold mb-1 font-admin-mono text-[10px] uppercase">
+                <FaCircleQuestion className="w-3 h-3" />
+                <span>What Does Purge Database Do?</span>
+              </div>
+              Permanently erases all content collections (/posts, /projects, /messages, /subscribers) from Firebase Realtime Database down to exactly 0 documents. Protected by 2FA email authorization OTP.
+            </div>
+          </div>
         </div>
 
         {stats.lastPurgedAt && (
