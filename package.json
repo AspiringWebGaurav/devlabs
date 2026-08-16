@@ -49,11 +49,17 @@
     "typescript": "^5"
   },
   "overrides": {
+    "uuid": "^11.1.1",
+    "glob": "^13.0.6",
     "brace-expansion": "^1.1.18",
     "sharp": "^0.35.0",
     "postcss": "^8.5.3"
   },
   "allowScripts": {
+    "@firebase/util@1.15.2": true,
+    "protobufjs@7.6.5": true,
+    "@firebase/util": true,
+    "protobufjs": true,
     "unrs-resolver@1.7.2": true
   }
 }
