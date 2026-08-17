@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Parse payload & verify OTP (if required by security config)
     const body = await request.json().catch(() => ({}));
-    const { otpCode, preserveAuth } = body;
+    const { otpCode, challengeToken, preserveAuth } = body;
 
     const securityConfig = await getAdminSecurityConfig();
 
@@ -49,7 +49,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const otpValidation = await verifySubmittedOTP(AUTHORIZED_ADMIN_EMAIL, otpCode, "wipe");
+      const otpValidation = await verifySubmittedOTP(
+        AUTHORIZED_ADMIN_EMAIL,
+        otpCode,
+        "wipe",
+        challengeToken
+      );
       if (!otpValidation.success) {
         return NextResponse.json(
           {

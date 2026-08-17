@@ -56,6 +56,7 @@ export default function AdminDashboardPage() {
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [wipeChallengeToken, setWipeChallengeToken] = useState<string>("");
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [expiresInSeconds, setExpiresInSeconds] = useState(300);
   const [otpError, setOtpError] = useState<string | null>(null);
@@ -205,7 +206,7 @@ export default function AdminDashboardPage() {
     setOtpError(null);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
       const res = await fetch("/api/admin/database/wipe-otp/send", {
@@ -216,7 +217,12 @@ export default function AdminDashboardPage() {
       });
 
       clearTimeout(timeoutId);
-      let data: { success?: boolean; error?: string; cooldownRemaining?: number } = {};
+      let data: {
+        success?: boolean;
+        error?: string;
+        challengeToken?: string;
+        cooldownRemaining?: number;
+      } = {};
       try {
         data = await res.json();
       } catch {
@@ -225,6 +231,7 @@ export default function AdminDashboardPage() {
 
       if (data.success) {
         setOtpSent(true);
+        setWipeChallengeToken(data.challengeToken || "");
         setOtpCooldown(30);
         setExpiresInSeconds(300);
         setOtpDigits(["", "", "", "", "", ""]);
@@ -370,7 +377,7 @@ export default function AdminDashboardPage() {
     });
   };
 
-  // Execute Database Wipe with Strict Verification FIRST, then Progressive Staged Execution
+  // Execute Database Wipe with Dedicated Verification FIRST (Matching Login OTP), then Staged Execution
   const handleExecutePurge = async (codeToSubmit?: string) => {
     const code = codeToSubmit || otpDigits.join("");
     if (code.length !== 6) {
@@ -381,57 +388,93 @@ export default function AdminDashboardPage() {
     setIsVerifyingOtp(true);
     setOtpError(null);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
+    // Step 1: Verify OTP first (Modular verification matching Login OTP)
     try {
+      const verifyController = new AbortController();
+      const verifyTimeout = setTimeout(() => verifyController.abort(), 20000);
+
+      const verifyRes = await fetch("/api/admin/database/wipe-otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          code,
+          challengeToken: wipeChallengeToken,
+        }),
+        signal: verifyController.signal,
+      });
+
+      clearTimeout(verifyTimeout);
+      let verifyData: { success?: boolean; error?: string; attemptsLeft?: number } = {};
+      try {
+        verifyData = await verifyRes.json();
+      } catch {
+        verifyData = { success: false, error: `Verification server error (${verifyRes.status}).` };
+      }
+
+      if (!verifyRes.ok || !verifyData.success) {
+        setIsVerifyingOtp(false);
+        setOtpDigits(["", "", "", "", "", ""]);
+        setTimeout(() => {
+          otpInputRefs.current[0]?.focus();
+        }, 50);
+        triggerShake(verifyData.error || "Verification failed: Invalid authorization code.");
+        return;
+      }
+    } catch (err: unknown) {
+      setIsVerifyingOtp(false);
+      const error = err as Error;
+      triggerShake(
+        error?.name === "AbortError"
+          ? "Verification timed out. Please check your connection."
+          : "Network error during authorization code verification."
+      );
+      return;
+    }
+
+    // Step 2: ONLY IF VERIFIED: Transition to wipe execution journey
+    setIsVerifyingOtp(false);
+    setIsWiping(true);
+
+    const stages = [
+      "1/4: Cryptographic authorization code verified ✓",
+      "2/4: Initializing Firebase Admin Service Account Key",
+      "3/4: Executing atomic database purge (/posts, /projects, /messages, /subscribers)",
+      "4/4: Flushing Upstash Redis cache & invalidating edge routes",
+    ];
+
+    startProgressTracking("purge", "NUCLEAR DATABASE PURGE (WIPE TO 0)", stages, 2.5);
+
+    updateProgressStage(0, 25, stages);
+    await new Promise((r) => setTimeout(r, 450));
+
+    updateProgressStage(1, 55, stages);
+    await new Promise((r) => setTimeout(r, 450));
+
+    // Call Purge API
+    try {
+      const purgeController = new AbortController();
+      const purgeTimeout = setTimeout(() => purgeController.abort(), 30000);
+
       const res = await fetch("/api/admin/database/purge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           otpCode: code,
+          challengeToken: wipeChallengeToken,
           preserveAuth,
         }),
-        signal: controller.signal,
+        signal: purgeController.signal,
       });
 
-      clearTimeout(timeoutId);
+      clearTimeout(purgeTimeout);
       let data: { success?: boolean; error?: string; purgedAt?: string } = {};
       try {
         data = await res.json();
       } catch {
-        data = { success: false, error: `Server returned HTTP ${res.status}` };
+        data = { success: false, error: `Purge execution returned HTTP ${res.status}` };
       }
-
-      if (!res.ok || !data.success) {
-        setIsVerifyingOtp(false);
-        setOtpDigits(["", "", "", "", "", ""]);
-        setTimeout(() => {
-          otpInputRefs.current[0]?.focus();
-        }, 50);
-        triggerShake(data.error || "Verification failed: Invalid authorization code.");
-        return;
-      }
-
-      // ONLY IF VERIFIED: Transition to wipe execution journey
-      setIsVerifyingOtp(false);
-      setIsWiping(true);
-
-      const stages = [
-        "1/4: Cryptographic authorization code verified ✓",
-        "2/4: Initializing Firebase Admin Service Account Key",
-        "3/4: Executing atomic database purge (/posts, /projects, /messages, /subscribers)",
-        "4/4: Flushing Upstash Redis cache & invalidating edge routes",
-      ];
-
-      startProgressTracking("purge", "NUCLEAR DATABASE PURGE (WIPE TO 0)", stages, 2.0);
-
-      updateProgressStage(0, 25, stages);
-      await new Promise((r) => setTimeout(r, 450));
-
-      updateProgressStage(1, 55, stages);
-      await new Promise((r) => setTimeout(r, 450));
 
       updateProgressStage(2, 85, stages);
       await new Promise((r) => setTimeout(r, 450));
@@ -461,6 +504,7 @@ export default function AdminDashboardPage() {
         setWipeSuccess(false);
         setOtpDigits(["", "", "", "", "", ""]);
         setOtpSent(false);
+        setWipeChallengeToken("");
 
         completeProgress(
           preserveAuth
@@ -470,15 +514,9 @@ export default function AdminDashboardPage() {
         );
       }, 1200);
     } catch (err: unknown) {
-      clearTimeout(timeoutId);
-      setIsVerifyingOtp(false);
       setIsWiping(false);
       const error = err as Error;
-      const msg =
-        error?.name === "AbortError"
-          ? "Purge request timed out. Please verify your connection."
-          : (error?.message || "Network error occurred during authorization verification.");
-      triggerShake(msg);
+      failProgress(error?.message || "Failed to complete database purge.");
     }
   };
 

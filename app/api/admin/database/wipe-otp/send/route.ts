@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Generate & Store Wipe OTP
     const otpCode = generateCryptographicOTP();
-    await storeOTP(destinationEmail, otpCode, "wipe");
+    const { challengeToken } = await storeOTP(destinationEmail, otpCode, "wipe");
 
     // 4. Dispatch Red Danger Themed OTP via EmailJS
     const emailResult = await sendDynamicOtpEmail({
@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Critical authorization code sent to ${maskedEmail}.`,
+      challengeToken,
       expiresInMinutes: 5,
     });
   } catch (error) {

@@ -183,20 +183,96 @@ function getFirebaseKey(email: string, purpose: "login" | "wipe"): string {
   return `${purpose}_${cleanEmail}`;
 }
 
+const OTP_SECRET =
+  process.env.ADMIN_SESSION_SECRET ||
+  process.env.NEXTAUTH_SECRET ||
+  "gps-portfolio-cryptographic-otp-master-secret-2026";
+
+/**
+ * Generates a stateless HMAC-signed Challenge Token for zero-latency cross-instance validation.
+ */
+export function generateOTPChallengeToken(
+  email: string,
+  otpCode: string,
+  purpose: "login" | "wipe"
+): string {
+  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 mins
+  const normalizedEmail = email.trim().toLowerCase();
+  const payload = `${purpose}:${normalizedEmail}:${otpCode.trim()}:${expiresAt}`;
+  const signature = crypto
+    .createHmac("sha256", OTP_SECRET)
+    .update(payload)
+    .digest("hex");
+
+  const tokenData = JSON.stringify({
+    email: normalizedEmail,
+    purpose,
+    expiresAt,
+    signature,
+  });
+  return Buffer.from(tokenData).toString("base64url");
+}
+
+/**
+ * Verifies a stateless HMAC-signed Challenge Token.
+ */
+export function verifyOTPChallengeToken(
+  token: string,
+  submittedCode: string,
+  expectedEmail: string,
+  expectedPurpose: "login" | "wipe"
+): { success: boolean; error?: string } {
+  try {
+    const raw = Buffer.from(token, "base64url").toString("utf-8");
+    const data = JSON.parse(raw);
+    if (!data || !data.signature || !data.expiresAt) {
+      return { success: false, error: "Invalid verification token format." };
+    }
+
+    if (Date.now() > data.expiresAt) {
+      return { success: false, error: "Verification code expired. Please request a new code." };
+    }
+
+    if (data.email !== expectedEmail.trim().toLowerCase() || data.purpose !== expectedPurpose) {
+      return { success: false, error: "Token mismatch for requested action." };
+    }
+
+    const payload = `${data.purpose}:${data.email}:${submittedCode.trim()}:${data.expiresAt}`;
+    const expectedSignature = crypto
+      .createHmac("sha256", OTP_SECRET)
+      .update(payload)
+      .digest("hex");
+
+    const isMatch =
+      expectedSignature.length === data.signature.length &&
+      crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(data.signature));
+
+    if (!isMatch) {
+      return { success: false, error: "Invalid verification code. Please check the 6 digits." };
+    }
+
+    return { success: true };
+  } catch {
+    return { success: false, error: "Invalid or corrupted challenge token." };
+  }
+}
+
 /**
  * Stores a generated OTP with a strict 5-minute (300,000ms) TTL.
- * Uses 3-tier persistence: Local Memory -> Upstash Redis -> Firebase Realtime Database.
+ * Uses 4-tier persistence: HMAC Token -> Local Memory -> Upstash Redis -> Firebase Realtime Database.
  */
 export async function storeOTP(
   targetEmail: string,
   otpCode: string,
   purpose: "login" | "wipe" = "login"
-): Promise<void> {
+): Promise<{ challengeToken: string }> {
   const normalizedEmail = targetEmail.trim().toLowerCase();
   const storeKey = getStoreKey(normalizedEmail, purpose);
   const fbKey = getFirebaseKey(normalizedEmail, purpose);
   const now = Date.now();
   const expiresAt = now + 5 * 60 * 1000; // 5 minutes
+
+  const challengeToken = generateOTPChallengeToken(normalizedEmail, otpCode, purpose);
 
   const otpData: StoredOTP = {
     hash: hashOtp(otpCode),
@@ -240,6 +316,8 @@ export async function storeOTP(
       console.warn("Firebase RTDB OTP save note:", err);
     }
   }
+
+  return { challengeToken };
 }
 
 /**
@@ -260,12 +338,14 @@ export function getResendCooldownRemaining(
 }
 
 /**
- * Validates a submitted OTP code with rate-limiting, cross-instance lookup, and timing-safe check.
+ * Validates a submitted OTP code with rate-limiting, cross-instance lookup, timing-safe check,
+ * and stateless HMAC token validation.
  */
 export async function verifySubmittedOTP(
   targetEmail: string,
   submittedCode: string,
-  purpose: "login" | "wipe" = "login"
+  purpose: "login" | "wipe" = "login",
+  challengeToken?: string
 ): Promise<{
   success: boolean;
   errorCode?: "NOT_FOUND" | "EXPIRED" | "INVALID_CODE" | "MAX_ATTEMPTS";
@@ -275,10 +355,29 @@ export async function verifySubmittedOTP(
   const normalizedEmail = targetEmail.trim().toLowerCase();
   const storeKey = getStoreKey(normalizedEmail, purpose);
   const fbKey = getFirebaseKey(normalizedEmail, purpose);
+
+  // 1. Check stateless cryptographic HMAC challenge token FIRST (100% reliable across serverless instances)
+  if (challengeToken && challengeToken.trim()) {
+    const tokenResult = verifyOTPChallengeToken(challengeToken, submittedCode, normalizedEmail, purpose);
+    if (tokenResult.success) {
+      // Clear persistent stores after successful verification
+      getOtpStore().delete(storeKey);
+      if (REDIS_URL && REDIS_TOKEN) {
+        fetch(`${REDIS_URL}/del/otp_${encodeURIComponent(storeKey)}`, {
+          headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+        }).catch(() => {});
+      }
+      if (FIREBASE_DB_URL) {
+        fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, { method: "DELETE" }).catch(() => {});
+      }
+      return { success: true };
+    }
+  }
+
   const store = getOtpStore();
   let existing = store.get(storeKey);
 
-  // 1. Fallback to Upstash Redis if local memory missed
+  // 2. Fallback to Upstash Redis if local memory missed
   if (!existing && REDIS_URL && REDIS_TOKEN) {
     try {
       const res = await fetch(`${REDIS_URL}/get/otp_${encodeURIComponent(storeKey)}`, {
@@ -297,7 +396,7 @@ export async function verifySubmittedOTP(
     }
   }
 
-  // 2. Fallback to Firebase Realtime Database (guarantees cross-instance sync on Vercel)
+  // 3. Fallback to Firebase Realtime Database (guarantees cross-instance sync on Vercel)
   if (!existing && FIREBASE_DB_URL) {
     try {
       const res = await fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, {
@@ -316,6 +415,13 @@ export async function verifySubmittedOTP(
   }
 
   if (!existing) {
+    if (challengeToken && challengeToken.trim()) {
+      return {
+        success: false,
+        errorCode: "INVALID_CODE",
+        error: "Invalid authorization code. Please verify the 6 digits.",
+      };
+    }
     return {
       success: false,
       errorCode: "NOT_FOUND",
@@ -323,10 +429,9 @@ export async function verifySubmittedOTP(
     };
   }
 
-  // 1. Check expiration
+  // Check expiration
   if (Date.now() > existing.expiresAt) {
     store.delete(storeKey);
-    // Cleanup Firebase
     if (FIREBASE_DB_URL) {
       fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, { method: "DELETE" }).catch(() => {});
     }
@@ -337,7 +442,7 @@ export async function verifySubmittedOTP(
     };
   }
 
-  // 2. Check remaining attempts
+  // Check remaining attempts
   if (existing.attemptsLeft <= 0) {
     store.delete(storeKey);
     if (FIREBASE_DB_URL) {
@@ -350,7 +455,7 @@ export async function verifySubmittedOTP(
     };
   }
 
-  // 3. Cryptographic timing-safe comparison
+  // Cryptographic timing-safe comparison
   const submittedHash = hashOtp(submittedCode);
   const isMatch =
     submittedHash.length === existing.hash.length &&
@@ -386,7 +491,7 @@ export async function verifySubmittedOTP(
       success: false,
       errorCode: "INVALID_CODE",
       attemptsLeft: existing.attemptsLeft,
-      error: `Incorrect code. ${existing.attemptsLeft} attempt${
+      error: `Invalid authorization code. ${existing.attemptsLeft} attempt${
         existing.attemptsLeft === 1 ? "" : "s"
       } remaining.`,
     };
