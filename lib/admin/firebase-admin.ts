@@ -28,15 +28,16 @@ function getInitializedAdminApp(): App {
     "admin@portfolio-admin.iam.gserviceaccount.com";
   let privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY || "";
 
-  // Fix multiline escaped private keys
+  // Fix multiline escaped private keys and surrounding quotes
   if (privateKey) {
-    privateKey = privateKey.replace(/\\n/g, "\n");
+    privateKey = privateKey.replace(/\\n/g, "\n").replace(/\\r/g, "");
     if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
       privateKey = privateKey.slice(1, -1);
     }
   }
 
   const databaseURL =
+    process.env.FIREBASE_DATABASE_URL ||
     process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
     "https://portfolio-admin-default-rtdb.firebaseio.com";
 
