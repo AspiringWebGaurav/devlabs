@@ -1,4 +1,4 @@
-import { getApps, getApp, initializeApp, cert, App } from "firebase-admin/app";
+import { getApps, initializeApp, cert, App } from "firebase-admin/app";
 import { getAuth, Auth } from "firebase-admin/auth";
 import { getDatabase, Database } from "firebase-admin/database";
 
@@ -12,10 +12,12 @@ export function isFirebaseAdminConfigured(): boolean {
   return !!(privateKey && privateKey.trim() && clientEmail && clientEmail.trim());
 }
 
-function getInitializedAdminApp(): App {
+function getInitializedAdminApp(): App | null {
   if (_adminApp) return _adminApp;
-  if (getApps().length > 0) {
-    _adminApp = getApp();
+
+  const existingApps = getApps();
+  if (existingApps.length > 0) {
+    _adminApp = existingApps[0];
     return _adminApp;
   }
 
@@ -51,20 +53,31 @@ function getInitializedAdminApp(): App {
         }),
         databaseURL,
       });
-    } else {
-      _adminApp = initializeApp({ projectId, databaseURL });
+      return _adminApp;
     }
-  } catch {
-    _adminApp = initializeApp({ projectId, databaseURL }, "admin-fallback");
+  } catch (err) {
+    console.warn("Firebase Admin SDK cert initialization warning:", err);
   }
 
-  return _adminApp;
+  try {
+    const appsAfterAttempt = getApps();
+    if (appsAfterAttempt.length > 0) {
+      _adminApp = appsAfterAttempt[0];
+      return _adminApp;
+    }
+    _adminApp = initializeApp({ projectId, databaseURL });
+    return _adminApp;
+  } catch (err) {
+    console.warn("Firebase Admin SDK fallback initialization warning:", err);
+    return null;
+  }
 }
 
 export function getAdminAuth(): Auth | null {
   try {
     if (!_adminAuth) {
       const app = getInitializedAdminApp();
+      if (!app) return null;
       _adminAuth = getAuth(app);
     }
     return _adminAuth;
@@ -78,6 +91,7 @@ export function getAdminDb(): Database | null {
   try {
     if (!_adminDb) {
       const app = getInitializedAdminApp();
+      if (!app) return null;
       _adminDb = getDatabase(app);
     }
     return _adminDb;

@@ -20,6 +20,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let session: { email?: string } | null = null;
+    try {
+      session = JSON.parse(decodeURIComponent(sessionCookie));
+    } catch {
+      try {
+        session = JSON.parse(sessionCookie);
+      } catch {
+        session = null;
+      }
+    }
+
+    if (!session || session.email?.trim().toLowerCase() !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+      return NextResponse.json(
+        { success: false, error: `Forbidden: Only ${AUTHORIZED_ADMIN_EMAIL} is authorized.` },
+        { status: 403 }
+      );
+    }
+
     const destinationEmail = AUTHORIZED_ADMIN_EMAIL.trim().toLowerCase();
 
     // 2. Cooldown check
@@ -68,8 +86,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Wipe OTP send error:", error);
+    const err = error as Error;
     return NextResponse.json(
-      { success: false, error: "Failed to dispatch authorization code." },
+      { success: false, error: err.message || "Failed to dispatch authorization code." },
       { status: 500 }
     );
   }
