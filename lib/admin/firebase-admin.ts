@@ -60,24 +60,47 @@ function getInitializedAdminApp(): App {
   return _adminApp;
 }
 
-export function getAdminAuth(): Auth {
-  if (!_adminAuth) {
-    _adminAuth = getAuth(getInitializedAdminApp());
+export function getAdminAuth(): Auth | null {
+  try {
+    if (!_adminAuth) {
+      const app = getInitializedAdminApp();
+      _adminAuth = getAuth(app);
+    }
+    return _adminAuth;
+  } catch (err) {
+    console.warn("Firebase Admin Auth init note:", err);
+    return null;
   }
-  return _adminAuth;
 }
 
-export function getAdminDb(): Database {
-  if (!_adminDb) {
-    _adminDb = getDatabase(getInitializedAdminApp());
+export function getAdminDb(): Database | null {
+  try {
+    if (!_adminDb) {
+      const app = getInitializedAdminApp();
+      _adminDb = getDatabase(app);
+    }
+    return _adminDb;
+  } catch (err) {
+    console.warn("Firebase Admin DB init note:", err);
+    return null;
   }
-  return _adminDb;
 }
 
 // Lazy Proxies so module imports during build static collection never trigger background OAuth requests
 export const adminDb = new Proxy({} as Database, {
   get(_target, prop) {
     const db = getAdminDb();
+    if (!db) {
+      // Return safe no-op functions if Admin SDK is unconfigured
+      if (prop === "ref") {
+        return () => ({
+          set: async () => {},
+          once: async () => ({ exists: () => false, val: () => null }),
+          remove: async () => {},
+        });
+      }
+      return undefined;
+    }
     const val = (db as unknown as Record<string, unknown>)[prop as string];
     if (typeof val === "function") {
       return val.bind(db);
@@ -89,6 +112,9 @@ export const adminDb = new Proxy({} as Database, {
 export const adminAuth = new Proxy({} as Auth, {
   get(_target, prop) {
     const auth = getAdminAuth();
+    if (!auth) {
+      return undefined;
+    }
     const val = (auth as unknown as Record<string, unknown>)[prop as string];
     if (typeof val === "function") {
       return val.bind(auth);

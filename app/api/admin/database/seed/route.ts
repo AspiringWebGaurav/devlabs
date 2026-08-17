@@ -13,7 +13,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized: Admin session required." }, { status: 401 });
     }
 
-    const session = JSON.parse(decodeURIComponent(sessionCookie.value));
+    let session: { email?: string } | null = null;
+    try {
+      session = JSON.parse(decodeURIComponent(sessionCookie.value));
+    } catch {
+      try {
+        session = JSON.parse(sessionCookie.value);
+      } catch {
+        session = null;
+      }
+    }
+
     if (!session || session.email?.trim().toLowerCase() !== "gauravpatil9262@gmail.com") {
       return NextResponse.json({ success: false, error: "Forbidden: Only gauravpatil9262@gmail.com is authorized." }, { status: 403 });
     }

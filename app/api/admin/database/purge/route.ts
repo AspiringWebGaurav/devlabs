@@ -17,7 +17,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const session = JSON.parse(decodeURIComponent(sessionCookie.value));
+    let session: { email?: string } | null = null;
+    try {
+      session = JSON.parse(decodeURIComponent(sessionCookie.value));
+    } catch {
+      try {
+        session = JSON.parse(sessionCookie.value);
+      } catch {
+        session = null;
+      }
+    }
+
     if (!session || session.email?.trim().toLowerCase() !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
       return NextResponse.json(
         { success: false, error: `Forbidden: Only ${AUTHORIZED_ADMIN_EMAIL} is authorized.` },
