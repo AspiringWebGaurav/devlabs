@@ -66,3 +66,11 @@ export interface AdminPostFormData {
   readTime: string;
   published: boolean;
 }
+
+export interface AdminSecurityConfig {
+  requireEmailOtp: boolean;
+  requireTotp: boolean;
+  wipeOtpRequired: boolean;
+  updatedAt?: number;
+}
+

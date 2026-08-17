@@ -1,4 +1,4 @@
-import { AdminSession, AdminUser } from "@/types/admin";
+import { AdminSession, AdminUser, AdminSecurityConfig } from "@/types/admin";
 import { auth, googleProvider, signInWithPopup, signOut } from "@/lib/admin/firebase";
 
 export const ADMIN_COOKIE_NAME = "admin_session";
@@ -177,8 +177,17 @@ export async function signInWithFirebaseGoogle(): Promise<{
 }
 
 /**
+ * Helper to extract a cookie value on the client side.
+ */
+function getClientCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^|;\\s*)" + name + "=([^;]*)"));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+/**
  * Checks client-side localStorage / cookie session for quick reactive UI updates.
- * Automatically invalidates expired sessions.
+ * Features dual-storage fallback and self-healing to prevent loader loops across browser sessions.
  */
 export function getClientAdminSession(): AdminSession {
   if (typeof window === "undefined") {
@@ -186,7 +195,28 @@ export function getClientAdminSession(): AdminSession {
   }
 
   try {
-    const raw = localStorage.getItem(ADMIN_COOKIE_NAME);
+    let raw = localStorage.getItem(ADMIN_COOKIE_NAME);
+    const cookieRaw = getClientCookie(ADMIN_COOKIE_NAME);
+
+    // If localStorage is empty but cookie exists, auto-heal localStorage
+    if (!raw && cookieRaw) {
+      raw = cookieRaw;
+      try {
+        localStorage.setItem(ADMIN_COOKIE_NAME, cookieRaw);
+      } catch {
+        // Ignore storage error
+      }
+    }
+
+    // If cookie is missing but localStorage exists, auto-heal cookie
+    if (raw && !cookieRaw) {
+      try {
+        document.cookie = `${ADMIN_COOKIE_NAME}=${encodeURIComponent(raw)}; path=/; max-age=28800; SameSite=Lax`;
+      } catch {
+        // Ignore cookie error
+      }
+    }
+
     if (!raw) return { user: null, isAuthenticated: false };
 
     const parsed: AdminUser = JSON.parse(raw);
@@ -262,9 +292,11 @@ export function touchAdminSession() {
 export async function clearClientAdminSession(): Promise<void> {
   if (typeof window === "undefined") return;
   try {
-    await signOut(auth);
-  } catch (err) {
-    console.error("Firebase signOut error:", err);
+    if (auth && typeof signOut === "function") {
+      await signOut(auth).catch(() => {});
+    }
+  } catch {
+    // Ignore any client auth signout errors
   }
 
   try {
@@ -278,3 +310,82 @@ export async function clearClientAdminSession(): Promise<void> {
   document.cookie = `${ADMIN_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
   document.cookie = `${ADMIN_COOKIE_NAME}=; path=/admin; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
 }
+
+const DEFAULT_SECURITY_CONFIG: AdminSecurityConfig = {
+  requireEmailOtp: true,
+  requireTotp: false,
+  wipeOtpRequired: true,
+};
+
+// Global memory cache for fast refresh
+const globalForSecurity = globalThis as unknown as {
+  __admin_security_config?: AdminSecurityConfig;
+};
+
+/**
+ * Retrieves the global admin security & 2FA configuration.
+ */
+export async function getAdminSecurityConfig(): Promise<AdminSecurityConfig> {
+  const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
+  const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (REDIS_URL && REDIS_TOKEN) {
+    try {
+      const res = await fetch(`${REDIS_URL}/get/admin_security_config`, {
+        headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.result) {
+          const parsed = typeof json.result === "string" ? JSON.parse(json.result) : json.result;
+          const resolved: AdminSecurityConfig = {
+            ...DEFAULT_SECURITY_CONFIG,
+            ...parsed,
+          };
+          globalForSecurity.__admin_security_config = resolved;
+          return resolved;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  return globalForSecurity.__admin_security_config || DEFAULT_SECURITY_CONFIG;
+}
+
+/**
+ * Saves and updates the global admin security & 2FA configuration.
+ */
+export async function saveAdminSecurityConfig(
+  updates: Partial<AdminSecurityConfig>
+): Promise<AdminSecurityConfig> {
+  const current = await getAdminSecurityConfig();
+  const updated: AdminSecurityConfig = {
+    ...current,
+    ...updates,
+    updatedAt: Date.now(),
+  };
+
+  globalForSecurity.__admin_security_config = updated;
+
+  const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
+  const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (REDIS_URL && REDIS_TOKEN) {
+    try {
+      await fetch(
+        `${REDIS_URL}/set/admin_security_config/${encodeURIComponent(JSON.stringify(updated))}`,
+        {
+          headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+        }
+      );
+    } catch {
+      // Ignore
+    }
+  }
+
+  return updated;
+}
+

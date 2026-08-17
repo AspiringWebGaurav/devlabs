@@ -9,7 +9,7 @@ export const TOTP_LOCKOUT_MS = 5 * 60 * 1000; // 5 minutes
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-// In-memory fallback cache
+// In-memory persistent cache
 interface GlobalTotpCache {
   __admin_totp_secret?: string;
   __admin_totp_attempts?: {
@@ -27,27 +27,32 @@ if (!globalForTotp.__admin_totp_attempts) {
  * Retrieves the currently registered TOTP secret from Redis or memory.
  */
 export async function getStoredTOTPSecret(): Promise<string | null> {
-  if (process.env.ADMIN_TOTP_SECRET) {
+  if (process.env.ADMIN_TOTP_SECRET?.trim()) {
     return process.env.ADMIN_TOTP_SECRET.trim();
   }
 
+  // 1. Check in-memory store
+  if (globalForTotp.__admin_totp_secret?.trim()) {
+    return globalForTotp.__admin_totp_secret.trim();
+  }
+
+  // 2. Check Upstash Redis REST API
   if (REDIS_URL && REDIS_TOKEN) {
     try {
-      const res = await fetch(REDIS_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${REDIS_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(["GET", `totp_secret_${TOTP_ADMIN_USER}`]),
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `${REDIS_URL}/get/totp_secret_${encodeURIComponent(TOTP_ADMIN_USER)}`,
+        {
+          headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+          cache: "no-store",
+        }
+      );
 
       if (res.ok) {
         const json = await res.json();
         if (json.result && typeof json.result === "string" && json.result.trim()) {
-          globalForTotp.__admin_totp_secret = json.result.trim();
-          return json.result.trim();
+          const secret = json.result.trim();
+          globalForTotp.__admin_totp_secret = secret;
+          return secret;
         }
       }
     } catch (err) {
@@ -59,7 +64,7 @@ export async function getStoredTOTPSecret(): Promise<string | null> {
 }
 
 /**
- * Persists the registered TOTP secret to Redis and memory.
+ * Persists the registered TOTP secret permanently to Redis and memory.
  */
 export async function saveTOTPSecret(secret: string): Promise<void> {
   const cleanSecret = secret.trim();
@@ -67,16 +72,36 @@ export async function saveTOTPSecret(secret: string): Promise<void> {
 
   if (REDIS_URL && REDIS_TOKEN) {
     try {
-      await fetch(REDIS_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${REDIS_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(["SET", `totp_secret_${TOTP_ADMIN_USER}`, cleanSecret]),
-      });
+      await fetch(
+        `${REDIS_URL}/set/totp_secret_${encodeURIComponent(
+          TOTP_ADMIN_USER
+        )}/${encodeURIComponent(cleanSecret)}`,
+        {
+          headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+        }
+      );
     } catch (err) {
       console.error("Failed to save TOTP secret to Redis:", err);
+    }
+  }
+}
+
+/**
+ * Revokes the registered TOTP secret from Redis and memory (for admin re-pairing).
+ */
+export async function revokeTOTPSecret(): Promise<void> {
+  globalForTotp.__admin_totp_secret = undefined;
+
+  if (REDIS_URL && REDIS_TOKEN) {
+    try {
+      await fetch(
+        `${REDIS_URL}/del/totp_secret_${encodeURIComponent(TOTP_ADMIN_USER)}`,
+        {
+          headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+        }
+      );
+    } catch (err) {
+      console.error("Failed to revoke TOTP secret from Redis:", err);
     }
   }
 }

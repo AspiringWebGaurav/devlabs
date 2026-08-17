@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { authenticateWithGooglePreOTP, setClientAdminSession } from "@/lib/admin/auth";
+import { AdminUser } from "@/types/admin";
 import { AdminLoader } from "@/components/admin/AdminLoader";
 import { LegalModal } from "@/components/admin/LegalModal";
 import {
@@ -140,6 +141,28 @@ export default function AdminLoginPage() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Complete Login and smoothly transition to Dashboard
+  const completeLoginSession = (user: AdminUser | GoogleAdminProfile) => {
+    const adminUser: AdminUser = {
+      id: "uid" in user ? `usr_google_${user.uid}` : user.id,
+      email: user.email,
+      name: user.name,
+      role: "superadmin",
+      avatar: user.avatar,
+    };
+
+    setClientAdminSession(adminUser);
+    setAuthStep("SUCCESS");
+    setSuccessPhase(1);
+    setTimeout(() => setSuccessPhase(2), 350);
+    setTimeout(() => setSuccessPhase(3), 700);
+    setTimeout(() => setSuccessPhase(4), 1050);
+    setTimeout(() => {
+      router.replace("/admin");
+      router.refresh();
+    }, 1400);
+  };
+
   // 1. Step 1: Google Popup Authentication
   const handleGoogleAuth = async () => {
     setIsLoading(true);
@@ -148,10 +171,37 @@ export default function AdminLoginPage() {
     try {
       const res = await authenticateWithGooglePreOTP();
       if (res.success && res.googleUser) {
-        setGoogleProfile(res.googleUser);
-        setActiveTargetEmail(res.googleUser.email);
+        const user = res.googleUser;
+        setGoogleProfile(user);
+        setActiveTargetEmail(user.email);
         setCustomEmailInput("");
         setUseCustomEmail(false);
+
+        // Fetch security configuration
+        let config = { requireEmailOtp: true, requireTotp: false };
+        try {
+          const configRes = await fetch("/api/admin/auth/security-config");
+          const configData = await configRes.json();
+          if (configData.config) {
+            config = configData.config;
+          }
+        } catch {
+          // Use default fallback
+        }
+
+        // Scenario A: Both OFF -> Instant 1-Click Login
+        if (!config.requireEmailOtp && !config.requireTotp) {
+          completeLoginSession(user);
+          return;
+        }
+
+        // Scenario C: Only Authenticator ON -> Skip Email OTP and jump straight to TOTP
+        if (!config.requireEmailOtp && config.requireTotp) {
+          await checkTotpStatusAndAdvance(user);
+          return;
+        }
+
+        // Scenarios B & D: Email OTP is Required
         setAuthStep("DESTINATION");
       } else {
         triggerShake(res.error || "Access Denied: You are not an admin.");
@@ -164,8 +214,9 @@ export default function AdminLoginPage() {
   };
 
   // 2. Step 2: Dispatch OTP to Destination Email via EmailJS
-  const handleDispatchOTP = async (targetOverride?: string) => {
+  const handleDispatchOTP = async (targetOverride?: string, targetUser?: GoogleAdminProfile | null) => {
     const finalTarget = (targetOverride || (useCustomEmail ? customEmailInput : activeTargetEmail)).trim().toLowerCase();
+    const activeUser = targetUser || googleProfile;
 
     if (!finalTarget) {
       triggerShake("Please provide a valid destination email address.");
@@ -178,7 +229,7 @@ export default function AdminLoginPage() {
       return;
     }
 
-    if (!googleProfile) {
+    if (!activeUser) {
       handleCancelAndResetToStart();
       return;
     }
@@ -196,8 +247,8 @@ export default function AdminLoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           targetEmail: finalTarget,
-          adminEmail: googleProfile.email,
-          adminName: googleProfile.name,
+          adminEmail: activeUser.email,
+          adminName: activeUser.name,
         }),
         signal: controller.signal,
       });
@@ -280,7 +331,8 @@ export default function AdminLoginPage() {
   };
 
   // 4. Step 4: Verify Email OTP and Check Google Authenticator Status
-  const handleVerifyEmailOTP = async (codeToVerify?: string) => {
+  const handleVerifyEmailOTP = async (codeToVerify?: string, targetUser?: GoogleAdminProfile | null) => {
+    const activeUser = targetUser || googleProfile;
     const code = codeToVerify || otpDigits.join("");
     if (code.length !== 6) {
       triggerShake("Please enter the complete 6-digit verification code.");
@@ -292,7 +344,7 @@ export default function AdminLoginPage() {
       return;
     }
 
-    if (!googleProfile) {
+    if (!activeUser) {
       handleCancelAndResetToStart();
       return;
     }
@@ -310,7 +362,10 @@ export default function AdminLoginPage() {
         body: JSON.stringify({
           targetEmail: activeTargetEmail,
           code,
-          adminEmail: googleProfile.email,
+          adminEmail: activeUser.email,
+          adminName: activeUser.name,
+          adminAvatar: activeUser.avatar,
+          adminUid: activeUser.uid,
         }),
         signal: controller.signal,
       });
@@ -319,7 +374,25 @@ export default function AdminLoginPage() {
       const data = await res.json();
 
       if (data.success) {
-        await checkTotpStatusAndAdvance();
+        // Fetch security configuration
+        let config = { requireEmailOtp: true, requireTotp: false };
+        try {
+          const configRes = await fetch("/api/admin/auth/security-config");
+          const configData = await configRes.json();
+          if (configData.config) {
+            config = configData.config;
+          }
+        } catch {
+          // Use default
+        }
+
+        // Scenario D: Authenticator TOTP is also required -> advance to TOTP
+        if (config.requireTotp) {
+          await checkTotpStatusAndAdvance(activeUser);
+        } else {
+          // Scenario B: Authenticator is OFF -> Complete Login directly!
+          completeLoginSession(data.user || activeUser);
+        }
       } else {
         if (typeof data.attemptsLeft === "number") {
           setAttemptsLeft(data.attemptsLeft);
@@ -342,14 +415,15 @@ export default function AdminLoginPage() {
   };
 
   // Check if TOTP is configured or needs First-Time Setup
-  const checkTotpStatusAndAdvance = async () => {
-    if (!googleProfile) return;
+  const checkTotpStatusAndAdvance = async (targetUser?: GoogleAdminProfile | null) => {
+    const activeUser = targetUser || googleProfile;
+    if (!activeUser) return;
 
     try {
       const statusRes = await fetch("/api/admin/auth/totp/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminEmail: googleProfile.email }),
+        body: JSON.stringify({ adminEmail: activeUser.email }),
       });
       const statusData = await statusRes.json();
 
@@ -363,16 +437,17 @@ export default function AdminLoginPage() {
           totpInputRefs.current[0]?.focus();
         }, 100);
       } else {
-        await loadTotpSetup();
+        await loadTotpSetup(activeUser);
       }
     } catch {
-      await loadTotpSetup();
+      await loadTotpSetup(activeUser);
     }
   };
 
   // Load TOTP Setup QR Code
-  const loadTotpSetup = async () => {
-    if (!googleProfile) return;
+  const loadTotpSetup = async (targetUser?: GoogleAdminProfile | null) => {
+    const activeUser = targetUser || googleProfile;
+    if (!activeUser) return;
     setIsLoading(true);
     setErrorMsg("");
 
@@ -380,7 +455,7 @@ export default function AdminLoginPage() {
       const res = await fetch("/api/admin/auth/totp/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminEmail: googleProfile.email }),
+        body: JSON.stringify({ adminEmail: activeUser.email }),
       });
       const data = await res.json();
 
@@ -453,7 +528,12 @@ export default function AdminLoginPage() {
   };
 
   // 6. Step 6: Verify 6-Digit Google Authenticator Code
-  const handleVerifyTOTP = async (codeToVerify?: string, isSetup = false) => {
+  const handleVerifyTOTP = async (
+    codeToVerify?: string,
+    isSetup = false,
+    targetUser?: GoogleAdminProfile | null
+  ) => {
+    const activeUser = targetUser || googleProfile;
     const token = codeToVerify || totpDigits.join("");
     if (token.length !== 6) {
       triggerShake("Please enter the 6-digit Google Authenticator code.");
@@ -466,7 +546,7 @@ export default function AdminLoginPage() {
       return;
     }
 
-    if (!googleProfile) {
+    if (!activeUser) {
       handleCancelAndResetToStart();
       return;
     }
@@ -485,10 +565,10 @@ export default function AdminLoginPage() {
           token,
           secret: isSetup ? totpSetupData?.secret : undefined,
           isInitialSetup: isSetup,
-          adminEmail: googleProfile.email,
-          adminName: googleProfile.name,
-          adminAvatar: googleProfile.avatar,
-          adminUid: googleProfile.uid,
+          adminEmail: activeUser.email,
+          adminName: activeUser.name,
+          adminAvatar: activeUser.avatar,
+          adminUid: activeUser.uid,
         }),
         signal: controller.signal,
       });
@@ -497,23 +577,7 @@ export default function AdminLoginPage() {
       const data = await res.json();
 
       if (data.success && data.user) {
-        setClientAdminSession(data.user);
-        setAuthStep("SUCCESS");
-        setSuccessPhase(1);
-
-        // Phase 1: 3FA Verified (800ms)
-        await new Promise((r) => setTimeout(r, 800));
-        setSuccessPhase(2);
-
-        // Phase 2: Establishing Session (800ms)
-        await new Promise((r) => setTimeout(r, 800));
-        setSuccessPhase(3);
-
-        // Phase 3: Initializing Workspace (600ms)
-        await new Promise((r) => setTimeout(r, 600));
-
-        router.push("/admin");
-        router.refresh();
+        completeLoginSession(data.user);
       } else {
         if (typeof data.attemptsLeft === "number") {
           setTotpAttemptsLeft(data.attemptsLeft);
@@ -535,7 +599,7 @@ export default function AdminLoginPage() {
       const error = err as Error;
       triggerShake(
         error.name === "AbortError"
-          ? "Verification timed out. Please check device clock sync."
+          ? "Verification timed out. Please check network."
           : "Network error during verification. Please try again."
       );
     } finally {

@@ -8,6 +8,7 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminLoader } from "@/components/admin/AdminLoader";
 import {
   getClientAdminSession,
+  setClientAdminSession,
   clearClientAdminSession,
   touchAdminSession,
 } from "@/lib/admin/auth";
@@ -62,25 +63,94 @@ export default function AdminLayout({
     };
   }, []);
 
-  // Initial Auth Check
+  // Suppress unhandled DOM Event / AbortError rejections
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (
+        event.reason instanceof Event ||
+        (event.reason && (event.reason.toString() === "[object Event]" || event.reason.name === "AbortError"))
+      ) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    return () => {
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+    };
+  }, []);
+
+  // Initial Auth Check with dual client/server verification and failsafe timeout
   useEffect(() => {
     if (isLoginPage) {
       setIsCheckingAuth(false);
       return;
     }
 
-    const session = getClientAdminSession();
-    if (
-      !session.isAuthenticated ||
-      !session.user ||
-      session.user.email.trim().toLowerCase() !== "gauravpatil9262@gmail.com"
-    ) {
-      router.push("/admin/login");
-    } else {
-      setCurrentUser(session.user);
-      lastActiveRef.current = Date.now();
-    }
-    setIsCheckingAuth(false);
+    let isMounted = true;
+
+    const performAuthCheck = async () => {
+      // 1. Fast Synchronous Check (localStorage & document.cookie)
+      const localSession = getClientAdminSession();
+      if (
+        localSession.isAuthenticated &&
+        localSession.user &&
+        localSession.user.email.trim().toLowerCase() === "gauravpatil9262@gmail.com"
+      ) {
+        if (isMounted) {
+          setCurrentUser(localSession.user);
+          lastActiveRef.current = Date.now();
+          setIsCheckingAuth(false);
+        }
+        return;
+      }
+
+      // 2. Server-side Cookie Verification fallback
+      try {
+        const res = await fetch("/api/admin/auth/session", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (
+            data.authenticated &&
+            data.user &&
+            data.user.email.trim().toLowerCase() === "gauravpatil9262@gmail.com"
+          ) {
+            setClientAdminSession(data.user);
+            if (isMounted) {
+              setCurrentUser(data.user);
+              lastActiveRef.current = Date.now();
+              setIsCheckingAuth(false);
+            }
+            return;
+          }
+        }
+      } catch {
+        // Fall through to unauthenticated handler
+      }
+
+      // 3. If unauthenticated, clear any stale state and redirect cleanly
+      await clearClientAdminSession();
+      if (isMounted) {
+        setIsCheckingAuth(false);
+        router.replace("/admin/login");
+      }
+    };
+
+    performAuthCheck();
+
+    // 4. Failsafe Timeout: screen will never be stuck on loader > 2.5s
+    const timeout = setTimeout(() => {
+      if (isMounted) {
+        setIsCheckingAuth(false);
+      }
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
   }, [pathname, isLoginPage, router]);
 
   // Background Session Heartbeat & Inactivity Monitor

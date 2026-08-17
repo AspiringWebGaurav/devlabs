@@ -48,6 +48,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  devIndicators: false,
   transpilePackages: ["three", "three-globe"],
   // Allow cross-origin dev access from local network IPs (e.g. mobile devices)
   // @ts-ignore - Next.js 15 allowedDevOrigins option
@@ -62,7 +63,6 @@ const nextConfig: NextConfig = {
       config.watchOptions = {
         poll: 1000,
         aggregateTimeout: 300,
-        ignored: ["**/node_modules", "**/.next", "**/.git"],
       };
     }
     return config;

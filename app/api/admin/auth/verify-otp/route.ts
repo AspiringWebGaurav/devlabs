@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySubmittedOTP } from "@/lib/admin/otp";
-import { AUTHORIZED_ADMIN_EMAIL } from "@/lib/admin/auth";
+import { AUTHORIZED_ADMIN_EMAIL, ADMIN_COOKIE_NAME } from "@/lib/admin/auth";
+import { AdminUser } from "@/types/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { targetEmail, code, adminEmail } = body;
+    const { targetEmail, code, adminEmail, adminName, adminAvatar, adminUid } = body;
 
     // 1. Verify that the authenticating user is gauravpatil9262@gmail.com
     const normalizedAdminEmail = (adminEmail || "").trim().toLowerCase();
@@ -43,12 +44,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Email OTP Stage Verified Successfully
-    return NextResponse.json({
+    // 4. Construct Authenticated Admin User Session
+    const now = Date.now();
+    const sessionDurationMs = 8 * 60 * 60 * 1000;
+    const expiresAt = now + sessionDurationMs;
+
+    const adminUser: AdminUser = {
+      id: adminUid ? `usr_google_${adminUid}` : `usr_admin_${Date.now()}`,
+      email: AUTHORIZED_ADMIN_EMAIL,
+      name: adminName || "Gaurav patil",
+      role: "superadmin",
+      avatar:
+        adminAvatar ||
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      issuedAt: now,
+      expiresAt,
+      lastActiveAt: now,
+    };
+
+    // 5. Issue session cookie and return user payload
+    const response = NextResponse.json({
       success: true,
       emailOtpVerified: true,
-      message: "Email security OTP verified. Proceeding to Google Authenticator.",
+      user: adminUser,
+      message: "Email security OTP verified successfully.",
     });
+
+    response.cookies.set({
+      name: ADMIN_COOKIE_NAME,
+      value: encodeURIComponent(JSON.stringify(adminUser)),
+      path: "/",
+      maxAge: 8 * 3600,
+      sameSite: "lax",
+      httpOnly: false,
+    });
+
+    return response;
   } catch (err: unknown) {
     const error = err as Error;
     return NextResponse.json(
