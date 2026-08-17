@@ -49,6 +49,7 @@
     "typescript": "^5"
   },
   "overrides": {
+    "node-domexception": "npm:@profoundlogic/node-domexception@^1.0.2",
     "uuid": "^11.1.1",
     "glob": "^13.0.6",
     "brace-expansion": "^1.1.18",
