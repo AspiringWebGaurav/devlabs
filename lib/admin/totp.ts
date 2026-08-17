@@ -23,8 +23,16 @@ if (!globalForTotp.__admin_totp_attempts) {
   globalForTotp.__admin_totp_attempts = { count: 0 };
 }
 
+const FIREBASE_DB_URL = (
+  process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
+  process.env.FIREBASE_DATABASE_URL ||
+  "https://portfolio-admin-default-rtdb.firebaseio.com"
+).replace(/\/$/, "");
+
+const FB_TOTP_KEY = `totp_${TOTP_ADMIN_USER.replace(/[^a-zA-Z0-9_]/g, "_")}`;
+
 /**
- * Retrieves the currently registered TOTP secret from Redis or memory.
+ * Retrieves the currently registered TOTP secret from Redis, Firebase RTDB, or memory.
  */
 export async function getStoredTOTPSecret(): Promise<string | null> {
   if (process.env.ADMIN_TOTP_SECRET?.trim()) {
@@ -56,7 +64,25 @@ export async function getStoredTOTPSecret(): Promise<string | null> {
         }
       }
     } catch (err) {
-      console.error("Failed to retrieve TOTP secret from Redis:", err);
+      console.warn("Failed to retrieve TOTP secret from Redis:", err);
+    }
+  }
+
+  // 3. Check Firebase Realtime Database
+  if (FIREBASE_DB_URL) {
+    try {
+      const res = await fetch(`${FIREBASE_DB_URL}/_system/totp/${FB_TOTP_KEY}.json`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const secret = await res.json();
+        if (secret && typeof secret === "string" && secret.trim()) {
+          globalForTotp.__admin_totp_secret = secret.trim();
+          return secret.trim();
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to retrieve TOTP secret from Firebase RTDB:", err);
     }
   }
 
@@ -64,7 +90,7 @@ export async function getStoredTOTPSecret(): Promise<string | null> {
 }
 
 /**
- * Persists the registered TOTP secret permanently to Redis and memory.
+ * Persists the registered TOTP secret permanently to Redis, Firebase RTDB, and memory.
  */
 export async function saveTOTPSecret(secret: string): Promise<void> {
   const cleanSecret = secret.trim();
@@ -81,13 +107,26 @@ export async function saveTOTPSecret(secret: string): Promise<void> {
         }
       );
     } catch (err) {
-      console.error("Failed to save TOTP secret to Redis:", err);
+      console.warn("Failed to save TOTP secret to Redis:", err);
+    }
+  }
+
+  if (FIREBASE_DB_URL) {
+    try {
+      await fetch(`${FIREBASE_DB_URL}/_system/totp/${FB_TOTP_KEY}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cleanSecret),
+        cache: "no-store",
+      });
+    } catch (err) {
+      console.warn("Failed to save TOTP secret to Firebase RTDB:", err);
     }
   }
 }
 
 /**
- * Revokes the registered TOTP secret from Redis and memory (for admin re-pairing).
+ * Revokes the registered TOTP secret from Redis, Firebase RTDB, and memory (for admin re-pairing).
  */
 export async function revokeTOTPSecret(): Promise<void> {
   globalForTotp.__admin_totp_secret = undefined;
@@ -101,7 +140,18 @@ export async function revokeTOTPSecret(): Promise<void> {
         }
       );
     } catch (err) {
-      console.error("Failed to revoke TOTP secret from Redis:", err);
+      console.warn("Failed to revoke TOTP secret from Redis:", err);
+    }
+  }
+
+  if (FIREBASE_DB_URL) {
+    try {
+      await fetch(`${FIREBASE_DB_URL}/_system/totp/${FB_TOTP_KEY}.json`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+    } catch (err) {
+      console.warn("Failed to delete TOTP secret from Firebase RTDB:", err);
     }
   }
 }

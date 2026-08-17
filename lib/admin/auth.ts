@@ -322,13 +322,20 @@ const globalForSecurity = globalThis as unknown as {
   __admin_security_config?: AdminSecurityConfig;
 };
 
+const FIREBASE_DB_URL = (
+  process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
+  process.env.FIREBASE_DATABASE_URL ||
+  "https://portfolio-admin-default-rtdb.firebaseio.com"
+).replace(/\/$/, "");
+
 /**
- * Retrieves the global admin security & 2FA configuration.
+ * Retrieves the global admin security & 2FA configuration from Redis, Firebase RTDB, or memory.
  */
 export async function getAdminSecurityConfig(): Promise<AdminSecurityConfig> {
   const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
   const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
+  // 1. Check Upstash Redis
   if (REDIS_URL && REDIS_TOKEN) {
     try {
       const res = await fetch(`${REDIS_URL}/get/admin_security_config`, {
@@ -348,7 +355,29 @@ export async function getAdminSecurityConfig(): Promise<AdminSecurityConfig> {
         }
       }
     } catch {
-      // Fallback
+      // Fall through to Firebase
+    }
+  }
+
+  // 2. Check Firebase Realtime Database
+  if (FIREBASE_DB_URL) {
+    try {
+      const res = await fetch(`${FIREBASE_DB_URL}/_system/security_config.json`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const parsed = await res.json();
+        if (parsed && typeof parsed === "object") {
+          const resolved: AdminSecurityConfig = {
+            ...DEFAULT_SECURITY_CONFIG,
+            ...parsed,
+          };
+          globalForSecurity.__admin_security_config = resolved;
+          return resolved;
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to retrieve security config from Firebase RTDB:", err);
     }
   }
 
@@ -382,7 +411,20 @@ export async function saveAdminSecurityConfig(
         }
       );
     } catch {
-      // Ignore
+      // Fall through to Firebase
+    }
+  }
+
+  if (FIREBASE_DB_URL) {
+    try {
+      await fetch(`${FIREBASE_DB_URL}/_system/security_config.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+        cache: "no-store",
+      });
+    } catch (err) {
+      console.warn("Failed to save security config to Firebase RTDB:", err);
     }
   }
 

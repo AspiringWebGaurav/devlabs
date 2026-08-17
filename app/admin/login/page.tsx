@@ -239,7 +239,7 @@ export default function AdminLoginPage() {
     setAuthStep("SENDING");
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
       const res = await fetch("/api/admin/auth/send-otp", {
@@ -254,7 +254,17 @@ export default function AdminLoginPage() {
       });
 
       clearTimeout(timeoutId);
-      const data = await res.json();
+      let data: {
+        success?: boolean;
+        error?: string;
+        maskedEmail?: string;
+        expiresInSeconds?: number;
+      } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { success: false, error: `Server returned HTTP ${res.status}` };
+      }
 
       if (data.success) {
         setActiveTargetEmail(finalTarget);
@@ -277,8 +287,8 @@ export default function AdminLoginPage() {
       const error = err as Error;
       setAuthStep("DESTINATION");
       triggerShake(
-        error.name === "AbortError"
-          ? "Dispatch timed out. Please check EmailJS service."
+        error?.name === "AbortError"
+          ? "Dispatch timed out. Please check your connection."
           : "Network error occurred while sending verification code."
       );
     } finally {
@@ -353,7 +363,7 @@ export default function AdminLoginPage() {
     setErrorMsg("");
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
       const res = await fetch("/api/admin/auth/verify-otp", {
@@ -371,9 +381,19 @@ export default function AdminLoginPage() {
       });
 
       clearTimeout(timeoutId);
-      const data = await res.json();
+      let data: {
+        success?: boolean;
+        error?: string;
+        user?: GoogleAdminProfile;
+        attemptsLeft?: number;
+      } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { success: false, error: `Server returned HTTP ${res.status}` };
+      }
 
-      if (data.success) {
+      if (res.ok && data.success) {
         // Fetch security configuration
         let config = { requireEmailOtp: true, requireTotp: false };
         try {
@@ -405,7 +425,7 @@ export default function AdminLoginPage() {
       clearTimeout(timeoutId);
       const error = err as Error;
       triggerShake(
-        error.name === "AbortError"
+        error?.name === "AbortError"
           ? "Verification timed out. Please check network."
           : "Network error during verification. Please try again."
       );
@@ -555,7 +575,7 @@ export default function AdminLoginPage() {
     setErrorMsg("");
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
       const res = await fetch("/api/admin/auth/totp/verify", {
@@ -574,9 +594,20 @@ export default function AdminLoginPage() {
       });
 
       clearTimeout(timeoutId);
-      const data = await res.json();
+      let data: {
+        success?: boolean;
+        error?: string;
+        user?: GoogleAdminProfile;
+        attemptsLeft?: number;
+        isLockedOut?: boolean;
+      } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { success: false, error: `Server returned HTTP ${res.status}` };
+      }
 
-      if (data.success && data.user) {
+      if (res.ok && data.success && data.user) {
         completeLoginSession(data.user);
       } else {
         if (typeof data.attemptsLeft === "number") {
@@ -598,7 +629,7 @@ export default function AdminLoginPage() {
       clearTimeout(timeoutId);
       const error = err as Error;
       triggerShake(
-        error.name === "AbortError"
+        error?.name === "AbortError"
           ? "Verification timed out. Please check network."
           : "Network error during verification. Please try again."
       );

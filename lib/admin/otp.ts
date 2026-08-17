@@ -172,8 +172,20 @@ function getStoreKey(email: string, purpose: "login" | "wipe"): string {
   return `${purpose}:${email.trim().toLowerCase()}`;
 }
 
+const FIREBASE_DB_URL = (
+  process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
+  process.env.FIREBASE_DATABASE_URL ||
+  "https://portfolio-admin-default-rtdb.firebaseio.com"
+).replace(/\/$/, "");
+
+function getFirebaseKey(email: string, purpose: "login" | "wipe"): string {
+  const cleanEmail = email.trim().toLowerCase().replace(/[^a-zA-Z0-9_]/g, "_");
+  return `${purpose}_${cleanEmail}`;
+}
+
 /**
  * Stores a generated OTP with a strict 5-minute (300,000ms) TTL.
+ * Uses 3-tier persistence: Local Memory -> Upstash Redis -> Firebase Realtime Database.
  */
 export async function storeOTP(
   targetEmail: string,
@@ -182,6 +194,7 @@ export async function storeOTP(
 ): Promise<void> {
   const normalizedEmail = targetEmail.trim().toLowerCase();
   const storeKey = getStoreKey(normalizedEmail, purpose);
+  const fbKey = getFirebaseKey(normalizedEmail, purpose);
   const now = Date.now();
   const expiresAt = now + 5 * 60 * 1000; // 5 minutes
 
@@ -195,7 +208,7 @@ export async function storeOTP(
     purpose,
   };
 
-  // 1. In-memory store
+  // 1. Local in-memory store
   getOtpStore().set(storeKey, otpData);
 
   // 2. Upstash Redis store with 300s TTL (if configured)
@@ -210,7 +223,21 @@ export async function storeOTP(
         }
       );
     } catch {
-      // Memory store acts as primary fallback
+      // Fall through to Firebase
+    }
+  }
+
+  // 3. Firebase Realtime Database Persistent Store (guarantees cross-instance sync on Vercel)
+  if (FIREBASE_DB_URL) {
+    try {
+      await fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(otpData),
+        cache: "no-store",
+      });
+    } catch (err) {
+      console.warn("Firebase RTDB OTP save note:", err);
     }
   }
 }
@@ -233,7 +260,7 @@ export function getResendCooldownRemaining(
 }
 
 /**
- * Validates a submitted OTP code with rate-limiting and timing-safe check.
+ * Validates a submitted OTP code with rate-limiting, cross-instance lookup, and timing-safe check.
  */
 export async function verifySubmittedOTP(
   targetEmail: string,
@@ -247,14 +274,16 @@ export async function verifySubmittedOTP(
 }> {
   const normalizedEmail = targetEmail.trim().toLowerCase();
   const storeKey = getStoreKey(normalizedEmail, purpose);
+  const fbKey = getFirebaseKey(normalizedEmail, purpose);
   const store = getOtpStore();
   let existing = store.get(storeKey);
 
-  // Fallback to Redis if memory cache missed
+  // 1. Fallback to Upstash Redis if local memory missed
   if (!existing && REDIS_URL && REDIS_TOKEN) {
     try {
       const res = await fetch(`${REDIS_URL}/get/otp_${encodeURIComponent(storeKey)}`, {
         headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+        cache: "no-store",
       });
       if (res.ok) {
         const json = await res.json();
@@ -264,7 +293,25 @@ export async function verifySubmittedOTP(
         }
       }
     } catch {
-      // Ignore
+      // Fall through to Firebase RTDB
+    }
+  }
+
+  // 2. Fallback to Firebase Realtime Database (guarantees cross-instance sync on Vercel)
+  if (!existing && FIREBASE_DB_URL) {
+    try {
+      const res = await fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === "object" && data.hash) {
+          existing = data as StoredOTP;
+          store.set(storeKey, existing);
+        }
+      }
+    } catch (err) {
+      console.warn("Firebase RTDB OTP lookup note:", err);
     }
   }
 
@@ -279,6 +326,10 @@ export async function verifySubmittedOTP(
   // 1. Check expiration
   if (Date.now() > existing.expiresAt) {
     store.delete(storeKey);
+    // Cleanup Firebase
+    if (FIREBASE_DB_URL) {
+      fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, { method: "DELETE" }).catch(() => {});
+    }
     return {
       success: false,
       errorCode: "EXPIRED",
@@ -289,6 +340,9 @@ export async function verifySubmittedOTP(
   // 2. Check remaining attempts
   if (existing.attemptsLeft <= 0) {
     store.delete(storeKey);
+    if (FIREBASE_DB_URL) {
+      fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, { method: "DELETE" }).catch(() => {});
+    }
     return {
       success: false,
       errorCode: "MAX_ATTEMPTS",
@@ -306,8 +360,20 @@ export async function verifySubmittedOTP(
     existing.attemptsLeft -= 1;
     store.set(storeKey, existing);
 
+    // Sync updated attempts left across Redis and Firebase
+    if (FIREBASE_DB_URL) {
+      fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(existing),
+      }).catch(() => {});
+    }
+
     if (existing.attemptsLeft <= 0) {
       store.delete(storeKey);
+      if (FIREBASE_DB_URL) {
+        fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, { method: "DELETE" }).catch(() => {});
+      }
       return {
         success: false,
         errorCode: "MAX_ATTEMPTS",
@@ -332,6 +398,15 @@ export async function verifySubmittedOTP(
     try {
       fetch(`${REDIS_URL}/del/otp_${encodeURIComponent(storeKey)}`, {
         headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+      });
+    } catch {
+      // Ignore
+    }
+  }
+  if (FIREBASE_DB_URL) {
+    try {
+      fetch(`${FIREBASE_DB_URL}/_system/otps/${fbKey}.json`, {
+        method: "DELETE",
       });
     } catch {
       // Ignore

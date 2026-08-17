@@ -204,14 +204,25 @@ export default function AdminDashboardPage() {
     setIsSendingOtp(true);
     setOtpError(null);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
     try {
       const res = await fetch("/api/admin/database/wipe-otp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: controller.signal,
       });
 
-      const data = await res.json();
+      clearTimeout(timeoutId);
+      let data: { success?: boolean; error?: string; cooldownRemaining?: number } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { success: false, error: `Server returned HTTP ${res.status}` };
+      }
+
       if (data.success) {
         setOtpSent(true);
         setOtpCooldown(30);
@@ -226,8 +237,14 @@ export default function AdminDashboardPage() {
           setOtpCooldown(data.cooldownRemaining);
         }
       }
-    } catch {
-      triggerShake("Network error while sending authorization code.");
+    } catch (err: unknown) {
+      clearTimeout(timeoutId);
+      const error = err as Error;
+      triggerShake(
+        error?.name === "AbortError"
+          ? "Request timed out while sending authorization code."
+          : "Network error while sending authorization code."
+      );
     } finally {
       setIsSendingOtp(false);
     }
@@ -364,10 +381,10 @@ export default function AdminDashboardPage() {
     setIsVerifyingOtp(true);
     setOtpError(null);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+    try {
       const res = await fetch("/api/admin/database/purge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -380,9 +397,14 @@ export default function AdminDashboardPage() {
       });
 
       clearTimeout(timeoutId);
-      const data = await res.json();
+      let data: { success?: boolean; error?: string; purgedAt?: string } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { success: false, error: `Server returned HTTP ${res.status}` };
+      }
 
-      if (!data.success) {
+      if (!res.ok || !data.success) {
         setIsVerifyingOtp(false);
         setOtpDigits(["", "", "", "", "", ""]);
         setTimeout(() => {
@@ -448,13 +470,14 @@ export default function AdminDashboardPage() {
         );
       }, 1200);
     } catch (err: unknown) {
+      clearTimeout(timeoutId);
       setIsVerifyingOtp(false);
       setIsWiping(false);
       const error = err as Error;
       const msg =
-        error.name === "AbortError"
-          ? "Purge timed out. Please verify your connection."
-          : "Network error occurred during authorization verification.";
+        error?.name === "AbortError"
+          ? "Purge request timed out. Please verify your connection."
+          : (error?.message || "Network error occurred during authorization verification.");
       triggerShake(msg);
     }
   };
