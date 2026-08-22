@@ -962,6 +962,19 @@ export default function AdminLoginPage() {
             {/* STAGE 4: 6-BOX EMAIL OTP INPUT */}
             {authStep === "OTP_INPUT" && (
               <div className="space-y-4 font-mono">
+                {/* Dynamic Delivery Banner */}
+                <div className="p-3 bg-[#F0FDF4] border border-[#BBF7D0] text-[#166534] rounded-sm text-xs flex items-center justify-between shadow-xs">
+                  <div className="flex items-center gap-2 truncate">
+                    <FaEnvelope className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
+                    <span className="truncate">
+                      Code sent to <strong className="text-black font-mono">{activeTargetEmail || googleProfile?.email}</strong>
+                    </span>
+                  </div>
+                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-[#DCFCE7] text-[#15803D] rounded-xs font-bold shrink-0 ml-2 border border-[#86EFAC]">
+                    {useCustomEmail ? "Custom Email" : "Primary Email"}
+                  </span>
+                </div>
+
                 <div
                   className={`flex items-center justify-between gap-1.5 sm:gap-2 transition-transform ${shakeError ? "animate-shake" : ""
                     }`}

@@ -23,13 +23,15 @@ function getInitializedAdminApp(): App | null {
     return _adminApp;
   }
 
+  if (!isFirebaseAdminConfigured()) {
+    return null;
+  }
+
   const projectId =
     process.env.FIREBASE_ADMIN_PROJECT_ID ||
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
     "portfolio-admin";
-  const clientEmail =
-    process.env.FIREBASE_ADMIN_CLIENT_EMAIL ||
-    "admin@portfolio-admin.iam.gserviceaccount.com";
+  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL || "";
   let privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY || "";
 
   // Fix multiline escaped private keys and surrounding quotes
@@ -46,31 +48,17 @@ function getInitializedAdminApp(): App | null {
     "https://portfolio-admin-default-rtdb.firebaseio.com";
 
   try {
-    if (projectId && clientEmail && privateKey) {
-      _adminApp = initializeApp({
-        credential: cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-        databaseURL,
-      });
-      return _adminApp;
-    }
-  } catch (err) {
-    console.warn("Firebase Admin SDK cert initialization warning:", err);
-  }
-
-  try {
-    const appsAfterAttempt = getApps();
-    if (appsAfterAttempt.length > 0) {
-      _adminApp = appsAfterAttempt[0];
-      return _adminApp;
-    }
-    _adminApp = initializeApp({ projectId, databaseURL });
+    _adminApp = initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+      databaseURL,
+    });
     return _adminApp;
   } catch (err) {
-    console.warn("Firebase Admin SDK fallback initialization warning:", err);
+    console.warn("Firebase Admin SDK cert initialization warning:", err);
     return null;
   }
 }
