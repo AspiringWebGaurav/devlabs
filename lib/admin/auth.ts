@@ -128,20 +128,26 @@ export async function authenticateWithGooglePreOTP(): Promise<{
       err?.code ||
       (typeof err?.message === "string" ? err.message.match(/auth\/[a-zA-Z0-9_-]+/)?.[0] : "");
 
+    console.warn("Firebase Google Auth Notice:", err);
+
     if (errCode === "auth/popup-closed-by-user" || errCode === "auth/cancelled-popup-request") {
       return {
         success: false,
-        error: "Google sign-in popup was closed before completing authentication. Please select your authorized admin account.",
+        error: "Google sign-in popup was closed before completing sign-in. Please click 'Continue with Google' and select your account.",
       };
     }
-
-    // Only log non-cancellation errors
-    console.warn("Firebase Google Auth Notice:", err);
 
     if (errCode === "auth/popup-blocked") {
       return {
         success: false,
-        error: "Google sign-in popup was blocked by your browser. Please allow popups for this site.",
+        error: "Google sign-in popup was blocked by your browser. Please allow popups for this site and try again.",
+      };
+    }
+
+    if (errCode === "auth/operation-not-allowed") {
+      return {
+        success: false,
+        error: "Google Sign-In is not enabled in Firebase Console. Go to Firebase Console > Authentication > Sign-in method and enable Google.",
       };
     }
 
@@ -162,13 +168,13 @@ export async function authenticateWithGooglePreOTP(): Promise<{
     if (errCode === "auth/invalid-api-key" || !process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
       return {
         success: false,
-        error: "Firebase API key missing. Please verify NEXT_PUBLIC_FIREBASE_* environment variables.",
+        error: "Firebase API key missing or invalid. Please check your NEXT_PUBLIC_FIREBASE_* environment variables.",
       };
     }
 
     return {
       success: false,
-      error: "Access Denied: This email account is not authorized as an administrator.",
+      error: err?.message || "Google authentication failed. Please try again or verify Firebase configuration.",
     };
   }
 }
