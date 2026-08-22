@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getAdminFirestore } from "@/lib/admin/firebase-admin";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import { sanitizeAndValidateText } from "@/lib/contact/profanity-filter";
 import { dispatchContactEmails } from "@/lib/contact/emailjs-contact";
@@ -63,20 +62,21 @@ export async function POST(request: NextRequest) {
     // Set timestamp immediately to prevent race-condition double clicks
     ipRateLimitMap.set(clientIp, now);
 
-    // 4. Cloudflare Turnstile Verification
-    const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIp);
-    if (!turnstileResult.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: turnstileResult.error || "Security verification failed. Please check Turnstile challenge.",
-          isTurnstileError: true,
-        },
-        { status: 403 }
-      );
+    // 4. Cloudflare Turnstile Bot Verification (if site key configured)
+    if (process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY) {
+      const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIp);
+      if (!turnstileResult.success) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: turnstileResult.error || "Security verification failed. Please complete the CAPTCHA.",
+          },
+          { status: 403 }
+        );
+      }
     }
 
-    // 5. Profanity & Abuse Text Sanitization
+    // 5. Profanity & Spam Filter Sanitization
     const nameSanitization = sanitizeAndValidateText(name, "Full Name", 2, 60);
     if (!nameSanitization.isValid) {
       return NextResponse.json(
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Persist to Cloud Firestore & RTDB under 'messages'
+    // 6. Realtime Database REST persistence (Universal cross-instance sync)
     const messageId = `msg_${now}_${Math.random().toString(36).substring(2, 7)}`;
     const selectedCategory = category || "General Inquiry";
 
@@ -109,11 +109,10 @@ export async function POST(request: NextRequest) {
       status: "UNREAD",
     };
 
-    // Realtime Database REST persistence (Universal cross-instance sync)
     const FIREBASE_DB_URL = (
       process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
       process.env.FIREBASE_DATABASE_URL ||
-      "https://portfolio-admin-default-rtdb.firebaseio.com"
+      ""
     ).replace(/\/$/, "");
 
     if (FIREBASE_DB_URL) {
@@ -127,16 +126,6 @@ export async function POST(request: NextRequest) {
       } catch (rtdbErr) {
         console.warn("RTDB message persistence note:", rtdbErr);
       }
-    }
-
-    // Firestore persistence
-    try {
-      const firestore = getAdminFirestore();
-      if (firestore) {
-        await firestore.collection("messages").doc(messageId).set(messageRecord, { merge: true });
-      }
-    } catch (dbErr) {
-      console.warn("Firestore message persistence note:", dbErr);
     }
 
     // 7. Dispatch Dual EmailJS Notifications (Clean direct execution)

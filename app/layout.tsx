@@ -5,7 +5,6 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { ThemeProvider } from "./provider";
 import { RouteProgressBar } from "@/components/ui/RouteProgressBar";
-import { SwitchyProvider } from "@/components/switchy/SwitchyProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,29 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var p = (window.location && window.location.pathname) || '';
-                  if (p.startsWith('/admin')) {
-                    document.documentElement.classList.remove('dark');
-                    document.documentElement.style.colorScheme = 'light';
-                    document.documentElement.style.backgroundColor = '#FAFAFA';
-                  } else {
-                    document.documentElement.classList.add('dark');
-                    document.documentElement.style.colorScheme = 'dark';
-                    document.documentElement.style.backgroundColor = '#000319';
-                  }
-                } catch(e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
+    <html lang="en" suppressHydrationWarning className="dark">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <ThemeProvider
           attribute="class"
@@ -64,7 +41,6 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <RouteProgressBar />
-          <SwitchyProvider />
           {children}
           <Analytics />
           <SpeedInsights />
