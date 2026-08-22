@@ -95,13 +95,29 @@ export const rtdb: Database = new Proxy({} as Database, {
   },
 });
 
-const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({
-  prompt: "select_account",
+let _googleProvider: GoogleAuthProvider | null = null;
+export const getGoogleProvider = (): GoogleAuthProvider => {
+  if (!_googleProvider) {
+    _googleProvider = new GoogleAuthProvider();
+    _googleProvider.setCustomParameters({
+      prompt: "select_account",
+    });
+  }
+  return _googleProvider;
+};
+
+export const googleProvider: GoogleAuthProvider = new Proxy({} as GoogleAuthProvider, {
+  get(_, prop) {
+    const instance = getGoogleProvider();
+    const val = (instance as unknown as Record<string, unknown>)[prop as string];
+    if (typeof val === "function") {
+      return (val as (...args: unknown[]) => unknown).bind(instance);
+    }
+    return val;
+  },
 });
 
 export {
-  googleProvider,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,

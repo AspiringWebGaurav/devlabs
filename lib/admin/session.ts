@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { ADMIN_COOKIE_NAME, AUTHORIZED_ADMIN_EMAIL } from "./auth";
+import { ADMIN_COOKIE_NAME, AUTHORIZED_ADMIN_EMAIL } from "./constants";
 
 /**
  * Validates whether the incoming NextRequest has an active, valid, non-expired Admin session cookie.

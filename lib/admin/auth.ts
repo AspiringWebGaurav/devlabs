@@ -1,13 +1,19 @@
 import { AdminSession, AdminUser, AdminSecurityConfig } from "@/types/admin";
 import { auth, googleProvider, signInWithPopup, signOut } from "@/lib/admin/firebase";
 
-export const ADMIN_COOKIE_NAME = "admin_session";
-export const AUTHORIZED_ADMIN_EMAIL = "gauravpatil9262@gmail.com";
-export const AUTHORIZED_ADMIN_HASH = "51244b59576a3a706630b1f136520a35105bfb9bb06b0c064e171cb788549637";
-export const AUTHORIZED_ADMIN_HASHES = [
-  "51244b59576a3a706630b1f136520a35105bfb9bb06b0c064e171cb788549637",
-  "e097248b9f86e12c2d7bb7243ddad4741f4c71058785526733508270d7e3ce8c",
-];
+import {
+  ADMIN_COOKIE_NAME,
+  AUTHORIZED_ADMIN_EMAIL,
+  AUTHORIZED_ADMIN_HASH,
+  AUTHORIZED_ADMIN_HASHES,
+} from "./constants";
+
+export {
+  ADMIN_COOKIE_NAME,
+  AUTHORIZED_ADMIN_EMAIL,
+  AUTHORIZED_ADMIN_HASH,
+  AUTHORIZED_ADMIN_HASHES,
+};
 
 /**
  * Computes SHA-256 hash of a string using Web Cryptography API.
