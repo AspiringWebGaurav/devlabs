@@ -1,4 +1,4 @@
-import { getAdminFirestore, getAdminDb } from "@/lib/admin/firebase-admin";
+import { getAdminFirestore } from "@/lib/admin/firebase-admin";
 import {
   Visitor,
   VisitorSession,
@@ -13,6 +13,54 @@ import { publishVisitorEvent } from "./event-bus";
 const VISITORS_COLLECTION = "visitors";
 const SESSIONS_COLLECTION = "visitor_sessions";
 const APPEALS_COLLECTION = "visitor_appeals";
+
+const FIREBASE_DB_URL = (
+  process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
+  process.env.FIREBASE_DATABASE_URL ||
+  "https://portfolio-admin-default-rtdb.firebaseio.com"
+).replace(/\/$/, "");
+
+// Universal cross-serverless REST helper for Realtime Database writes
+async function rtdbPut(path: string, data: unknown): Promise<void> {
+  if (!FIREBASE_DB_URL) return;
+  try {
+    await fetch(`${FIREBASE_DB_URL}/${path}.json`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+      cache: "no-store",
+    });
+  } catch (err) {
+    console.warn(`RTDB PUT ${path} note:`, err);
+  }
+}
+
+async function rtdbGet<T>(path: string): Promise<T | null> {
+  if (!FIREBASE_DB_URL) return null;
+  try {
+    const res = await fetch(`${FIREBASE_DB_URL}/${path}.json`, {
+      cache: "no-store",
+    });
+    if (res.ok) {
+      return (await res.json()) as T;
+    }
+  } catch (err) {
+    console.warn(`RTDB GET ${path} note:`, err);
+  }
+  return null;
+}
+
+async function rtdbDelete(path: string): Promise<void> {
+  if (!FIREBASE_DB_URL) return;
+  try {
+    await fetch(`${FIREBASE_DB_URL}/${path}.json`, {
+      method: "DELETE",
+      cache: "no-store",
+    });
+  } catch (err) {
+    console.warn(`RTDB DELETE ${path} note:`, err);
+  }
+}
 
 // Session timeout window: 15 minutes of inactivity before considering a new visit session
 const SESSION_INACTIVITY_MS = 15 * 60 * 1000;
@@ -88,7 +136,23 @@ export async function findVisitorByMachineHash(machineHash: string | undefined |
     }
   }
 
-  // 2. Firestore query lookup
+  // 2. Direct HTTPS REST lookup in Firebase Realtime Database
+  const rtdbData = await rtdbGet<Record<string, Visitor>>("visitors");
+  if (rtdbData && typeof rtdbData === "object") {
+    for (const item of Object.values(rtdbData)) {
+      if (
+        item &&
+        (item.machineHash === cleanMfp ||
+          (Array.isArray(item.machineHashes) && item.machineHashes.includes(cleanMfp)))
+      ) {
+        memStore.visitors.set(item.id, item);
+        memStore.machineIndex?.set(cleanMfp, item.id);
+        return item;
+      }
+    }
+  }
+
+  // 3. Firestore query lookup
   const firestore = getAdminFirestore();
   if (firestore) {
     try {
@@ -119,32 +183,7 @@ export async function findVisitorByMachineHash(machineHash: string | undefined |
         return found;
       }
     } catch {
-      // Fall through to RTDB
-    }
-  }
-
-  // 3. Firebase Realtime Database lookup
-  const rtdb = getAdminDb();
-  if (rtdb) {
-    try {
-      const snap = await rtdb.ref(VISITORS_COLLECTION).once("value");
-      if (snap.exists()) {
-        const val = snap.val();
-        if (val && typeof val === "object") {
-          for (const item of Object.values(val) as Visitor[]) {
-            if (
-              item.machineHash === cleanMfp ||
-              (Array.isArray(item.machineHashes) && item.machineHashes.includes(cleanMfp))
-            ) {
-              memStore.visitors.set(item.id, item);
-              memStore.machineIndex?.set(cleanMfp, item.id);
-              return item;
-            }
-          }
-        }
-      }
-    } catch (rtdbErr) {
-      console.warn("RTDB findVisitorByMachineHash note:", rtdbErr);
+      // Fall through
     }
   }
 
@@ -173,7 +212,6 @@ export async function upsertVisitor(
 ): Promise<Visitor> {
   const now = Date.now();
   const firestore = getAdminFirestore();
-  const rtdb = getAdminDb();
   const rawMfp = data.machineHash?.trim();
 
   // If machineHash is present, check if this physical device already has a registered visitor document
@@ -187,33 +225,25 @@ export async function upsertVisitor(
 
   let completeVisitor: Visitor;
 
-  // 1. Check existing record in Firestore or RTDB or Memory
-  let existing: Visitor | null = null;
+  // 1. Check existing record in Memory, RTDB REST, or Firestore
+  let existing: Visitor | null = memStore.visitors.get(targetVisitorId) || null;
 
-  if (firestore) {
+  if (!existing) {
+    const rtdbRecord = await rtdbGet<Visitor>(`${VISITORS_COLLECTION}/${targetVisitorId}`);
+    if (rtdbRecord && rtdbRecord.id) {
+      existing = rtdbRecord;
+    }
+  }
+
+  if (!existing && firestore) {
     try {
       const snap = await firestore.collection(VISITORS_COLLECTION).doc(targetVisitorId).get();
       if (snap.exists) {
         existing = snap.data() as Visitor;
       }
     } catch {
-      // Fall through to RTDB
+      // Ignored
     }
-  }
-
-  if (!existing && rtdb) {
-    try {
-      const snap = await rtdb.ref(`${VISITORS_COLLECTION}/${targetVisitorId}`).once("value");
-      if (snap.exists()) {
-        existing = snap.val() as Visitor;
-      }
-    } catch {
-      // Fall through to memory
-    }
-  }
-
-  if (!existing) {
-    existing = memStore.visitors.get(targetVisitorId) || null;
   }
 
   if (!existing) {
@@ -318,21 +348,15 @@ export async function upsertVisitor(
 
   const cleanedDoc = cleanForFirestore(completeVisitor);
 
-  // 1. Dual-Write to Cloud Firestore
+  // 1. Direct HTTPS REST Dual-Write to Firebase Realtime Database (Global instant sync)
+  await rtdbPut(`${VISITORS_COLLECTION}/${targetVisitorId}`, cleanedDoc);
+
+  // 2. Dual-Write to Cloud Firestore
   if (firestore) {
     try {
       await firestore.collection(VISITORS_COLLECTION).doc(targetVisitorId).set(cleanedDoc, { merge: true });
     } catch (err) {
       console.warn("Firestore upsertVisitor note:", err);
-    }
-  }
-
-  // 2. Dual-Write to Firebase Realtime Database
-  if (rtdb) {
-    try {
-      await rtdb.ref(`${VISITORS_COLLECTION}/${targetVisitorId}`).set(cleanedDoc);
-    } catch (err) {
-      console.warn("RTDB upsertVisitor note:", err);
     }
   }
 
@@ -350,6 +374,11 @@ export async function upsertVisitor(
  * Retrieves a visitor by Visitor ID.
  */
 export async function getVisitorById(visitorId: string): Promise<Visitor | null> {
+  const rtdbRecord = await rtdbGet<Visitor>(`${VISITORS_COLLECTION}/${visitorId}`);
+  if (rtdbRecord && rtdbRecord.id) {
+    return rtdbRecord;
+  }
+
   const firestore = getAdminFirestore();
   if (firestore) {
     try {
@@ -358,19 +387,7 @@ export async function getVisitorById(visitorId: string): Promise<Visitor | null>
         return snap.data() as Visitor;
       }
     } catch {
-      // Fall through to RTDB
-    }
-  }
-
-  const rtdb = getAdminDb();
-  if (rtdb) {
-    try {
-      const snap = await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}`).once("value");
-      if (snap.exists()) {
-        return snap.val() as Visitor;
-      }
-    } catch {
-      // Fall through to memory
+      // Ignored
     }
   }
 
@@ -379,7 +396,7 @@ export async function getVisitorById(visitorId: string): Promise<Visitor | null>
 
 /**
  * Lists all visitors for the admin panel with optional filtering.
- * Queries Cloud Firestore + Firebase Realtime Database with deduplication.
+ * Queries Firebase Realtime Database (REST) + Cloud Firestore with deduplication.
  */
 export async function listVisitors(options?: {
   limit?: number;
@@ -389,7 +406,17 @@ export async function listVisitors(options?: {
   const maxLimit = options?.limit || 100;
   const visitorMap = new Map<string, Visitor>();
 
-  // 1. Fetch from Cloud Firestore
+  // 1. Fetch from Firebase Realtime Database via direct HTTPS REST (Instant cross-serverless)
+  const rtdbData = await rtdbGet<Record<string, Visitor>>(VISITORS_COLLECTION);
+  if (rtdbData && typeof rtdbData === "object") {
+    for (const item of Object.values(rtdbData)) {
+      if (item && item.id) {
+        visitorMap.set(item.id, item);
+      }
+    }
+  }
+
+  // 2. Fetch from Cloud Firestore and merge latest
   const firestore = getAdminFirestore();
   if (firestore) {
     try {
@@ -402,34 +429,14 @@ export async function listVisitors(options?: {
       snap.forEach((doc) => {
         const v = doc.data() as Visitor;
         if (v && v.id) {
-          visitorMap.set(v.id, v);
+          const existing = visitorMap.get(v.id);
+          if (!existing || (v.lastSeen || 0) > (existing.lastSeen || 0)) {
+            visitorMap.set(v.id, v);
+          }
         }
       });
     } catch (err) {
       console.warn("Firestore listVisitors note:", err);
-    }
-  }
-
-  // 2. Fetch from Firebase Realtime Database
-  const rtdb = getAdminDb();
-  if (rtdb) {
-    try {
-      const snap = await rtdb.ref(VISITORS_COLLECTION).once("value");
-      if (snap.exists()) {
-        const val = snap.val();
-        if (val && typeof val === "object") {
-          for (const item of Object.values(val) as Visitor[]) {
-            if (item && item.id) {
-              const existing = visitorMap.get(item.id);
-              if (!existing || (item.lastSeen || 0) > (existing.lastSeen || 0)) {
-                visitorMap.set(item.id, item);
-              }
-            }
-          }
-        }
-      }
-    } catch (rtdbErr) {
-      console.warn("RTDB listVisitors note:", rtdbErr);
     }
   }
 
@@ -553,7 +560,6 @@ export async function getVisitorStatsSummary(): Promise<VisitorStatsSummary> {
 export async function setVisitorBan(visitorId: string, banState: VisitorBan): Promise<boolean> {
   const now = Date.now();
   const firestore = getAdminFirestore();
-  const rtdb = getAdminDb();
 
   const banPayload = {
     ban: {
@@ -565,27 +571,21 @@ export async function setVisitorBan(visitorId: string, banState: VisitorBan): Pr
     updatedAt: now,
   };
 
-  // 1. Update in Firestore with merge: true
+  // 1. Direct REST Realtime Database update
+  await rtdbPut(`${VISITORS_COLLECTION}/${visitorId}/ban`, banPayload.ban);
+  if (banState.enabled) {
+    await rtdbPut(`banned_visitors/${visitorId}`, banPayload.ban);
+  } else {
+    await rtdbDelete(`banned_visitors/${visitorId}`);
+  }
+
+  // 2. Update in Firestore with merge: true
   if (firestore) {
     try {
       const docRef = firestore.collection(VISITORS_COLLECTION).doc(visitorId);
       await docRef.set(cleanForFirestore(banPayload), { merge: true });
     } catch (err) {
       console.warn("Firestore setVisitorBan note:", err);
-    }
-  }
-
-  // 2. Update in Firebase Realtime Database
-  if (rtdb) {
-    try {
-      await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}/ban`).set(banPayload.ban);
-      if (banState.enabled) {
-        await rtdb.ref(`banned_visitors/${visitorId}`).set(banPayload.ban);
-      } else {
-        await rtdb.ref(`banned_visitors/${visitorId}`).remove();
-      }
-    } catch (rtdbErr) {
-      console.warn("RTDB setVisitorBan note:", rtdbErr);
     }
   }
 
@@ -618,16 +618,20 @@ export async function setVisitorBan(visitorId: string, banState: VisitorBan): Pr
 export async function createSession(session: VisitorSession): Promise<void> {
   const now = Date.now();
   const firestore = getAdminFirestore();
-  const rtdb = getAdminDb();
 
-  // 1. Write to Firestore
+  // 1. Direct REST Realtime Database write
+  await rtdbPut(`${SESSIONS_COLLECTION}/${session.sessionId}`, cleanForFirestore(session));
+  await rtdbPut(`${VISITORS_COLLECTION}/${session.visitorId}/activeSessionId`, session.sessionId);
+  await rtdbPut(`${VISITORS_COLLECTION}/${session.visitorId}/online`, true);
+
+  // 2. Write to Firestore
   if (firestore) {
     try {
       const sessionRef = firestore.collection(SESSIONS_COLLECTION).doc(session.sessionId);
       const snap = await sessionRef.get();
 
       if (snap.exists) {
-        // Reuse existing session document (e.g. on SSE reconnect or route navigation)
+        // Reuse existing session document
         await sessionRef.set(
           cleanForFirestore({
             currentPath: session.currentPath,
@@ -641,7 +645,7 @@ export async function createSession(session: VisitorSession): Promise<void> {
         const cleaned = cleanForFirestore(session);
         await sessionRef.set(cleaned, { merge: true });
 
-        // Auto-prune old sessions for this visitor (keep max 3 latest sessions to prevent Firestore bloat)
+        // Auto-prune old sessions for this visitor (keep max 3 latest sessions)
         const oldSessions = await firestore
           .collection(SESSIONS_COLLECTION)
           .where("visitorId", "==", session.visitorId)
@@ -661,17 +665,6 @@ export async function createSession(session: VisitorSession): Promise<void> {
     }
   }
 
-  // 2. Write to Firebase Realtime Database
-  if (rtdb) {
-    try {
-      await rtdb.ref(`${SESSIONS_COLLECTION}/${session.sessionId}`).set(cleanForFirestore(session));
-      await rtdb.ref(`${VISITORS_COLLECTION}/${session.visitorId}/activeSessionId`).set(session.sessionId);
-      await rtdb.ref(`${VISITORS_COLLECTION}/${session.visitorId}/online`).set(true);
-    } catch (rtdbErr) {
-      console.warn("RTDB createSession note:", rtdbErr);
-    }
-  }
-
   memStore.sessions.set(session.sessionId, session);
 }
 
@@ -681,9 +674,14 @@ export async function createSession(session: VisitorSession): Promise<void> {
 export async function closeSession(sessionId: string, visitorId: string): Promise<void> {
   const now = Date.now();
   const firestore = getAdminFirestore();
-  const rtdb = getAdminDb();
 
-  // 1. Close session in Firestore
+  // 1. Direct REST Realtime Database disconnect
+  await rtdbPut(`${SESSIONS_COLLECTION}/${sessionId}/online`, false);
+  await rtdbPut(`${SESSIONS_COLLECTION}/${sessionId}/disconnectedAt`, now);
+  await rtdbPut(`${VISITORS_COLLECTION}/${visitorId}/online`, false);
+  await rtdbPut(`${VISITORS_COLLECTION}/${visitorId}/lastSeen`, now);
+
+  // 2. Close session in Firestore
   if (firestore) {
     try {
       const sessionRef = firestore.collection(SESSIONS_COLLECTION).doc(sessionId);
@@ -707,18 +705,6 @@ export async function closeSession(sessionId: string, visitorId: string): Promis
       );
     } catch {
       // Memory fallback
-    }
-  }
-
-  // 2. Close session in Firebase Realtime Database
-  if (rtdb) {
-    try {
-      await rtdb.ref(`${SESSIONS_COLLECTION}/${sessionId}/online`).set(false);
-      await rtdb.ref(`${SESSIONS_COLLECTION}/${sessionId}/disconnectedAt`).set(now);
-      await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}/online`).set(false);
-      await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}/lastSeen`).set(now);
-    } catch (rtdbErr) {
-      console.warn("RTDB closeSession note:", rtdbErr);
     }
   }
 
@@ -752,11 +738,14 @@ export async function cascadeDeleteVisitor(
   visitorId: string
 ): Promise<{ deletedSessions: number; deletedAppeals: number }> {
   const firestore = getAdminFirestore();
-  const rtdb = getAdminDb();
   let deletedSessions = 0;
   let deletedAppeals = 0;
 
-  // 1. Delete from Cloud Firestore
+  // 1. Direct REST Realtime Database removal
+  await rtdbDelete(`${VISITORS_COLLECTION}/${visitorId}`);
+  await rtdbDelete(`banned_visitors/${visitorId}`);
+
+  // 2. Delete from Cloud Firestore
   if (firestore) {
     try {
       const visitorRef = firestore.collection(VISITORS_COLLECTION).doc(visitorId);
@@ -793,16 +782,6 @@ export async function cascadeDeleteVisitor(
       }
     } catch (err) {
       console.warn("Firestore cascadeDeleteVisitor note:", err);
-    }
-  }
-
-  // 2. Delete from Firebase Realtime Database
-  if (rtdb) {
-    try {
-      await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}`).remove().catch(() => {});
-      await rtdb.ref(`banned_visitors/${visitorId}`).remove().catch(() => {});
-    } catch (rtdbErr) {
-      console.warn("RTDB cascadeDeleteVisitor note:", rtdbErr);
     }
   }
 
@@ -950,7 +929,6 @@ export async function submitVisitorAppeal(data: {
   const now = Date.now();
   const id = `app_${Math.random().toString(36).substring(2, 11)}`;
   const firestore = getAdminFirestore();
-  const rtdb = getAdminDb();
 
   const appeal: VisitorAppeal = {
     id,
@@ -966,21 +944,15 @@ export async function submitVisitorAppeal(data: {
 
   const cleaned = cleanForFirestore(appeal);
 
-  // 1. Write to Firestore
+  // 1. Direct REST Realtime Database write
+  await rtdbPut(`${APPEALS_COLLECTION}/${id}`, cleaned);
+
+  // 2. Write to Firestore
   if (firestore) {
     try {
       await firestore.collection(APPEALS_COLLECTION).doc(id).set(cleaned, { merge: true });
     } catch (err) {
       console.warn("Firestore submitVisitorAppeal note:", err);
-    }
-  }
-
-  // 2. Write to Firebase Realtime Database
-  if (rtdb) {
-    try {
-      await rtdb.ref(`${APPEALS_COLLECTION}/${id}`).set(cleaned);
-    } catch (rtdbErr) {
-      console.warn("RTDB submitVisitorAppeal note:", rtdbErr);
     }
   }
 
@@ -1004,7 +976,17 @@ export async function submitVisitorAppeal(data: {
 export async function getVisitorAppeals(): Promise<VisitorAppeal[]> {
   const appealMap = new Map<string, VisitorAppeal>();
 
-  // 1. Fetch from Firestore
+  // 1. Fetch from RTDB via REST
+  const rtdbData = await rtdbGet<Record<string, VisitorAppeal>>(APPEALS_COLLECTION);
+  if (rtdbData && typeof rtdbData === "object") {
+    for (const item of Object.values(rtdbData)) {
+      if (item && item.id) {
+        appealMap.set(item.id, item);
+      }
+    }
+  }
+
+  // 2. Fetch from Firestore
   const firestore = getAdminFirestore();
   if (firestore) {
     try {
@@ -1014,30 +996,12 @@ export async function getVisitorAppeals(): Promise<VisitorAppeal[]> {
         .get();
       snap.docs.forEach((d) => {
         const a = d.data() as VisitorAppeal;
-        if (a && a.id) appealMap.set(a.id, a);
+        if (a && a.id && !appealMap.has(a.id)) {
+          appealMap.set(a.id, a);
+        }
       });
     } catch (err) {
       console.warn("Firestore getVisitorAppeals note:", err);
-    }
-  }
-
-  // 2. Fetch from RTDB
-  const rtdb = getAdminDb();
-  if (rtdb) {
-    try {
-      const snap = await rtdb.ref(APPEALS_COLLECTION).once("value");
-      if (snap.exists()) {
-        const val = snap.val();
-        if (val && typeof val === "object") {
-          for (const item of Object.values(val) as VisitorAppeal[]) {
-            if (item && item.id && !appealMap.has(item.id)) {
-              appealMap.set(item.id, item);
-            }
-          }
-        }
-      }
-    } catch (rtdbErr) {
-      console.warn("RTDB getVisitorAppeals note:", rtdbErr);
     }
   }
 
@@ -1055,6 +1019,15 @@ export async function getVisitorAppeals(): Promise<VisitorAppeal[]> {
  * Retrieves the latest appeal for a given visitor ID.
  */
 export async function getAppealByVisitorId(visitorId: string): Promise<VisitorAppeal | null> {
+  const rtdbData = await rtdbGet<Record<string, VisitorAppeal>>(APPEALS_COLLECTION);
+  if (rtdbData && typeof rtdbData === "object") {
+    for (const item of Object.values(rtdbData)) {
+      if (item && item.visitorId === visitorId) {
+        return item;
+      }
+    }
+  }
+
   const firestore = getAdminFirestore();
   if (firestore) {
     try {
@@ -1069,25 +1042,6 @@ export async function getAppealByVisitorId(visitorId: string): Promise<VisitorAp
       }
     } catch (err) {
       console.warn("Firestore getAppealByVisitorId note:", err);
-    }
-  }
-
-  const rtdb = getAdminDb();
-  if (rtdb) {
-    try {
-      const snap = await rtdb.ref(APPEALS_COLLECTION).once("value");
-      if (snap.exists()) {
-        const val = snap.val();
-        if (val && typeof val === "object") {
-          for (const item of Object.values(val) as VisitorAppeal[]) {
-            if (item && item.visitorId === visitorId) {
-              return item;
-            }
-          }
-        }
-      }
-    } catch (rtdbErr) {
-      console.warn("RTDB getAppealByVisitorId note:", rtdbErr);
     }
   }
 
@@ -1110,11 +1064,18 @@ export async function updateAppealStatus(
   adminNotes?: string
 ): Promise<VisitorAppeal | null> {
   const firestore = getAdminFirestore();
-  const rtdb = getAdminDb();
   const now = Date.now();
 
   let updatedAppeal: VisitorAppeal | null = null;
 
+  // 1. Direct REST Realtime Database update
+  await rtdbPut(`${APPEALS_COLLECTION}/${appealId}/status`, status);
+  await rtdbPut(`${APPEALS_COLLECTION}/${appealId}/reviewedAt`, now);
+  if (adminNotes !== undefined) {
+    await rtdbPut(`${APPEALS_COLLECTION}/${appealId}/adminNotes`, adminNotes);
+  }
+
+  // 2. Firestore update
   if (firestore) {
     try {
       const docRef = firestore.collection(APPEALS_COLLECTION).doc(appealId);
@@ -1136,18 +1097,6 @@ export async function updateAppealStatus(
       }
     } catch (err) {
       console.warn("Firestore updateAppealStatus note:", err);
-    }
-  }
-
-  if (rtdb) {
-    try {
-      await rtdb.ref(`${APPEALS_COLLECTION}/${appealId}/status`).set(status);
-      await rtdb.ref(`${APPEALS_COLLECTION}/${appealId}/reviewedAt`).set(now);
-      if (adminNotes !== undefined) {
-        await rtdb.ref(`${APPEALS_COLLECTION}/${appealId}/adminNotes`).set(adminNotes);
-      }
-    } catch (rtdbErr) {
-      console.warn("RTDB updateAppealStatus note:", rtdbErr);
     }
   }
 
