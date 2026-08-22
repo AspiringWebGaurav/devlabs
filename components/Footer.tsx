@@ -1,13 +1,21 @@
+"use client";
+
+import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { FaLocationArrow } from "react-icons/fa6";
 
 import { socialMedia } from "@/data";
 import MagicButton from "./ui/MagicButton";
+import { VisitorIdBadge } from "./visitor/VisitorIdBadge";
+import { ContactModal } from "./contact/ContactModal";
 
 const Footer = () => {
+  const [isContactOpen, setIsContactOpen] = useState(false);
+
   return (
     <footer className="w-full pt-20 pb-10" id="contact">
-      {/* background grid */}
+      {/* Background grid */}
 
       <div className="flex flex-col items-center">
         <h1 className="heading lg:max-w-[45vw]">
@@ -18,15 +26,16 @@ const Footer = () => {
           Reach out to me today and let&apos;s discuss how I can help you
           achieve your goals.
         </p>
-        <a href="mailto:gauravpatil5737@gmail.com">
-          <MagicButton
-            title="Let's get in touch"
-            icon={<FaLocationArrow />}
-            position="right"
-          />
-        </a>
+        <MagicButton
+          title="Let's get in touch"
+          icon={<FaLocationArrow />}
+          position="right"
+          handleClick={() => setIsContactOpen(true)}
+        />
       </div>
-      <div className="flex mt-20 pt-8 border-t border-white/[0.08] md:flex-row flex-col justify-between items-center gap-4">
+
+      <div className="grid grid-cols-1 md:grid-cols-3 items-center w-full mt-20 pt-8 border-t border-white/[0.08] gap-4">
+        {/* Left: Copyright & Legal Links */}
         <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 text-xs sm:text-sm text-neutral-400 font-normal">
           <span>© {new Date().getFullYear()} Gaurav Patil</span>
           <span className="text-neutral-600">·</span>
@@ -49,23 +58,34 @@ const Footer = () => {
           </Link>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Center: Dynamic Verified Live Visitor ID */}
+        <div className="flex items-center justify-center">
+          <VisitorIdBadge />
+        </div>
+
+        {/* Right: Social Media Links */}
+        <div className="flex items-center justify-center md:justify-end gap-3">
           {socialMedia.map((info) => (
             <a
               key={info.id}
               href={info.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-10 h-10 cursor-pointer flex justify-center items-center rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-md hover:border-purple/50 hover:bg-purple/[0.08] transition-all duration-300 hover:scale-105 shadow-sm"
-              aria-label="Social Link"
+              className="w-10 h-10 cursor-pointer flex justify-center items-center backdrop-filter backdrop-blur-lg saturate-180 bg-opacity-75 bg-black-200 rounded-lg border border-black-300 hover:border-purple/50 transition-colors duration-200"
+              aria-label={`Link to ${info.link}`}
             >
-              <img src={info.img} alt="icons" width={18} height={18} className="opacity-80 hover:opacity-100 transition-opacity" />
+              <Image src={info.img} alt="icons" width={20} height={20} />
             </a>
           ))}
         </div>
       </div>
-    </footer>
 
+      {/* Dynamic Interactive Contact Modal */}
+      <ContactModal
+        isOpen={isContactOpen}
+        onClose={() => setIsContactOpen(false)}
+      />
+    </footer>
   );
 };
 
