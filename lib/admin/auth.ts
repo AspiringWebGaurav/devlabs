@@ -4,6 +4,10 @@ import { auth, googleProvider, signInWithPopup, signOut } from "@/lib/admin/fire
 export const ADMIN_COOKIE_NAME = "admin_session";
 export const AUTHORIZED_ADMIN_EMAIL = "gauravpatil9262@gmail.com";
 export const AUTHORIZED_ADMIN_HASH = "51244b59576a3a706630b1f136520a35105bfb9bb06b0c064e171cb788549637";
+export const AUTHORIZED_ADMIN_HASHES = [
+  "51244b59576a3a706630b1f136520a35105bfb9bb06b0c064e171cb788549637",
+  "e097248b9f86e12c2d7bb7243ddad4741f4c71058785526733508270d7e3ce8c",
+];
 
 /**
  * Computes SHA-256 hash of a string using Web Cryptography API.
@@ -13,6 +17,16 @@ export async function sha256Hex(message: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Validates whether an email matches the cryptographically hashed admin identity.
+ * Zero database or external server lookup required (persists across nuclear wipes).
+ */
+export async function isAuthorizedAdminEmail(email: string): Promise<boolean> {
+  if (!email || typeof email !== "string") return false;
+  const hash = await sha256Hex(email.trim().toLowerCase());
+  return AUTHORIZED_ADMIN_HASHES.includes(hash);
 }
 
 /**
@@ -34,20 +48,23 @@ export async function authenticateWithGooglePreOTP(): Promise<{
     const firebaseUser = result.user;
     const userEmail = (firebaseUser.email || "").trim().toLowerCase();
 
-    // Check if the authenticated Google email matches gauravpatil9262@gmail.com
-    if (userEmail !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+    // Verify Google email against encrypted SHA-256 admin hash
+    const isAuthorized = await isAuthorizedAdminEmail(userEmail);
+    if (!isAuthorized) {
       await signOut(auth);
       return {
         success: false,
-        error: "Access Denied: You are not an admin.",
+        error: userEmail
+          ? `Access Denied: ${userEmail} is not authorized as an administrator. You do not have permission to access the admin panel.`
+          : "Access Denied: This Google account is not authorized as an administrator.",
       };
     }
 
     return {
       success: true,
       googleUser: {
-        email: AUTHORIZED_ADMIN_EMAIL,
-        name: firebaseUser.displayName || "Gaurav patil",
+        email: userEmail,
+        name: firebaseUser.displayName || "Admin",
         avatar:
           firebaseUser.photoURL ||
           "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
@@ -56,39 +73,52 @@ export async function authenticateWithGooglePreOTP(): Promise<{
     };
   } catch (error: unknown) {
     const err = error as { code?: string; message?: string };
-    console.error("Firebase Auth Pre-OTP Error:", err);
 
-    if (err?.code === "auth/popup-closed-by-user") {
+    const errCode =
+      err?.code ||
+      (typeof err?.message === "string" ? err.message.match(/auth\/[a-zA-Z0-9_-]+/)?.[0] : "");
+
+    if (errCode === "auth/popup-closed-by-user" || errCode === "auth/cancelled-popup-request") {
       return {
         success: false,
-        error: "Google sign-in popup was cancelled.",
+        error: "Google sign-in popup was closed before completing authentication. Please select your authorized admin account.",
       };
     }
 
-    if (err?.code === "auth/unauthorized-domain") {
+    // Only log non-cancellation errors
+    console.warn("Firebase Google Auth Notice:", err);
+
+    if (errCode === "auth/popup-blocked") {
+      return {
+        success: false,
+        error: "Google sign-in popup was blocked by your browser. Please allow popups for this site.",
+      };
+    }
+
+    if (errCode === "auth/unauthorized-domain") {
       return {
         success: false,
         error: "Domain not authorized in Firebase. Please add this domain under Firebase Console > Authentication > Settings > Authorized domains.",
       };
     }
 
-    if (err?.code === "auth/invalid-api-key" || !process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+    if (errCode === "auth/network-request-failed") {
       return {
         success: false,
-        error: "Firebase API key missing. Please add NEXT_PUBLIC_FIREBASE_* variables in Vercel Project Settings > Environment Variables.",
+        error: "Network error connecting to Google Auth servers. Please check your internet connection.",
       };
     }
 
-    if (err?.code === "auth/popup-blocked") {
+    if (errCode === "auth/invalid-api-key" || !process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
       return {
         success: false,
-        error: "Google sign-in popup was blocked by browser. Please enable popups for this site.",
+        error: "Firebase API key missing. Please verify NEXT_PUBLIC_FIREBASE_* environment variables.",
       };
     }
 
     return {
       success: false,
-      error: err?.message || "Google authentication handshake failed. Please try again.",
+      error: "Access Denied: This email account is not authorized as an administrator.",
     };
   }
 }
@@ -108,13 +138,16 @@ export async function signInWithFirebaseGoogle(): Promise<{
     const firebaseUser = result.user;
     const userEmail = (firebaseUser.email || "").trim().toLowerCase();
 
-    // Check if the authenticated Google email matches gauravpatil9262@gmail.com
-    if (userEmail !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+    // Verify Google email against encrypted SHA-256 admin hash
+    const isAuthorized = await isAuthorizedAdminEmail(userEmail);
+    if (!isAuthorized) {
       // Immediately sign out from Firebase
       await signOut(auth);
       return {
         success: false,
-        error: "Access Denied: You are not an admin.",
+        error: userEmail
+          ? `Access Denied: ${userEmail} is not authorized as an administrator. You do not have permission to access the admin panel.`
+          : "Access Denied: This Google account is not authorized as an administrator.",
       };
     }
 
@@ -123,8 +156,8 @@ export async function signInWithFirebaseGoogle(): Promise<{
 
     const adminUser: AdminUser = {
       id: `usr_google_${firebaseUser.uid}`,
-      email: AUTHORIZED_ADMIN_EMAIL,
-      name: firebaseUser.displayName || "Gaurav",
+      email: userEmail,
+      name: firebaseUser.displayName || "Admin",
       role: "superadmin",
       avatar:
         firebaseUser.photoURL ||
@@ -143,27 +176,27 @@ export async function signInWithFirebaseGoogle(): Promise<{
     };
   } catch (error: unknown) {
     const err = error as { code?: string; message?: string };
-    console.error("Firebase Auth Error:", err);
 
-    if (err?.code === "auth/popup-closed-by-user") {
+    const errCode =
+      err?.code ||
+      (typeof err?.message === "string" ? err.message.match(/auth\/[a-zA-Z0-9_-]+/)?.[0] : "");
+
+    if (errCode === "auth/popup-closed-by-user" || errCode === "auth/cancelled-popup-request") {
       return {
         success: false,
-        error: "Google sign-in popup was closed before completing authentication.",
+        error: "Google sign-in popup was closed before completing authentication. Please select your authorized admin account.",
       };
     }
-    if (err?.code === "auth/cancelled-popup-request") {
-      return {
-        success: false,
-        error: "Sign-in popup request was cancelled.",
-      };
-    }
-    if (err?.code === "auth/unauthorized-domain") {
+
+    console.warn("Firebase Auth Notice:", err);
+
+    if (errCode === "auth/unauthorized-domain") {
       return {
         success: false,
         error: "Firebase domain unauthorized. Add 'localhost' to Firebase Console -> Authentication -> Settings -> Authorized Domains.",
       };
     }
-    if (err?.code === "auth/operation-not-allowed" || err?.code === "auth/internal-error") {
+    if (errCode === "auth/operation-not-allowed" || errCode === "auth/internal-error") {
       return {
         success: false,
         error: "Firebase Google Provider is not enabled in Firebase Console. Enable 'Google' under Firebase Console -> Authentication -> Sign-in method, or add localhost to Authorized Domains.",
@@ -171,7 +204,7 @@ export async function signInWithFirebaseGoogle(): Promise<{
     }
     return {
       success: false,
-      error: err?.message || "Firebase Google Authentication failed.",
+      error: "Access Denied: This email account is not authorized as an administrator.",
     };
   }
 }
@@ -222,11 +255,12 @@ export function getClientAdminSession(): AdminSession {
     const parsed: AdminUser = JSON.parse(raw);
     const now = Date.now();
 
-    // Check email identity
+    // Check email identity and superadmin role
     const isCorrectAdmin =
       parsed &&
       parsed.email &&
-      parsed.email.trim().toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase();
+      (parsed.email.trim().toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase() ||
+       parsed.role === "superadmin");
 
     // Check expiration timestamp
     if (parsed.expiresAt && now > parsed.expiresAt) {
@@ -359,7 +393,7 @@ export async function getAdminSecurityConfig(): Promise<AdminSecurityConfig> {
     }
   }
 
-  // 2. Check Firebase Realtime Database
+// 2. Check Firebase Realtime Database
   if (FIREBASE_DB_URL) {
     try {
       const res = await fetch(`${FIREBASE_DB_URL}/_system/security_config.json`, {
@@ -381,11 +415,35 @@ export async function getAdminSecurityConfig(): Promise<AdminSecurityConfig> {
     }
   }
 
+  // 3. Check Cloud Firestore (Server-side)
+  if (typeof window === "undefined") {
+    try {
+      const { getAdminFirestore } = await import("@/lib/admin/firebase-admin");
+      const firestore = getAdminFirestore();
+      if (firestore) {
+        const snap = await firestore.collection("admin_security_config").doc("default").get();
+        if (snap.exists) {
+          const data = snap.data();
+          if (data && typeof data === "object") {
+            const resolved: AdminSecurityConfig = {
+              ...DEFAULT_SECURITY_CONFIG,
+              ...data,
+            };
+            globalForSecurity.__admin_security_config = resolved;
+            return resolved;
+          }
+        }
+      }
+    } catch {
+      // Fall through to memory
+    }
+  }
+
   return globalForSecurity.__admin_security_config || DEFAULT_SECURITY_CONFIG;
 }
 
 /**
- * Saves and updates the global admin security & 2FA configuration.
+ * Saves and updates the global admin security & 2FA configuration across 4 layers.
  */
 export async function saveAdminSecurityConfig(
   updates: Partial<AdminSecurityConfig>
@@ -425,6 +483,19 @@ export async function saveAdminSecurityConfig(
       });
     } catch (err) {
       console.warn("Failed to save security config to Firebase RTDB:", err);
+    }
+  }
+
+  // Persist to Cloud Firestore (Server-side)
+  if (typeof window === "undefined") {
+    try {
+      const { getAdminFirestore } = await import("@/lib/admin/firebase-admin");
+      const firestore = getAdminFirestore();
+      if (firestore) {
+        await firestore.collection("admin_security_config").doc("default").set(updated, { merge: true });
+      }
+    } catch (err) {
+      console.warn("Failed to save security config to Firestore:", err);
     }
   }
 

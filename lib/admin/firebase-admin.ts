@@ -1,10 +1,12 @@
 import { getApps, initializeApp, cert, App } from "firebase-admin/app";
 import { getAuth, Auth } from "firebase-admin/auth";
 import { getDatabase, Database } from "firebase-admin/database";
+import { getFirestore, Firestore } from "firebase-admin/firestore";
 
 let _adminApp: App | null = null;
 let _adminAuth: Auth | null = null;
 let _adminDb: Database | null = null;
+let _adminFirestore: Firestore | null = null;
 
 export function isFirebaseAdminConfigured(): boolean {
   const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
@@ -101,6 +103,25 @@ export function getAdminDb(): Database | null {
   }
 }
 
+export function getAdminFirestore(): Firestore | null {
+  try {
+    if (!_adminFirestore) {
+      const app = getInitializedAdminApp();
+      if (!app) return null;
+      _adminFirestore = getFirestore(app);
+      try {
+        _adminFirestore.settings({ ignoreUndefinedProperties: true });
+      } catch {
+        // Settings may only be called before any other methods
+      }
+    }
+    return _adminFirestore;
+  } catch (err) {
+    console.warn("Firebase Admin Firestore init note:", err);
+    return null;
+  }
+}
+
 // Lazy Proxies so module imports during build static collection never trigger background OAuth requests
 export const adminDb = new Proxy({} as Database, {
   get(_target, prop) {
@@ -133,6 +154,20 @@ export const adminAuth = new Proxy({} as Auth, {
     const val = (auth as unknown as Record<string, unknown>)[prop as string];
     if (typeof val === "function") {
       return val.bind(auth);
+    }
+    return val;
+  },
+});
+
+export const adminFirestore = new Proxy({} as Firestore, {
+  get(_target, prop) {
+    const firestore = getAdminFirestore();
+    if (!firestore) {
+      return undefined;
+    }
+    const val = (firestore as unknown as Record<string, unknown>)[prop as string];
+    if (typeof val === "function") {
+      return val.bind(firestore);
     }
     return val;
   },

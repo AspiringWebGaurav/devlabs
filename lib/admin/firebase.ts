@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from "@firebase/app";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -9,8 +9,8 @@ import {
   browserLocalPersistence,
   setPersistence,
   Auth,
-} from "@firebase/auth";
-import { getDatabase, ref, onValue, set, get, remove, Database } from "@firebase/database";
+} from "firebase/auth";
+import { getDatabase, ref, onValue, set, get, remove, Database } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "dummy-api-key-build-safe",

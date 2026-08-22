@@ -2,7 +2,7 @@ import { generateSecret, generateURI, verifySync } from "otplib";
 import QRCode from "qrcode";
 
 export const TOTP_APP_NAME = "Gaurav Portfolio Admin Panel";
-export const TOTP_ADMIN_USER = "gauravpatil9262@gmail.com";
+export const TOTP_ADMIN_USER = "admin@gauravportfolio";
 export const MAX_TOTP_ATTEMPTS = 5;
 export const TOTP_LOCKOUT_MS = 5 * 60 * 1000; // 5 minutes
 

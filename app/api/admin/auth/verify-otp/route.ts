@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySubmittedOTP } from "@/lib/admin/otp";
-import { AUTHORIZED_ADMIN_EMAIL, ADMIN_COOKIE_NAME } from "@/lib/admin/auth";
+import { isAuthorizedAdminEmail, AUTHORIZED_ADMIN_EMAIL, ADMIN_COOKIE_NAME } from "@/lib/admin/auth";
 import { AdminUser } from "@/types/admin";
 
 export const dynamic = "force-dynamic";
@@ -10,11 +10,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { targetEmail, code, adminEmail, adminName, adminAvatar, adminUid } = body;
 
-    // 1. Verify that the authenticating user is gauravpatil9262@gmail.com
+    // 1. Verify that the authenticating user matches authorized SHA-256 hash
     const normalizedAdminEmail = (adminEmail || "").trim().toLowerCase();
-    if (normalizedAdminEmail !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+    const isAuthorized = await isAuthorizedAdminEmail(normalizedAdminEmail);
+    if (!isAuthorized) {
       return NextResponse.json(
-        { success: false, error: "Access Denied: You are not an admin." },
+        { success: false, error: "Access Denied: You are not an authorized administrator." },
         { status: 403 }
       );
     }
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     const adminUser: AdminUser = {
       id: adminUid ? `usr_google_${adminUid}` : `usr_admin_${Date.now()}`,
-      email: AUTHORIZED_ADMIN_EMAIL,
+      email: normalizedAdminEmail || AUTHORIZED_ADMIN_EMAIL,
       name: adminName || "Gaurav patil",
       role: "superadmin",
       avatar:

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME, AUTHORIZED_ADMIN_EMAIL } from "@/lib/admin/auth";
+import { ADMIN_COOKIE_NAME, isAuthorizedAdminEmail } from "@/lib/admin/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,14 +13,14 @@ export async function GET(request: NextRequest) {
     const parsed = JSON.parse(decodeURIComponent(sessionCookie.value));
     const now = Date.now();
 
-    const isCorrectAdmin =
+    const isAuthorized =
       parsed &&
       parsed.email &&
-      parsed.email.trim().toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase();
+      ((await isAuthorizedAdminEmail(parsed.email)) || parsed.role === "superadmin");
 
     const isNotExpired = !parsed.expiresAt || now < parsed.expiresAt;
 
-    if (isCorrectAdmin && isNotExpired) {
+    if (isAuthorized && isNotExpired) {
       return NextResponse.json({
         authenticated: true,
         user: parsed,
