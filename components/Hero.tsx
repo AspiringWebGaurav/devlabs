@@ -8,6 +8,7 @@ import { Spotlight } from "./ui/Spotlight";
 import { TextGenerateEffect } from "./ui/TextGenerateEffect";
 
 const Hero = () => {
+  // Live reload validation test: Webpack HMR active
   const { scrollY } = useScroll();
   const indicatorOpacity = useTransform(scrollY, [0, 100], [1, 0]);
   const indicatorY = useTransform(scrollY, [0, 100], [0, 20]);
