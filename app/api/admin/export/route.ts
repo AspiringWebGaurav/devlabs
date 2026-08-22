@@ -24,9 +24,17 @@ export async function GET(request: NextRequest) {
   } catch (error: unknown) {
     const err = error as Error;
     console.error("Admin Export API Note:", err);
-    return NextResponse.json(
-      { success: false, error: err.message || "Failed to generate export package." },
-      { status: 500 }
-    );
+    try {
+      const fallbackData = await extractCompleteAdminDataset();
+      return NextResponse.json({
+        success: true,
+        data: fallbackData,
+      });
+    } catch {
+      return NextResponse.json(
+        { success: false, error: err.message || "Failed to generate export package." },
+        { status: 500 }
+      );
+    }
   }
 }

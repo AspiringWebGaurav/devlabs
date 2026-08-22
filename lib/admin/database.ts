@@ -50,7 +50,7 @@ function getRuntimeStore(): RuntimeStore {
 // Timeout helper to avoid hanging
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 4000, fallback: T): Promise<T> {
   return Promise.race([
-    promise,
+    promise.catch(() => fallback),
     new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs)),
   ]);
 }

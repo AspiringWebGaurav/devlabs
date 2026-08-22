@@ -73,20 +73,22 @@ export default function AdminExportPage() {
     try {
       const res = await fetch("/api/admin/export", { cache: "no-store" });
       const text = await res.text();
-      let json: { success?: boolean; error?: string; data?: FullExportPackage };
+      let json: { success?: boolean; error?: string; data?: FullExportPackage } | null = null;
       try {
         json = JSON.parse(text);
       } catch {
-        throw new Error(
-          res.status === 401 || res.status === 403
-            ? "Session expired or unauthorized. Please refresh and log in."
-            : `Server returned unexpected response (HTTP ${res.status}).`
-        );
+        json = null;
       }
-      if (!res.ok || !json.success || !json.data) {
-        throw new Error(json?.error || "Failed to load database export summary.");
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("Admin session expired or unauthorized. Please re-authenticate.");
       }
-      setData(json.data);
+      if (json && json.success && json.data) {
+        setData(json.data);
+      } else if (json && json.error) {
+        throw new Error(json.error);
+      } else {
+        throw new Error(`Export service unavailable (HTTP ${res.status}).`);
+      }
     } catch (err: unknown) {
       const error = err as Error;
       setErrorMsg(error.message || "Failed to connect to export service.");
