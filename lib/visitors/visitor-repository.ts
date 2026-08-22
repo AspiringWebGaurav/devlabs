@@ -1,4 +1,4 @@
-import { getAdminFirestore } from "@/lib/admin/firebase-admin";
+import { getAdminFirestore, getAdminDb } from "@/lib/admin/firebase-admin";
 import {
   Visitor,
   VisitorSession,
@@ -119,7 +119,32 @@ export async function findVisitorByMachineHash(machineHash: string | undefined |
         return found;
       }
     } catch {
-      // Memory fallback
+      // Fall through to RTDB
+    }
+  }
+
+  // 3. Firebase Realtime Database lookup
+  const rtdb = getAdminDb();
+  if (rtdb) {
+    try {
+      const snap = await rtdb.ref(VISITORS_COLLECTION).once("value");
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val && typeof val === "object") {
+          for (const item of Object.values(val) as Visitor[]) {
+            if (
+              item.machineHash === cleanMfp ||
+              (Array.isArray(item.machineHashes) && item.machineHashes.includes(cleanMfp))
+            ) {
+              memStore.visitors.set(item.id, item);
+              memStore.machineIndex?.set(cleanMfp, item.id);
+              return item;
+            }
+          }
+        }
+      }
+    } catch (rtdbErr) {
+      console.warn("RTDB findVisitorByMachineHash note:", rtdbErr);
     }
   }
 
@@ -127,7 +152,7 @@ export async function findVisitorByMachineHash(machineHash: string | undefined |
 }
 
 /**
- * Upserts a visitor record into Firestore.
+ * Upserts a visitor record into Firestore & Firebase Realtime Database.
  * First visit creates document; repeat visit updates lastSeen, totalVisits, online, and metadata without duplicating.
  * Supports persistent machineHash resolution across normal and incognito tabs.
  */
@@ -148,6 +173,7 @@ export async function upsertVisitor(
 ): Promise<Visitor> {
   const now = Date.now();
   const firestore = getAdminFirestore();
+  const rtdb = getAdminDb();
   const rawMfp = data.machineHash?.trim();
 
   // If machineHash is present, check if this physical device already has a registered visitor document
@@ -159,145 +185,40 @@ export async function upsertVisitor(
     }
   }
 
-  // 1. Attempt Firestore write
+  let completeVisitor: Visitor;
+
+  // 1. Check existing record in Firestore or RTDB or Memory
+  let existing: Visitor | null = null;
+
   if (firestore) {
     try {
-      const docRef = firestore.collection(VISITORS_COLLECTION).doc(targetVisitorId);
-      const snap = await docRef.get();
-
-      if (!snap.exists) {
-        const newVisitor: Visitor = {
-          id: targetVisitorId,
-          machineHash: rawMfp || undefined,
-          machineHashes: rawMfp ? [rawMfp] : [],
-          firstSeen: now,
-          lastSeen: now,
-          totalVisits: 1,
-          totalPages: 1,
-          online: true,
-          currentPath: data.currentPath || "/",
-          referrer: data.referrer || "",
-          currentIP: data.currentIP || "Unknown",
-          ipHistory: data.currentIP ? [data.currentIP] : ["Unknown"],
-          geo: {
-            country: data.geo?.country || "Unknown",
-            state: data.geo?.state || "Unknown",
-            city: data.geo?.city || "Unknown",
-            region: data.geo?.region || "",
-            latitude: data.geo?.latitude || 0,
-            longitude: data.geo?.longitude || 0,
-            isp: data.geo?.isp || "",
-            asn: data.geo?.asn || "",
-          },
-          device: {
-            type: data.device?.type || "desktop",
-            os: data.device?.os || "Unknown OS",
-            osVersion: data.device?.osVersion || "",
-            architecture: data.device?.architecture || "",
-          },
-          browser: {
-            name: data.browser?.name || "Unknown Browser",
-            version: data.browser?.version || "",
-          },
-          viewport: data.viewport || {
-            width: 1920,
-            height: 1080,
-            colorScheme: "dark",
-            touch: false,
-          },
-          activeSessionId: data.activeSessionId || "",
-          ban: { enabled: false },
-          createdAt: now,
-          updatedAt: now,
-        };
-
-        const cleanedDoc = cleanForFirestore(newVisitor);
-        await docRef.set(cleanedDoc, { merge: true });
-
-        // Update memory & ban cache
-        memStore.visitors.set(targetVisitorId, newVisitor);
-        if (rawMfp) memStore.machineIndex?.set(rawMfp, targetVisitorId);
-        setCachedBanStatus(targetVisitorId, false, undefined, rawMfp);
-        return newVisitor;
-      } else {
-        const existing = snap.data() as Visitor;
-        const ipHistory = Array.isArray(existing.ipHistory) ? [...existing.ipHistory] : [];
-        if (data.currentIP && !ipHistory.includes(data.currentIP)) {
-          ipHistory.push(data.currentIP);
-        }
-
-        const machineHashes = Array.isArray(existing.machineHashes) ? [...existing.machineHashes] : [];
-        if (rawMfp && !machineHashes.includes(rawMfp)) {
-          machineHashes.push(rawMfp);
-        }
-
-        // Increment totalVisits ONLY if inactivity period has lapsed (prevents hard refresh spam)
-        const isSessionExpired = now - (existing.lastSeen || 0) > SESSION_INACTIVITY_MS;
-        const totalVisits = (existing.totalVisits || 1) + (isSessionExpired ? 1 : 0);
-        const totalPages = (existing.totalPages || 1) + (data.incrementPage ? 1 : 0);
-
-        const updated: Partial<Visitor> = {
-          machineHash: rawMfp || existing.machineHash,
-          machineHashes,
-          lastSeen: now,
-          totalVisits,
-          totalPages,
-          online: true,
-          currentPath: data.currentPath || existing.currentPath || "/",
-          referrer: data.referrer !== undefined ? data.referrer : (existing.referrer || ""),
-          currentIP: data.currentIP || existing.currentIP || "Unknown",
-          ipHistory: ipHistory.slice(-20),
-          geo: {
-            country: data.geo?.country || existing.geo?.country || "Unknown",
-            state: data.geo?.state || existing.geo?.state || "Unknown",
-            city: data.geo?.city || existing.geo?.city || "Unknown",
-            region: data.geo?.region || existing.geo?.region || "",
-            latitude: data.geo?.latitude ?? existing.geo?.latitude ?? 0,
-            longitude: data.geo?.longitude ?? existing.geo?.longitude ?? 0,
-            isp: data.geo?.isp || existing.geo?.isp || "",
-            asn: data.geo?.asn || existing.geo?.asn || "",
-          },
-          device: {
-            type: data.device?.type || existing.device?.type || "desktop",
-            os: data.device?.os || existing.device?.os || "Unknown OS",
-            osVersion: data.device?.osVersion || existing.device?.osVersion || "",
-            architecture: data.device?.architecture || existing.device?.architecture || "",
-          },
-          browser: {
-            name: data.browser?.name || existing.browser?.name || "Unknown Browser",
-            version: data.browser?.version || existing.browser?.version || "",
-          },
-          viewport: data.viewport || existing.viewport,
-          activeSessionId: data.activeSessionId || existing.activeSessionId || "",
-          updatedAt: now,
-        };
-
-        const cleanedUpdate = cleanForFirestore(updated);
-        await docRef.set(cleanedUpdate, { merge: true });
-
-        const completeVisitor: Visitor = {
-          ...existing,
-          ...updated,
-        } as Visitor;
-
-        // Cache ban state in memory for O(1) checks
-        if (existing.ban) {
-          setCachedBanStatus(targetVisitorId, existing.ban.enabled, existing.ban.reason, rawMfp || existing.machineHash);
-        }
-
-        memStore.visitors.set(targetVisitorId, completeVisitor);
-        if (rawMfp) memStore.machineIndex?.set(rawMfp, targetVisitorId);
-        return completeVisitor;
+      const snap = await firestore.collection(VISITORS_COLLECTION).doc(targetVisitorId).get();
+      if (snap.exists) {
+        existing = snap.data() as Visitor;
       }
-    } catch (err) {
-      console.warn("Firestore upsertVisitor note:", err);
+    } catch {
+      // Fall through to RTDB
     }
   }
 
-  // 2. Fallback to in-memory store
-  const existing = memStore.visitors.get(targetVisitorId);
+  if (!existing && rtdb) {
+    try {
+      const snap = await rtdb.ref(`${VISITORS_COLLECTION}/${targetVisitorId}`).once("value");
+      if (snap.exists()) {
+        existing = snap.val() as Visitor;
+      }
+    } catch {
+      // Fall through to memory
+    }
+  }
+
   if (!existing) {
-    const newVisitor: Visitor = {
+    existing = memStore.visitors.get(targetVisitorId) || null;
+  }
+
+  if (!existing) {
+    // New Visitor Creation
+    completeVisitor = {
       id: targetVisitorId,
       machineHash: rawMfp || undefined,
       machineHashes: rawMfp ? [rawMfp] : [],
@@ -307,24 +228,43 @@ export async function upsertVisitor(
       totalPages: 1,
       online: true,
       currentPath: data.currentPath || "/",
-      referrer: data.referrer,
+      referrer: data.referrer || "",
       currentIP: data.currentIP || "Unknown",
-      ipHistory: [data.currentIP || "Unknown"],
-      geo: data.geo,
-      device: data.device,
-      browser: data.browser,
-      viewport: data.viewport,
-      activeSessionId: data.activeSessionId,
+      ipHistory: data.currentIP ? [data.currentIP] : ["Unknown"],
+      geo: {
+        country: data.geo?.country || "Unknown",
+        state: data.geo?.state || "Unknown",
+        city: data.geo?.city || "Unknown",
+        region: data.geo?.region || "",
+        latitude: data.geo?.latitude || 0,
+        longitude: data.geo?.longitude || 0,
+        isp: data.geo?.isp || "",
+        asn: data.geo?.asn || "",
+      },
+      device: {
+        type: data.device?.type || "desktop",
+        os: data.device?.os || "Unknown OS",
+        osVersion: data.device?.osVersion || "",
+        architecture: data.device?.architecture || "",
+      },
+      browser: {
+        name: data.browser?.name || "Unknown Browser",
+        version: data.browser?.version || "",
+      },
+      viewport: data.viewport || {
+        width: 1920,
+        height: 1080,
+        colorScheme: "dark",
+        touch: false,
+      },
+      activeSessionId: data.activeSessionId || "",
       ban: { enabled: false },
       createdAt: now,
       updatedAt: now,
     };
-    memStore.visitors.set(targetVisitorId, newVisitor);
-    if (rawMfp) memStore.machineIndex?.set(rawMfp, targetVisitorId);
-    setCachedBanStatus(targetVisitorId, false, undefined, rawMfp);
-    return newVisitor;
   } else {
-    const ipHistory = [...existing.ipHistory];
+    // Existing Visitor Update
+    const ipHistory = Array.isArray(existing.ipHistory) ? [...existing.ipHistory] : [];
     if (data.currentIP && !ipHistory.includes(data.currentIP)) {
       ipHistory.push(data.currentIP);
     }
@@ -335,29 +275,75 @@ export async function upsertVisitor(
     }
 
     const isSessionExpired = now - (existing.lastSeen || 0) > SESSION_INACTIVITY_MS;
-    const updated: Visitor = {
+    const totalVisits = (existing.totalVisits || 1) + (isSessionExpired ? 1 : 0);
+    const totalPages = (existing.totalPages || 1) + (data.incrementPage ? 1 : 0);
+
+    completeVisitor = {
       ...existing,
       machineHash: rawMfp || existing.machineHash,
       machineHashes,
       lastSeen: now,
-      totalVisits: existing.totalVisits + (isSessionExpired ? 1 : 0),
-      totalPages: existing.totalPages + (data.incrementPage ? 1 : 0),
+      totalVisits,
+      totalPages,
       online: true,
-      currentPath: data.currentPath || existing.currentPath,
-      referrer: data.referrer !== undefined ? data.referrer : existing.referrer,
-      currentIP: data.currentIP || existing.currentIP,
+      currentPath: data.currentPath || existing.currentPath || "/",
+      referrer: data.referrer !== undefined ? data.referrer : (existing.referrer || ""),
+      currentIP: data.currentIP || existing.currentIP || "Unknown",
       ipHistory: ipHistory.slice(-20),
-      geo: data.geo || existing.geo,
-      device: data.device || existing.device,
-      browser: data.browser || existing.browser,
+      geo: {
+        country: data.geo?.country || existing.geo?.country || "Unknown",
+        state: data.geo?.state || existing.geo?.state || "Unknown",
+        city: data.geo?.city || existing.geo?.city || "Unknown",
+        region: data.geo?.region || existing.geo?.region || "",
+        latitude: data.geo?.latitude ?? existing.geo?.latitude ?? 0,
+        longitude: data.geo?.longitude ?? existing.geo?.longitude ?? 0,
+        isp: data.geo?.isp || existing.geo?.isp || "",
+        asn: data.geo?.asn || existing.geo?.asn || "",
+      },
+      device: {
+        type: data.device?.type || existing.device?.type || "desktop",
+        os: data.device?.os || existing.device?.os || "Unknown OS",
+        osVersion: data.device?.osVersion || existing.device?.osVersion || "",
+        architecture: data.device?.architecture || existing.device?.architecture || "",
+      },
+      browser: {
+        name: data.browser?.name || existing.browser?.name || "Unknown Browser",
+        version: data.browser?.version || existing.browser?.version || "",
+      },
       viewport: data.viewport || existing.viewport,
-      activeSessionId: data.activeSessionId || existing.activeSessionId,
+      activeSessionId: data.activeSessionId || existing.activeSessionId || "",
       updatedAt: now,
     };
-    memStore.visitors.set(targetVisitorId, updated);
-    if (rawMfp) memStore.machineIndex?.set(rawMfp, targetVisitorId);
-    return updated;
   }
+
+  const cleanedDoc = cleanForFirestore(completeVisitor);
+
+  // 1. Dual-Write to Cloud Firestore
+  if (firestore) {
+    try {
+      await firestore.collection(VISITORS_COLLECTION).doc(targetVisitorId).set(cleanedDoc, { merge: true });
+    } catch (err) {
+      console.warn("Firestore upsertVisitor note:", err);
+    }
+  }
+
+  // 2. Dual-Write to Firebase Realtime Database
+  if (rtdb) {
+    try {
+      await rtdb.ref(`${VISITORS_COLLECTION}/${targetVisitorId}`).set(cleanedDoc);
+    } catch (err) {
+      console.warn("RTDB upsertVisitor note:", err);
+    }
+  }
+
+  // 3. Update memory store & ban cache
+  if (completeVisitor.ban) {
+    setCachedBanStatus(targetVisitorId, completeVisitor.ban.enabled, completeVisitor.ban.reason, rawMfp || completeVisitor.machineHash);
+  }
+  memStore.visitors.set(targetVisitorId, completeVisitor);
+  if (rawMfp) memStore.machineIndex?.set(rawMfp, targetVisitorId);
+
+  return completeVisitor;
 }
 
 /**
@@ -371,7 +357,18 @@ export async function getVisitorById(visitorId: string): Promise<Visitor | null>
       if (snap.exists) {
         return snap.data() as Visitor;
       }
-      return null;
+    } catch {
+      // Fall through to RTDB
+    }
+  }
+
+  const rtdb = getAdminDb();
+  if (rtdb) {
+    try {
+      const snap = await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}`).once("value");
+      if (snap.exists()) {
+        return snap.val() as Visitor;
+      }
     } catch {
       // Fall through to memory
     }
@@ -382,6 +379,7 @@ export async function getVisitorById(visitorId: string): Promise<Visitor | null>
 
 /**
  * Lists all visitors for the admin panel with optional filtering.
+ * Queries Cloud Firestore + Firebase Realtime Database with deduplication.
  */
 export async function listVisitors(options?: {
   limit?: number;
@@ -389,8 +387,10 @@ export async function listVisitors(options?: {
   status?: "all" | "online" | "banned";
 }): Promise<Visitor[]> {
   const maxLimit = options?.limit || 100;
-  const firestore = getAdminFirestore();
+  const visitorMap = new Map<string, Visitor>();
 
+  // 1. Fetch from Cloud Firestore
+  const firestore = getAdminFirestore();
   if (firestore) {
     try {
       const snap = await firestore
@@ -399,51 +399,73 @@ export async function listVisitors(options?: {
         .limit(maxLimit)
         .get();
 
-      let results: Visitor[] = [];
       snap.forEach((doc) => {
-        results.push(doc.data() as Visitor);
+        const v = doc.data() as Visitor;
+        if (v && v.id) {
+          visitorMap.set(v.id, v);
+        }
       });
-
-      if (results.length > 0) {
-        if (options?.status === "online") {
-          results = results.filter((v) => v.online);
-        } else if (options?.status === "banned") {
-          results = results.filter((v) => v.ban?.enabled);
-        }
-
-        if (options?.search && options.search.trim()) {
-          const query = options.search.trim().toLowerCase();
-          results = results.filter(
-            (v) =>
-              v.id.toLowerCase().includes(query) ||
-              v.currentIP?.toLowerCase().includes(query) ||
-              v.geo?.country?.toLowerCase().includes(query) ||
-              v.geo?.city?.toLowerCase().includes(query) ||
-              v.currentPath?.toLowerCase().includes(query)
-          );
-        }
-
-        return results;
-      }
     } catch (err) {
       console.warn("Firestore listVisitors note:", err);
     }
   }
 
-  // Memory fallback
-  let list = Array.from(memStore.visitors.values()).sort((a, b) => b.lastSeen - a.lastSeen);
-  if (options?.status === "online") list = list.filter((v) => v.online);
-  if (options?.status === "banned") list = list.filter((v) => v.ban?.enabled);
-  if (options?.search) {
-    const q = options.search.toLowerCase();
-    list = list.filter(
+  // 2. Fetch from Firebase Realtime Database
+  const rtdb = getAdminDb();
+  if (rtdb) {
+    try {
+      const snap = await rtdb.ref(VISITORS_COLLECTION).once("value");
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val && typeof val === "object") {
+          for (const item of Object.values(val) as Visitor[]) {
+            if (item && item.id) {
+              const existing = visitorMap.get(item.id);
+              if (!existing || (item.lastSeen || 0) > (existing.lastSeen || 0)) {
+                visitorMap.set(item.id, item);
+              }
+            }
+          }
+        }
+      }
+    } catch (rtdbErr) {
+      console.warn("RTDB listVisitors note:", rtdbErr);
+    }
+  }
+
+  // 3. Fallback to memory store if both databases are empty
+  if (visitorMap.size === 0) {
+    for (const [id, v] of memStore.visitors.entries()) {
+      visitorMap.set(id, v);
+    }
+  }
+
+  let results = Array.from(visitorMap.values());
+
+  // Sort by lastSeen descending
+  results.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+
+  // Status Filter
+  if (options?.status === "online") {
+    results = results.filter((v) => v.online);
+  } else if (options?.status === "banned") {
+    results = results.filter((v) => v.ban?.enabled);
+  }
+
+  // Search Filter
+  if (options?.search && options.search.trim()) {
+    const query = options.search.trim().toLowerCase();
+    results = results.filter(
       (v) =>
-        v.id.toLowerCase().includes(q) ||
-        v.geo?.country?.toLowerCase().includes(q) ||
-        v.currentPath?.toLowerCase().includes(q)
+        v.id.toLowerCase().includes(query) ||
+        v.currentIP?.toLowerCase().includes(query) ||
+        v.geo?.country?.toLowerCase().includes(query) ||
+        v.geo?.city?.toLowerCase().includes(query) ||
+        v.currentPath?.toLowerCase().includes(query)
     );
   }
-  return list.slice(0, maxLimit);
+
+  return results.slice(0, maxLimit);
 }
 
 /**
@@ -526,11 +548,12 @@ export async function getVisitorStatsSummary(): Promise<VisitorStatsSummary> {
 }
 
 /**
- * Updates a visitor's ban state in Firestore, in-memory cache, and emits live SSE event.
+ * Updates a visitor's ban state in Firestore, Firebase Realtime Database, in-memory cache, and emits live SSE event.
  */
 export async function setVisitorBan(visitorId: string, banState: VisitorBan): Promise<boolean> {
   const now = Date.now();
   const firestore = getAdminFirestore();
+  const rtdb = getAdminDb();
 
   const banPayload = {
     ban: {
@@ -542,7 +565,7 @@ export async function setVisitorBan(visitorId: string, banState: VisitorBan): Pr
     updatedAt: now,
   };
 
-  // 1. Update in Firestore with merge: true (never fails with 5 NOT_FOUND)
+  // 1. Update in Firestore with merge: true
   if (firestore) {
     try {
       const docRef = firestore.collection(VISITORS_COLLECTION).doc(visitorId);
@@ -552,18 +575,32 @@ export async function setVisitorBan(visitorId: string, banState: VisitorBan): Pr
     }
   }
 
-  // 2. Update memory store
+  // 2. Update in Firebase Realtime Database
+  if (rtdb) {
+    try {
+      await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}/ban`).set(banPayload.ban);
+      if (banState.enabled) {
+        await rtdb.ref(`banned_visitors/${visitorId}`).set(banPayload.ban);
+      } else {
+        await rtdb.ref(`banned_visitors/${visitorId}`).remove();
+      }
+    } catch (rtdbErr) {
+      console.warn("RTDB setVisitorBan note:", rtdbErr);
+    }
+  }
+
+  // 3. Update memory store
   const existing = memStore.visitors.get(visitorId);
   if (existing) {
     existing.ban = banPayload.ban as VisitorBan;
     existing.updatedAt = now;
   }
 
-  // 3. Update fast ban cache across both visitorId and physical machineHash
+  // 4. Update fast ban cache across both visitorId and physical machineHash
   const machineHashToBan = existing?.machineHash;
   setCachedBanStatus(visitorId, banState.enabled, banState.reason, machineHashToBan);
 
-  // 4. Broadcast live event across server event bus
+  // 5. Broadcast live event across server event bus
   publishVisitorEvent({
     type: banState.enabled ? "VISITOR_BANNED" : "VISITOR_UNBANNED",
     visitorId,
@@ -581,7 +618,9 @@ export async function setVisitorBan(visitorId: string, banState: VisitorBan): Pr
 export async function createSession(session: VisitorSession): Promise<void> {
   const now = Date.now();
   const firestore = getAdminFirestore();
+  const rtdb = getAdminDb();
 
+  // 1. Write to Firestore
   if (firestore) {
     try {
       const sessionRef = firestore.collection(SESSIONS_COLLECTION).doc(session.sessionId);
@@ -621,6 +660,18 @@ export async function createSession(session: VisitorSession): Promise<void> {
       console.warn("Firestore createSession note:", err);
     }
   }
+
+  // 2. Write to Firebase Realtime Database
+  if (rtdb) {
+    try {
+      await rtdb.ref(`${SESSIONS_COLLECTION}/${session.sessionId}`).set(cleanForFirestore(session));
+      await rtdb.ref(`${VISITORS_COLLECTION}/${session.visitorId}/activeSessionId`).set(session.sessionId);
+      await rtdb.ref(`${VISITORS_COLLECTION}/${session.visitorId}/online`).set(true);
+    } catch (rtdbErr) {
+      console.warn("RTDB createSession note:", rtdbErr);
+    }
+  }
+
   memStore.sessions.set(session.sessionId, session);
 }
 
@@ -630,8 +681,9 @@ export async function createSession(session: VisitorSession): Promise<void> {
 export async function closeSession(sessionId: string, visitorId: string): Promise<void> {
   const now = Date.now();
   const firestore = getAdminFirestore();
+  const rtdb = getAdminDb();
 
-  // Close session
+  // 1. Close session in Firestore
   if (firestore) {
     try {
       const sessionRef = firestore.collection(SESSIONS_COLLECTION).doc(sessionId);
@@ -655,6 +707,18 @@ export async function closeSession(sessionId: string, visitorId: string): Promis
       );
     } catch {
       // Memory fallback
+    }
+  }
+
+  // 2. Close session in Firebase Realtime Database
+  if (rtdb) {
+    try {
+      await rtdb.ref(`${SESSIONS_COLLECTION}/${sessionId}/online`).set(false);
+      await rtdb.ref(`${SESSIONS_COLLECTION}/${sessionId}/disconnectedAt`).set(now);
+      await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}/online`).set(false);
+      await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}/lastSeen`).set(now);
+    } catch (rtdbErr) {
+      console.warn("RTDB closeSession note:", rtdbErr);
     }
   }
 
@@ -688,16 +752,16 @@ export async function cascadeDeleteVisitor(
   visitorId: string
 ): Promise<{ deletedSessions: number; deletedAppeals: number }> {
   const firestore = getAdminFirestore();
+  const rtdb = getAdminDb();
   let deletedSessions = 0;
   let deletedAppeals = 0;
 
+  // 1. Delete from Cloud Firestore
   if (firestore) {
     try {
-      // 1. Delete visitor document
       const visitorRef = firestore.collection(VISITORS_COLLECTION).doc(visitorId);
       await visitorRef.delete().catch(() => {});
 
-      // 2. Query and delete all linked session documents in batched chunks
       const sessionsSnap = await firestore
         .collection(SESSIONS_COLLECTION)
         .where("visitorId", "==", visitorId)
@@ -713,7 +777,6 @@ export async function cascadeDeleteVisitor(
         }
       }
 
-      // 3. Query and delete all linked appeal documents
       const appealsSnap = await firestore
         .collection(APPEALS_COLLECTION)
         .where("visitorId", "==", visitorId)
@@ -733,7 +796,17 @@ export async function cascadeDeleteVisitor(
     }
   }
 
-  // 4. Clear from in-memory stores
+  // 2. Delete from Firebase Realtime Database
+  if (rtdb) {
+    try {
+      await rtdb.ref(`${VISITORS_COLLECTION}/${visitorId}`).remove().catch(() => {});
+      await rtdb.ref(`banned_visitors/${visitorId}`).remove().catch(() => {});
+    } catch (rtdbErr) {
+      console.warn("RTDB cascadeDeleteVisitor note:", rtdbErr);
+    }
+  }
+
+  // 3. Clear from in-memory stores
   const v = memStore.visitors.get(visitorId);
   if (v?.machineHash) {
     memStore.machineIndex.delete(v.machineHash);
@@ -757,10 +830,10 @@ export async function cascadeDeleteVisitor(
     }
   }
 
-  // 5. Invalidate ban cache
+  // 4. Invalidate ban cache
   invalidateBanCache(visitorId, v?.machineHash);
 
-  // 6. Broadcast deletion to disconnect active streams and update admin UI
+  // 5. Broadcast deletion to disconnect active streams and update admin UI
   publishVisitorEvent({
     type: "VISITOR_DELETED",
     visitorId,
@@ -779,56 +852,49 @@ export async function pruneStaleAndOrphanedData(): Promise<{
   deletedAppeals: number;
   totalPruned: number;
 }> {
-  const now = Date.now();
   const firestore = getAdminFirestore();
+  const now = Date.now();
+  const maxAgeMs = 24 * 60 * 60 * 1000;
   let deletedSessions = 0;
   let deletedAppeals = 0;
-  const maxAgeMs = 24 * 60 * 60 * 1000; // 24 hours
 
   if (firestore) {
     try {
-      // 1. Fetch all valid visitor IDs
       const visitorsSnap = await firestore.collection(VISITORS_COLLECTION).get();
-      const validVisitorIds = new Set<string>();
-      visitorsSnap.forEach((doc) => validVisitorIds.add(doc.id));
+      const validVisitorIds = new Set(visitorsSnap.docs.map((doc) => doc.id));
 
-      // 2. Fetch all session documents
       const sessionsSnap = await firestore.collection(SESSIONS_COLLECTION).get();
-      const sessionDocsToDelete: FirebaseFirestore.DocumentReference[] = [];
+      const staleSessionDocs: FirebaseFirestore.DocumentReference[] = [];
 
       sessionsSnap.forEach((doc) => {
-        const data = doc.data();
-        const connectedAt = data.connectedAt || 0;
-        const isStale = now - connectedAt > maxAgeMs;
-        const isOrphan = !data.visitorId || !validVisitorIds.has(data.visitorId);
-
+        const data = doc.data() as VisitorSession;
+        const isStale = now - (data.connectedAt || 0) > maxAgeMs;
+        const isOrphan = !validVisitorIds.has(data.visitorId);
         if (isStale || isOrphan) {
-          sessionDocsToDelete.push(doc.ref);
+          staleSessionDocs.push(doc.ref);
         }
       });
 
-      // Batch delete in chunks of 450
-      for (let i = 0; i < sessionDocsToDelete.length; i += 450) {
-        const chunk = sessionDocsToDelete.slice(i, i + 450);
+      for (let i = 0; i < staleSessionDocs.length; i += 450) {
+        const chunk = staleSessionDocs.slice(i, i + 450);
         const batch = firestore.batch();
         chunk.forEach((ref) => batch.delete(ref));
         await batch.commit();
         deletedSessions += chunk.length;
       }
 
-      // 3. Fetch all appeals and delete orphans
       const appealsSnap = await firestore.collection(APPEALS_COLLECTION).get();
-      const appealDocsToDelete: FirebaseFirestore.DocumentReference[] = [];
+      const orphanAppealDocs: FirebaseFirestore.DocumentReference[] = [];
 
       appealsSnap.forEach((doc) => {
-        const data = doc.data();
-        if (!data.visitorId || !validVisitorIds.has(data.visitorId)) {
-          appealDocsToDelete.push(doc.ref);
+        const data = doc.data() as VisitorAppeal;
+        if (!validVisitorIds.has(data.visitorId)) {
+          orphanAppealDocs.push(doc.ref);
         }
       });
 
-      for (let i = 0; i < appealDocsToDelete.length; i += 450) {
-        const chunk = appealDocsToDelete.slice(i, i + 450);
+      for (let i = 0; i < orphanAppealDocs.length; i += 450) {
+        const chunk = orphanAppealDocs.slice(i, i + 450);
         const batch = firestore.batch();
         chunk.forEach((ref) => batch.delete(ref));
         await batch.commit();
@@ -839,7 +905,7 @@ export async function pruneStaleAndOrphanedData(): Promise<{
     }
   }
 
-  // 4. Clean in-memory stores
+  // Clean in-memory stores
   for (const [sId, sess] of memStore.sessions.entries()) {
     const isStale = now - sess.connectedAt > maxAgeMs;
     const isOrphan = !memStore.visitors.has(sess.visitorId);
@@ -884,6 +950,7 @@ export async function submitVisitorAppeal(data: {
   const now = Date.now();
   const id = `app_${Math.random().toString(36).substring(2, 11)}`;
   const firestore = getAdminFirestore();
+  const rtdb = getAdminDb();
 
   const appeal: VisitorAppeal = {
     id,
@@ -897,19 +964,30 @@ export async function submitVisitorAppeal(data: {
     submittedAt: now,
   };
 
+  const cleaned = cleanForFirestore(appeal);
+
+  // 1. Write to Firestore
   if (firestore) {
     try {
-      const cleaned = cleanForFirestore(appeal);
       await firestore.collection(APPEALS_COLLECTION).doc(id).set(cleaned, { merge: true });
     } catch (err) {
       console.warn("Firestore submitVisitorAppeal note:", err);
     }
   }
 
-  // Also persist in memory store fallback
+  // 2. Write to Firebase Realtime Database
+  if (rtdb) {
+    try {
+      await rtdb.ref(`${APPEALS_COLLECTION}/${id}`).set(cleaned);
+    } catch (rtdbErr) {
+      console.warn("RTDB submitVisitorAppeal note:", rtdbErr);
+    }
+  }
+
+  // 3. Update memory store
   memStore.appeals.set(id, appeal);
 
-  // Publish SSE event for instant Admin Alert
+  // 4. Publish SSE event for instant Admin Alert
   publishVisitorEvent({
     type: "APPEAL_CREATED",
     visitorId: data.visitorId,
@@ -921,9 +999,12 @@ export async function submitVisitorAppeal(data: {
 }
 
 /**
- * Retrieves all submitted visitor appeals from Cloud Firestore with in-memory fallback.
+ * Retrieves all submitted visitor appeals from Cloud Firestore & Realtime Database.
  */
 export async function getVisitorAppeals(): Promise<VisitorAppeal[]> {
+  const appealMap = new Map<string, VisitorAppeal>();
+
+  // 1. Fetch from Firestore
   const firestore = getAdminFirestore();
   if (firestore) {
     try {
@@ -931,16 +1012,43 @@ export async function getVisitorAppeals(): Promise<VisitorAppeal[]> {
         .collection(APPEALS_COLLECTION)
         .orderBy("submittedAt", "desc")
         .get();
-      if (!snap.empty) {
-        return snap.docs.map((d) => d.data() as VisitorAppeal);
-      }
+      snap.docs.forEach((d) => {
+        const a = d.data() as VisitorAppeal;
+        if (a && a.id) appealMap.set(a.id, a);
+      });
     } catch (err) {
       console.warn("Firestore getVisitorAppeals note:", err);
     }
   }
 
-  // In-memory fallback
-  return Array.from(memStore.appeals.values()).sort((a, b) => b.submittedAt - a.submittedAt);
+  // 2. Fetch from RTDB
+  const rtdb = getAdminDb();
+  if (rtdb) {
+    try {
+      const snap = await rtdb.ref(APPEALS_COLLECTION).once("value");
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val && typeof val === "object") {
+          for (const item of Object.values(val) as VisitorAppeal[]) {
+            if (item && item.id && !appealMap.has(item.id)) {
+              appealMap.set(item.id, item);
+            }
+          }
+        }
+      }
+    } catch (rtdbErr) {
+      console.warn("RTDB getVisitorAppeals note:", rtdbErr);
+    }
+  }
+
+  // 3. Fallback to memory
+  if (appealMap.size === 0) {
+    for (const [id, a] of memStore.appeals.entries()) {
+      appealMap.set(id, a);
+    }
+  }
+
+  return Array.from(appealMap.values()).sort((a, b) => b.submittedAt - a.submittedAt);
 }
 
 /**
@@ -964,6 +1072,25 @@ export async function getAppealByVisitorId(visitorId: string): Promise<VisitorAp
     }
   }
 
+  const rtdb = getAdminDb();
+  if (rtdb) {
+    try {
+      const snap = await rtdb.ref(APPEALS_COLLECTION).once("value");
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val && typeof val === "object") {
+          for (const item of Object.values(val) as VisitorAppeal[]) {
+            if (item && item.visitorId === visitorId) {
+              return item;
+            }
+          }
+        }
+      }
+    } catch (rtdbErr) {
+      console.warn("RTDB getAppealByVisitorId note:", rtdbErr);
+    }
+  }
+
   // In-memory fallback
   for (const appeal of memStore.appeals.values()) {
     if (appeal.visitorId === visitorId) {
@@ -983,6 +1110,7 @@ export async function updateAppealStatus(
   adminNotes?: string
 ): Promise<VisitorAppeal | null> {
   const firestore = getAdminFirestore();
+  const rtdb = getAdminDb();
   const now = Date.now();
 
   let updatedAppeal: VisitorAppeal | null = null;
@@ -1001,42 +1129,43 @@ export async function updateAppealStatus(
         await docRef.set(cleanForFirestore(updates), { merge: true });
         updatedAppeal = { ...existing, ...updates };
 
-        // If ACCEPTED, automatically unban the visitor in Firestore, BanCache, and SSE!
+        // If ACCEPTED, automatically unban the visitor
         if (status === "ACCEPTED" && existing.visitorId) {
           await setVisitorBan(existing.visitorId, { enabled: false });
         }
-
-        // Publish event for real-time admin sync
-        publishVisitorEvent({
-          type: "APPEAL_UPDATED",
-          visitorId: existing.visitorId,
-          timestamp: now,
-          appeal: updatedAppeal,
-        });
       }
     } catch (err) {
       console.warn("Firestore updateAppealStatus note:", err);
     }
   }
 
-  // Memory fallback update if firestore was not available or document was in memStore
-  if (!updatedAppeal && memStore.appeals.has(appealId)) {
-    const existing = memStore.appeals.get(appealId)!;
-    updatedAppeal = {
-      ...existing,
-      status,
-      reviewedAt: now,
-      adminNotes: adminNotes ?? existing.adminNotes,
-    };
-    memStore.appeals.set(appealId, updatedAppeal);
-
-    if (status === "ACCEPTED" && existing.visitorId) {
-      await setVisitorBan(existing.visitorId, { enabled: false });
+  if (rtdb) {
+    try {
+      await rtdb.ref(`${APPEALS_COLLECTION}/${appealId}/status`).set(status);
+      await rtdb.ref(`${APPEALS_COLLECTION}/${appealId}/reviewedAt`).set(now);
+      if (adminNotes !== undefined) {
+        await rtdb.ref(`${APPEALS_COLLECTION}/${appealId}/adminNotes`).set(adminNotes);
+      }
+    } catch (rtdbErr) {
+      console.warn("RTDB updateAppealStatus note:", rtdbErr);
     }
+  }
 
+  const inMem = memStore.appeals.get(appealId);
+  if (inMem) {
+    inMem.status = status;
+    inMem.reviewedAt = now;
+    if (adminNotes !== undefined) inMem.adminNotes = adminNotes;
+    if (!updatedAppeal) updatedAppeal = inMem;
+    if (status === "ACCEPTED" && inMem.visitorId) {
+      await setVisitorBan(inMem.visitorId, { enabled: false });
+    }
+  }
+
+  if (updatedAppeal) {
     publishVisitorEvent({
       type: "APPEAL_UPDATED",
-      visitorId: existing.visitorId,
+      visitorId: updatedAppeal.visitorId,
       timestamp: now,
       appeal: updatedAppeal,
     });
