@@ -10,24 +10,24 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-black-100 text-white relative overflow-hidden py-16 px-5 sm:px-10">
+    <main className="min-h-screen bg-black-100 text-white relative overflow-hidden py-10 sm:py-16 px-5 sm:px-10 lg:px-16 xl:px-24 w-full">
       {/* Background Grid */}
       <div className="h-full w-full dark:bg-black-100 bg-white dark:bg-grid-white/[0.03] bg-grid-black-100/[0.2] absolute top-0 left-0 flex items-center justify-center pointer-events-none -z-10">
         <div className="absolute pointer-events-none inset-0 flex items-center justify-center dark:bg-black-100 bg-white [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
       </div>
 
-      <div className="max-w-4xl mx-auto">
+      <div className="w-full mx-auto max-w-4xl lg:max-w-none">
         {/* Back Link */}
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm text-purple hover:text-white transition-colors duration-200 mb-10 group"
+          className="inline-flex items-center gap-2 text-sm text-purple hover:text-white transition-colors duration-200 mb-8 sm:mb-10 group"
         >
           <FaArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
           Back to Portfolio
         </Link>
 
         {/* Header */}
-        <header className="mb-12">
+        <header className="mb-10 sm:mb-12">
           <p className="uppercase tracking-widest text-xs text-purple font-medium mb-3">
             Legal
           </p>
@@ -35,12 +35,12 @@ export default function TermsPage() {
             Terms of Service
           </h1>
           <p className="text-white-200 text-sm">
-            Last Updated: August 14, 2025
+            Last Updated: August 21, 2026
           </p>
         </header>
 
         {/* Content Box */}
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl p-6 sm:p-10 space-y-8 text-neutral-300 leading-relaxed text-sm sm:text-base">
+        <div className="w-full rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl p-6 sm:p-10 lg:p-12 space-y-8 text-neutral-300 leading-relaxed text-sm sm:text-base">
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-white">
               1. Acceptance of Terms
