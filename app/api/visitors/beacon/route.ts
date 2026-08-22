@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   decodeAndVerifyVisitorCookie,
+  encodeVisitorCookieValue,
   generateVisitorId,
   VISITOR_COOKIE_NAME,
+  VISITOR_COOKIE_MAX_AGE,
 } from "@/lib/visitors/cookie-manager";
 import { BeaconPayloadSchema } from "@/lib/visitors/schemas";
 import { upsertVisitor } from "@/lib/visitors/visitor-repository";
@@ -79,11 +81,24 @@ export async function POST(request: NextRequest) {
       visitor: updatedVisitor,
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       visitorId: canonicalVisitorId,
       banned: Boolean(updatedVisitor.ban?.enabled),
     });
+
+    const encodedCookie = encodeVisitorCookieValue(canonicalVisitorId);
+    response.cookies.set({
+      name: VISITOR_COOKIE_NAME,
+      value: encodedCookie,
+      path: "/",
+      maxAge: VISITOR_COOKIE_MAX_AGE,
+      sameSite: "lax",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    return response;
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : "Internal Server Error" },

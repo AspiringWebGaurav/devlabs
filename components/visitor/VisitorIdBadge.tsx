@@ -30,17 +30,36 @@ export const VisitorIdBadge: React.FC = () => {
           if (typeof window !== "undefined") {
             window.sessionStorage.setItem("portfolio_vst_id", data.visitorId);
           }
+          return;
         }
       }
     } catch {
       // Ignored
     }
+
+    // 3. Fallback retry after 1200ms
+    setTimeout(async () => {
+      try {
+        const res = await fetch("/api/visitors/me", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data && data.success && data.visitorId) {
+            setVisitorId(data.visitorId);
+            if (typeof window !== "undefined") {
+              window.sessionStorage.setItem("portfolio_vst_id", data.visitorId);
+            }
+          }
+        }
+      } catch {
+        // Ignored
+      }
+    }, 1200);
   }, []);
 
   useEffect(() => {
     fetchVisitorId();
 
-    // 3. Listen for live SSE or Beacon ID broadcast events
+    // Listen for live SSE or Beacon ID broadcast events
     const handleVstEvent = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
       if (customEvent.detail && customEvent.detail.startsWith("vst_")) {
@@ -66,7 +85,12 @@ export const VisitorIdBadge: React.FC = () => {
   };
 
   if (!visitorId) {
-    return null;
+    return (
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-white/[0.04] bg-white/[0.015] text-[11px] font-mono text-neutral-600 animate-pulse select-none">
+        <span className="tracking-tight text-neutral-600">id:</span>
+        <span className="font-normal text-neutral-600">vst_...</span>
+      </div>
+    );
   }
 
   return (
