@@ -4,6 +4,7 @@ import { auth, googleProvider, signInWithPopup, signOut } from "@/lib/admin/fire
 import {
   ADMIN_COOKIE_NAME,
   AUTHORIZED_ADMIN_EMAIL,
+  AUTHORIZED_ADMIN_EMAILS,
   AUTHORIZED_ADMIN_HASH,
   AUTHORIZED_ADMIN_HASHES,
 } from "./constants";
@@ -11,6 +12,7 @@ import {
 export {
   ADMIN_COOKIE_NAME,
   AUTHORIZED_ADMIN_EMAIL,
+  AUTHORIZED_ADMIN_EMAILS,
   AUTHORIZED_ADMIN_HASH,
   AUTHORIZED_ADMIN_HASHES,
 };
@@ -26,13 +28,55 @@ export async function sha256Hex(message: string): Promise<string> {
 }
 
 /**
- * Validates whether an email matches the cryptographically hashed admin identity.
- * Zero database or external server lookup required (persists across nuclear wipes).
+ * Validates whether an email matches the authorized admin identity across:
+ * 1. Direct authorized list (Gaurav's primary emails)
+ * 2. Environment variables (ADMIN_EMAIL, NEXT_PUBLIC_ADMIN_EMAIL, ADMIN_AUTHORIZED_EMAILS)
+ * 3. Cryptographic SHA-256 Hashes
  */
 export async function isAuthorizedAdminEmail(email: string): Promise<boolean> {
   if (!email || typeof email !== "string") return false;
-  const hash = await sha256Hex(email.trim().toLowerCase());
-  return AUTHORIZED_ADMIN_HASHES.includes(hash);
+  const cleanEmail = email.trim().toLowerCase();
+
+  // 1. Check known authorized admin emails
+  if (
+    cleanEmail === AUTHORIZED_ADMIN_EMAIL.toLowerCase() ||
+    AUTHORIZED_ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(cleanEmail)
+  ) {
+    return true;
+  }
+
+  // 2. Check environment variable emails
+  const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || "").trim().toLowerCase();
+  if (envAdminEmail) {
+    const splitEmails = envAdminEmail.split(",").map((e) => e.trim().toLowerCase());
+    if (splitEmails.includes(cleanEmail)) {
+      return true;
+    }
+  }
+
+  const envAuthorizedList = (process.env.ADMIN_AUTHORIZED_EMAILS || "").trim().toLowerCase();
+  if (envAuthorizedList) {
+    const splitList = envAuthorizedList.split(",").map((e) => e.trim().toLowerCase());
+    if (splitList.includes(cleanEmail)) {
+      return true;
+    }
+  }
+
+  // 3. Check SHA-256 Hashes
+  const hash = await sha256Hex(cleanEmail);
+  if (AUTHORIZED_ADMIN_HASHES.includes(hash)) {
+    return true;
+  }
+
+  const envHashes = (process.env.ADMIN_AUTHORIZED_HASH || "")
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+  if (envHashes.includes(hash)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
