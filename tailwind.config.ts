@@ -151,6 +151,11 @@ const config = {
           "15%, 45%, 75%": { transform: "translateX(-8px)" },
           "30%, 60%, 90%": { transform: "translateX(8px)" },
         },
+        scroll: {
+          to: {
+            transform: "translate(calc(-50% - 0.5rem))",
+          },
+        },
       },
       animation: {
         shake: "shake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both",

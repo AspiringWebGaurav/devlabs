@@ -145,3 +145,10 @@
   );
   animation: skeletonShimmer 1.8s infinite;
 }
+
+@keyframes scroll {
+  to {
+    transform: translate(calc(-50% - 0.5rem));
+  }
+}
+
