@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Access Denied: ${email} is not authorized as an administrator. Only the primary administrator (gauravpatil9262) has access.`,
+          error: "Access Denied: You are not authorized to access this administrator console.",
         },
         { status: 403 }
       );
