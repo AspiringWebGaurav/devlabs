@@ -231,7 +231,6 @@ export default function AdminLayout({
 
   const getSectionTitle = () => {
     if (pathname === "/admin") return "DATABASE SERVICES";
-    if (pathname.startsWith("/admin/visitors")) return "VISITOR DATA";
     if (pathname.startsWith("/admin/settings")) return "ADMIN PROFILE & SECURITY";
     if (pathname.startsWith("/admin/export")) return "DATA EXPORT & INTELLIGENCE";
     const segment = pathname.replace("/admin/", "").replace("/admin", "").replace("/", "");

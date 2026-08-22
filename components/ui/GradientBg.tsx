@@ -81,25 +81,46 @@ export const BackgroundGradientAnimation = ({
     thirdColor,
   ]);
 
-  // High-performance RAF animation loop without React re-render overhead
-  useEffect(() => {
-    let animationFrameId: number;
+  const isMovingRef = useRef(false);
+  const animationFrameIdRef = useRef<number | null>(null);
+
+  // High-performance RAF animation loop that sleeps when idle
+  const startAnimationLoop = () => {
+    if (isMovingRef.current) return;
+    isMovingRef.current = true;
 
     function move() {
       if (interactiveRef.current) {
-        curXRef.current += (tgXRef.current - curXRef.current) / 20;
-        curYRef.current += (tgYRef.current - curYRef.current) / 20;
+        const dx = tgXRef.current - curXRef.current;
+        const dy = tgYRef.current - curYRef.current;
+
+        curXRef.current += dx / 20;
+        curYRef.current += dy / 20;
+
         interactiveRef.current.style.transform = `translate(${Math.round(
           curXRef.current
         )}px, ${Math.round(curYRef.current)}px)`;
+
+        // If delta is negligible, stop the loop to conserve CPU/GPU
+        if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) {
+          curXRef.current = tgXRef.current;
+          curYRef.current = tgYRef.current;
+          isMovingRef.current = false;
+          animationFrameIdRef.current = null;
+          return;
+        }
       }
-      animationFrameId = requestAnimationFrame(move);
+      animationFrameIdRef.current = requestAnimationFrame(move);
     }
 
-    animationFrameId = requestAnimationFrame(move);
+    animationFrameIdRef.current = requestAnimationFrame(move);
+  };
 
+  useEffect(() => {
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
     };
   }, []);
 
@@ -108,6 +129,7 @@ export const BackgroundGradientAnimation = ({
       const rect = interactiveRef.current.getBoundingClientRect();
       tgXRef.current = event.clientX - rect.left;
       tgYRef.current = event.clientY - rect.top;
+      startAnimationLoop();
     }
   };
 

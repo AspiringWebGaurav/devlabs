@@ -85,10 +85,32 @@ export const MovingBorder = ({
 }) => {
   const pathRef = useRef<SVGRectElement | null>(null);
   const progress = useMotionValue<number>(0);
+  const cachedLengthRef = useRef<number>(0);
+  const isVisibleRef = useRef<boolean>(true);
+
+  React.useEffect(() => {
+    if (!pathRef.current) return;
+    cachedLengthRef.current = pathRef.current.getTotalLength() || 0;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry.isIntersecting;
+      },
+      { rootMargin: "100px 0px" }
+    );
+
+    if (pathRef.current.ownerSVGElement) {
+      observer.observe(pathRef.current.ownerSVGElement);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   useAnimationFrame((time) => {
-    const length = pathRef.current?.getTotalLength();
+    if (!isVisibleRef.current) return;
+    const length = cachedLengthRef.current || pathRef.current?.getTotalLength();
     if (length) {
+      cachedLengthRef.current = length;
       const pxPerMillisecond = length / duration;
       progress.set((time * pxPerMillisecond) % length);
     }
@@ -96,11 +118,11 @@ export const MovingBorder = ({
 
   const x = useTransform(
     progress,
-    (val) => pathRef.current?.getPointAtLength(val).x
+    (val) => pathRef.current?.getPointAtLength(val).x || 0
   );
   const y = useTransform(
     progress,
-    (val) => pathRef.current?.getPointAtLength(val).y
+    (val) => pathRef.current?.getPointAtLength(val).y || 0
   );
 
   const transform = useMotionTemplate`translateX(${x}px) translateY(${y}px) translateX(-50%) translateY(-50%)`;

@@ -393,39 +393,40 @@ const globeConfig = {
   ];
 
 const GridGlobe = () => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [shouldRender, setShouldRender] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !containerRef.current) return;
+
+    // Use IntersectionObserver to start loading globe when user is within 350px of BentoGrid
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldRender(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "350px 0px" }
+    );
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    // remove dark:bg-black bg-white h-screen md:h-auto  w-full flex-row py-20
-    // change absolute -left-5 top-36, add w-full h-full md:top-40
-    <div className="flex items-center justify-center absolute -left-5 top-36 md:top-40 w-full h-full">
-      {/* remove h-full md:h-[40rem] */}
+    <div
+      ref={containerRef}
+      className="flex items-center justify-center absolute -left-5 top-36 md:top-40 w-full h-full"
+    >
       <div className="max-w-7xl mx-auto w-full relative overflow-hidden h-96 px-4">
-        {/* remove these text divs */}
-        {/* <motion.div
-          initial={{
-            opacity: 0,
-            y: 20,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            duration: 1,
-          }}
-          className="div"
-        >
-          <h2 className="text-center text-xl md:text-4xl font-bold text-black dark:text-white">
-            We sell soap worldwide
-          </h2>
-          <p className="text-center text-base md:text-lg font-normal text-neutral-700 dark:text-neutral-200 max-w-md mt-2 mx-auto">
-            This globe is interactive and customizable. Have fun with it, and
-            don&apos;t forget to share it.
-          </p>
-        </motion.div> */}
         <div className="absolute w-full bottom-0 inset-x-0 h-40 bg-gradient-to-b pointer-events-none select-none from-transparent dark:to-black to-white z-40" />
-        {/* remove -bottom-20 */}
         <div className="absolute w-full h-72 md:h-full z-10">
-          <World data={sampleArcs} globeConfig={globeConfig} />
+          {shouldRender ? (
+            <World data={sampleArcs} globeConfig={globeConfig} />
+          ) : (
+            <div className="w-full h-full" />
+          )}
         </div>
       </div>
     </div>

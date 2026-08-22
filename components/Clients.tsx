@@ -7,7 +7,7 @@ import { InfiniteMovingCards } from "./ui/InfiniteMovingCards";
 
 const Clients = () => {
   return (
-    <section id="testimonials" className="py-20">
+    <section className="py-20">
       <h1 className="heading">
         Kind words from
         <span className="text-purple"> satisfied clients</span>
@@ -31,11 +31,15 @@ const Clients = () => {
               <img
                 src={img}
                 alt={name}
+                loading="lazy"
+                decoding="async"
                 className="md:w-10 w-5"
               />
               <img
                 src={nameImg}
                 alt={name}
+                loading="lazy"
+                decoding="async"
                 width={id === 4 || id === 5 ? 100 : 150}
                 className="md:w-24 w-20"
               />

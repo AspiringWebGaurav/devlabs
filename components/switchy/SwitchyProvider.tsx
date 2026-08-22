@@ -22,29 +22,16 @@ function stripSwitchyOverlays() {
   if (badge && badge.parentNode) badge.parentNode.removeChild(badge);
 }
 
-function isVisitorBanned(): boolean {
-  if (typeof document === "undefined") return false;
-  try {
-    const match = document.cookie.match(/(?:^|;\s*)vst_ban_state=([^;]+)/);
-    return Boolean(match && match[1] && match[1].length > 5);
-  } catch {
-    return false;
-  }
-}
-
 export function SwitchyProvider() {
   const pathname = usePathname();
 
   useEffect(() => {
     const isAdmin = pathname.startsWith("/admin");
-    const isBannedRoute = pathname === "/banned";
-    const banned = isVisitorBanned();
 
-    // Condition: Exclude Admin Panel and Banned Visitors from Switchyy mode overlays
-    if (isAdmin || isBannedRoute || banned) {
+    // Condition: Exclude Admin Panel from Switchyy mode overlays
+    if (isAdmin) {
       stripSwitchyOverlays();
 
-      // Remove script if present when entering protected/banned territory
       const existingScript = document.getElementById(SCRIPT_ID);
       if (existingScript && existingScript.parentNode) {
         existingScript.parentNode.removeChild(existingScript);
@@ -52,12 +39,13 @@ export function SwitchyProvider() {
       return;
     }
 
-    // Condition: Public unbanned portfolio visitor -> Inject Switchyy SDK
+    // Condition: Public portfolio visitor -> Inject Switchyy SDK asynchronously
     if (!document.getElementById(SCRIPT_ID)) {
       const script = document.createElement("script");
       script.id = SCRIPT_ID;
       script.src = SWITCHY_SRC;
       script.async = true;
+      script.defer = true;
       document.head.appendChild(script);
     }
   }, [pathname]);

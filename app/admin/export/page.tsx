@@ -4,31 +4,27 @@ import React, { useState, useEffect } from "react";
 import {
   FaFileZipper,
   FaFileExcel,
-  FaBrain,
   FaDatabase,
   FaShieldHalved,
+  FaNewspaper,
+  FaEnvelope,
   FaUsers,
-  FaClockRotateLeft,
   FaCircleCheck,
   FaArrowsRotate,
   FaDownload,
   FaTriangleExclamation,
-  FaFilter,
   FaFolderTree,
   FaRotateRight,
-  FaFingerprint,
-  FaGlobe,
-  FaBolt,
-  FaRobot,
-  FaBan,
   FaFileWord,
   FaFileLines,
   FaBroom,
 } from "react-icons/fa6";
 import {
   FullExportPackage,
-  convertVisitorsToCsv,
-  convertSessionsToCsv,
+  convertPostsToCsv,
+  convertProjectsToCsv,
+  convertMessagesToCsv,
+  convertSubscribersToCsv,
   convertAuditLogsToCsv,
   generateStandaloneHtmlReport,
   generateWordDocumentReport,
@@ -63,18 +59,12 @@ export default function AdminExportPage() {
 
   // Granular Filter Toggles
   const [options, setOptions] = useState<ZipPackagingOptions>({
-    includeVisitors: true,
-    includeSessions: true,
-    includeAppeals: true,
     includeDatabase: true,
     includeSecurity: true,
-    includeAiAnomaly: true,
     includeHtmlReport: true,
     includeWordReport: true,
     includePowerPointReport: true,
   });
-
-  const [dateFilter, setDateFilter] = useState<"ALL" | "30D" | "7D" | "TODAY">("ALL");
 
   // Fetch Dataset Summary on Mount
   const fetchDatasetSummary = async () => {
@@ -109,46 +99,6 @@ export default function AdminExportPage() {
     fetchDatasetSummary();
   }, []);
 
-  // Filter dataset by date if specified
-  const getFilteredDataset = (): FullExportPackage => {
-    if (!data) throw new Error("Dataset not loaded");
-    if (dateFilter === "ALL") return data;
-
-    const now = Date.now();
-    const filterMs =
-      dateFilter === "TODAY"
-        ? 24 * 60 * 60 * 1000
-        : dateFilter === "7D"
-        ? 7 * 24 * 60 * 60 * 1000
-        : 30 * 24 * 60 * 60 * 1000;
-
-    const cutoff = now - filterMs;
-
-    const filteredVisitors = data.visitors.filter((v) => {
-      const t = v.lastSeen || v.firstSeen || 0;
-      return t >= cutoff;
-    });
-
-    const filteredSessions = data.sessions.filter((s) => {
-      const t = s.connectedAt || 0;
-      return t >= cutoff;
-    });
-
-    return {
-      ...data,
-      visitors: filteredVisitors,
-      sessions: filteredSessions,
-      manifest: {
-        ...data.manifest,
-        counts: {
-          ...data.manifest.counts,
-          visitors: filteredVisitors.length,
-          sessions: filteredSessions.length,
-        },
-      },
-    };
-  };
-
   // 1. Primary Action: Generate Full Enterprise Multi-Format ZIP Package
   const handleGenerateFullZip = async () => {
     if (!data) return;
@@ -170,11 +120,8 @@ export default function AdminExportPage() {
       }
       const freshData: FullExportPackage = json.success && json.data ? json.data : data;
 
-      const filtered = getFilteredDataset();
-      const packageData = { ...freshData, ...filtered };
-
       const result = await packageEnterpriseZip(
-        packageData,
+        freshData,
         options,
         (percent, status, currentStage) => {
           setExportPercent(percent);
@@ -196,7 +143,7 @@ export default function AdminExportPage() {
     }
   };
 
-  // Trigger Database Orphan Maintenance Sweep
+  // Trigger Database Maintenance Sweep
   const handleSweepDatabase = async () => {
     setIsSweeping(true);
     setSweepResult(null);
@@ -214,7 +161,7 @@ export default function AdminExportPage() {
       }
       if (json && json.success) {
         setSweepResult(
-          `Sweep Complete: Scanned ${json.report?.totalExamined ?? 0} items, cleaned ${json.report?.totalPruned ?? 0} stale nodes. Database 100% healthy.`
+          `Sweep Complete: Scanned database collections. Database 100% healthy.`
         );
         fetchDatasetSummary();
       } else {
@@ -236,8 +183,7 @@ export default function AdminExportPage() {
   // 2. Download Interactive HTML Report (.HTML)
   const handleDownloadHtmlReport = () => {
     if (!data) return;
-    const filtered = getFilteredDataset();
-    const html = generateStandaloneHtmlReport(filtered);
+    const html = generateStandaloneHtmlReport(data);
     const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
     const filename = `gaurav_portfolio_report_${Date.now()}.html`;
     triggerDownload(blob, filename);
@@ -247,9 +193,8 @@ export default function AdminExportPage() {
   // 3. Download Microsoft Word Document (.DOC)
   const handleDownloadWordReport = () => {
     if (!data) return;
-    const filtered = getFilteredDataset();
-    const blob = generateWordDocumentReport(filtered);
-    const filename = `executive_security_report_${Date.now()}.doc`;
+    const blob = generateWordDocumentReport(data);
+    const filename = `executive_report_${Date.now()}.doc`;
     triggerDownload(blob, filename);
     showToast(filename, "Microsoft Word (.DOC)");
   };
@@ -257,75 +202,67 @@ export default function AdminExportPage() {
   // 4. Download PowerPoint Slide Deck (.PPT / HTML Presentation)
   const handleDownloadPowerPoint = () => {
     if (!data) return;
-    const filtered = getFilteredDataset();
-    const pptHtml = generatePowerPointPresentation(filtered);
+    const pptHtml = generatePowerPointPresentation(data);
     const blob = new Blob([pptHtml], { type: "text/html;charset=utf-8;" });
     const filename = `executive_presentation_${Date.now()}.ppt.html`;
     triggerDownload(blob, filename);
     showToast(filename, "PowerPoint Slide Deck");
   };
 
-  // 5. Download Visitors Excel (CSV)
-  const handleDownloadVisitorsCsv = () => {
+  // 5. Download Posts Excel (CSV)
+  const handleDownloadPostsCsv = () => {
     if (!data) return;
-    const filtered = getFilteredDataset();
-    const csv = convertVisitorsToCsv(filtered.visitors);
+    const csv = convertPostsToCsv(data.posts || []);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const filename = `visitors_telemetry_export_${Date.now()}.csv`;
+    const filename = `blog_posts_${Date.now()}.csv`;
     triggerDownload(blob, filename);
-    showToast(filename, "Excel CSV (UTF-8 BOM)");
+    showToast(filename, "Posts CSV");
   };
 
-  // 6. Download Sessions Excel (CSV)
-  const handleDownloadSessionsCsv = () => {
+  // 6. Download Projects Excel (CSV)
+  const handleDownloadProjectsCsv = () => {
     if (!data) return;
-    const filtered = getFilteredDataset();
-    const csv = convertSessionsToCsv(filtered.sessions);
+    const csv = convertProjectsToCsv(data.projects || []);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const filename = `visitor_sessions_${Date.now()}.csv`;
+    const filename = `projects_${Date.now()}.csv`;
     triggerDownload(blob, filename);
-    showToast(filename, "Excel CSV (UTF-8 BOM)");
+    showToast(filename, "Projects CSV");
   };
 
-  // 7. Download Admin Audit Logs (CSV)
+  // 7. Download Contact Messages (CSV)
+  const handleDownloadMessagesCsv = () => {
+    if (!data) return;
+    const csv = convertMessagesToCsv(data.messages || []);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const filename = `client_inquiries_${Date.now()}.csv`;
+    triggerDownload(blob, filename);
+    showToast(filename, "Inquiries CSV");
+  };
+
+  // 8. Download Subscribers (CSV)
+  const handleDownloadSubscribersCsv = () => {
+    if (!data) return;
+    const csv = convertSubscribersToCsv(data.subscribers || []);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const filename = `subscribers_${Date.now()}.csv`;
+    triggerDownload(blob, filename);
+    showToast(filename, "Subscribers CSV");
+  };
+
+  // 9. Download Admin Audit Logs (CSV)
   const handleDownloadAuditLogsCsv = () => {
     if (!data) return;
-    const filtered = getFilteredDataset();
-    const csv = convertAuditLogsToCsv(filtered.auditLogs || []);
+    const csv = convertAuditLogsToCsv(data.auditLogs || []);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const filename = `admin_audit_logs_${Date.now()}.csv`;
     triggerDownload(blob, filename);
     showToast(filename, "Audit Logs CSV");
   };
 
-  // 8. Download AI Forensic Anomaly Package (JSON)
-  const handleDownloadAiPackage = () => {
-    if (!data) return;
-    const filtered = getFilteredDataset();
-    const aiBundle = {
-      instructions: "Paste this JSON directly into Claude, Gemini, or ChatGPT for forensic anomaly analysis.",
-      prompt: filtered.aiPromptMarkdown,
-      manifest: filtered.manifest,
-      anomalyReport: filtered.anomalyReport,
-      orphanReport: filtered.orphanReport,
-      allVisitors: filtered.visitors,
-      allSessions: filtered.sessions,
-      allAppeals: filtered.appeals,
-      allAuditLogs: filtered.auditLogs,
-    };
-    const blob = new Blob([JSON.stringify(aiBundle, null, 2)], {
-      type: "application/json;charset=utf-8;",
-    });
-    const filename = `ai_anomaly_forensic_bundle_${Date.now()}.json`;
-    triggerDownload(blob, filename);
-    showToast(filename, "AI Forensic Bundle");
-  };
-
-  // 9. Download Complete Raw Database Dump (JSON)
+  // 10. Download Complete Raw Database Dump (JSON)
   const handleDownloadFullDatabaseJson = () => {
     if (!data) return;
-    const filtered = getFilteredDataset();
-    const blob = new Blob([JSON.stringify(filtered, null, 2)], {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json;charset=utf-8;",
     });
     const filename = `database_complete_dump_${Date.now()}.json`;
@@ -350,7 +287,7 @@ export default function AdminExportPage() {
             Data Export &amp; Intelligence Center
           </h1>
           <p className="text-xs text-[#64748B] mt-0.5">
-            Extract every table, visitor device fingerprint, session trace, audit event, and pre-compiled AI Anomaly heuristic in all formats.
+            Extract published articles, showcase projects, client inquiries, subscribers, audit logs, and security configurations in multiple formats.
           </p>
         </div>
 
@@ -359,11 +296,11 @@ export default function AdminExportPage() {
           <button
             onClick={handleSweepDatabase}
             disabled={isSweeping || isLoading}
-            title="Scan and purge any orphaned sessions or stale telemetry"
+            title="Scan database health and clean stale records"
             className="flex items-center gap-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 border border-purple-300 rounded-sm text-xs font-admin-mono font-bold text-purple-900 transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
           >
             <FaBroom className={`w-3 h-3 text-purple-700 ${isSweeping ? "animate-spin" : ""}`} />
-            <span>{isSweeping ? "SWEEPING..." : "SWEEP ORPHANS"}</span>
+            <span>{isSweeping ? "SWEEPING..." : "SWEEP DATABASE"}</span>
           </button>
           <button
             onClick={fetchDatasetSummary}
@@ -420,204 +357,79 @@ export default function AdminExportPage() {
 
       {/* Overview Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Card 1: Visitors */}
+        {/* Card 1: Blog Publications */}
         <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#64748B]">
             <span className="text-[11px] font-admin-mono uppercase tracking-wider font-semibold">
-              Total Visitors
+              Published Posts
             </span>
-            <FaUsers className="w-4 h-4 text-indigo-600" />
+            <FaNewspaper className="w-4 h-4 text-indigo-600" />
           </div>
           <div className="mt-3">
             <p className="text-2xl font-black font-admin-mono text-black">
-              {isLoading ? "..." : (data?.manifest.counts.visitors ?? 0).toLocaleString()}
+              {isLoading ? "..." : (data?.manifest.counts.posts ?? 0).toLocaleString()}
             </p>
             <p className="text-[11px] font-admin-mono text-[#64748B] mt-0.5">
-              {data?.anomalyReport.summaryStatistics.activeCount ?? 0} Active &bull;{" "}
-              <span className="text-rose-600 font-bold">
-                {data?.anomalyReport.summaryStatistics.bannedCount ?? 0} Banned
-              </span>
+              Articles &amp; Tech Tutorials
             </p>
           </div>
         </div>
 
-        {/* Card 2: Sessions */}
+        {/* Card 2: Client Inquiries */}
         <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#64748B]">
             <span className="text-[11px] font-admin-mono uppercase tracking-wider font-semibold">
-              Recorded Sessions
+              Client Inquiries
             </span>
-            <FaClockRotateLeft className="w-4 h-4 text-emerald-600" />
+            <FaEnvelope className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="mt-3">
             <p className="text-2xl font-black font-admin-mono text-black">
-              {isLoading ? "..." : (data?.manifest.counts.sessions ?? 0).toLocaleString()}
+              {isLoading ? "..." : (data?.manifest.counts.messages ?? 0).toLocaleString()}
             </p>
             <p className="text-[11px] font-admin-mono text-[#64748B] mt-0.5">
-              Avg duration: {data?.anomalyReport.summaryStatistics.avgSessionDurationSec ?? 0}s per session
+              Persistent Contact Submissions
             </p>
           </div>
         </div>
 
-        {/* Card 3: Database Nodes */}
+        {/* Card 3: Newsletter Subscribers */}
         <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#64748B]">
             <span className="text-[11px] font-admin-mono uppercase tracking-wider font-semibold">
-              Content Collections
+              Subscribers
             </span>
-            <FaDatabase className="w-4 h-4 text-amber-600" />
+            <FaUsers className="w-4 h-4 text-amber-600" />
           </div>
           <div className="mt-3">
             <p className="text-2xl font-black font-admin-mono text-black">
-              {isLoading
-                ? "..."
-                : (
-                    (data?.manifest.counts.posts ?? 0) +
-                    (data?.manifest.counts.projects ?? 0) +
-                    (data?.manifest.counts.messages ?? 0) +
-                    (data?.manifest.counts.subscribers ?? 0)
-                  ).toLocaleString()}
+              {isLoading ? "..." : (data?.manifest.counts.subscribers ?? 0).toLocaleString()}
             </p>
             <p className="text-[11px] font-admin-mono text-[#64748B] mt-0.5">
-              {data?.manifest.counts.posts ?? 0} Posts &bull; {data?.manifest.counts.messages ?? 0} Messages &bull; {data?.manifest.counts.subscribers ?? 0} Subs
+              Newsletter Subscriptions
             </p>
           </div>
         </div>
 
-        {/* Card 4: AI Anomaly Readiness */}
+        {/* Card 4: Audit Logs */}
         <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#64748B]">
             <span className="text-[11px] font-admin-mono uppercase tracking-wider font-semibold">
-              AI Anomaly Matrix
+              Security Audit Logs
             </span>
-            <FaBrain className="w-4 h-4 text-[#A855F7]" />
+            <FaShieldHalved className="w-4 h-4 text-[#A855F7]" />
           </div>
           <div className="mt-3">
             <p className="text-2xl font-black font-admin-mono text-[#A855F7]">
-              {isLoading ? "..." : (data?.anomalyReport.anomaliesFound ?? 0).toLocaleString()}
+              {isLoading ? "..." : (data?.manifest.counts.auditLogs ?? 0).toLocaleString()}
             </p>
             <p className="text-[11px] font-admin-mono text-emerald-600 font-bold mt-0.5 flex items-center gap-1">
               <FaCircleCheck className="w-2.5 h-2.5" />
-              <span>{data?.manifest.counts.auditLogs ?? 0} Audit Logs Included</span>
+              <span>Immutable Ledger</span>
             </p>
           </div>
         </div>
       </div>
-
-      {/* Real-time AI Anomaly Discovery Matrix Preview */}
-      {data && (
-        <div className="bg-white border border-[#E5E7EB] rounded-sm p-4 sm:p-5 shadow-xs space-y-3">
-          <div className="flex items-center justify-between border-b border-[#F0F0F0] pb-3">
-            <div className="flex items-center gap-2">
-              <FaBrain className="w-4 h-4 text-purple-600" />
-              <h3 className="text-xs font-bold text-black uppercase font-admin-mono tracking-wider">
-                Pre-Computed AI Anomaly &amp; Threat Detection Matrix
-              </h3>
-            </div>
-            <span className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-admin-mono font-bold rounded-xs">
-              {data.anomalyReport.anomaliesFound} Security Heuristics Flagged
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs font-admin-mono">
-            {/* Anomaly 1: Fingerprint Collisions */}
-            <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xs space-y-1">
-              <div className="flex items-center justify-between text-[#334155] font-bold">
-                <span className="flex items-center gap-1.5 text-indigo-700">
-                  <FaFingerprint className="w-3.5 h-3.5" />
-                  <span>Hardware Collisions</span>
-                </span>
-                <span className="font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded text-[10.5px]">
-                  {data.anomalyReport.categories.fingerprintCollisions.length}
-                </span>
-              </div>
-              <p className="text-[11px] text-[#64748B] leading-relaxed">
-                Shared physical machine hashes across multiple visitor IDs (Incognito evasion).
-              </p>
-            </div>
-
-            {/* Anomaly 2: Velocity Spikes */}
-            <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xs space-y-1">
-              <div className="flex items-center justify-between text-[#334155] font-bold">
-                <span className="flex items-center gap-1.5 text-amber-700">
-                  <FaBolt className="w-3.5 h-3.5" />
-                  <span>High-Velocity Spikes</span>
-                </span>
-                <span className="font-bold bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded text-[10.5px]">
-                  {data.anomalyReport.categories.highVelocityBursts.length}
-                </span>
-              </div>
-              <p className="text-[11px] text-[#64748B] leading-relaxed">
-                Aggressive visitor frequency exceeding standard human interaction velocity.
-              </p>
-            </div>
-
-            {/* Anomaly 3: Bot Bounces */}
-            <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xs space-y-1">
-              <div className="flex items-center justify-between text-[#334155] font-bold">
-                <span className="flex items-center gap-1.5 text-purple-700">
-                  <FaRobot className="w-3.5 h-3.5" />
-                  <span>Bot Bounce Traces</span>
-                </span>
-                <span className="font-bold bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded text-[10.5px]">
-                  {data.anomalyReport.categories.botBouncePatterns.length}
-                </span>
-              </div>
-              <p className="text-[11px] text-[#64748B] leading-relaxed">
-                Sub-2-second automated multi-page crawler hits and headless user-agents.
-              </p>
-            </div>
-
-            {/* Anomaly 4: Geo/Timezone Mismatches */}
-            <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xs space-y-1">
-              <div className="flex items-center justify-between text-[#334155] font-bold">
-                <span className="flex items-center gap-1.5 text-blue-700">
-                  <FaGlobe className="w-3.5 h-3.5" />
-                  <span>Geo / Timezone Mismatches</span>
-                </span>
-                <span className="font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded text-[10.5px]">
-                  {data.anomalyReport.categories.geoTimezoneMismatches.length}
-                </span>
-              </div>
-              <p className="text-[11px] text-[#64748B] leading-relaxed">
-                IP country location differing from browser timezone offset (VPN / Proxy hops).
-              </p>
-            </div>
-
-            {/* Anomaly 5: Banned Node Activity */}
-            <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xs space-y-1">
-              <div className="flex items-center justify-between text-[#334155] font-bold">
-                <span className="flex items-center gap-1.5 text-rose-700">
-                  <FaBan className="w-3.5 h-3.5" />
-                  <span>Banned Node Traces</span>
-                </span>
-                <span className="font-bold bg-rose-100 text-rose-800 px-1.5 py-0.2 rounded text-[10.5px]">
-                  {data.anomalyReport.categories.bannedActivityAttempts.length}
-                </span>
-              </div>
-              <p className="text-[11px] text-[#64748B] leading-relaxed">
-                Banned visitors recorded with lifetime access records and persistent sessions.
-              </p>
-            </div>
-
-            {/* Anomaly 6: Admin Endpoint Probing */}
-            <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xs space-y-1">
-              <div className="flex items-center justify-between text-[#334155] font-bold">
-                <span className="flex items-center gap-1.5 text-slate-800">
-                  <FaShieldHalved className="w-3.5 h-3.5 text-slate-700" />
-                  <span>Admin Probing Events</span>
-                </span>
-                <span className="font-bold bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded text-[10.5px]">
-                  {data.anomalyReport.categories.adminProbingAttempts.length}
-                </span>
-              </div>
-              <p className="text-[11px] text-[#64748B] leading-relaxed">
-                Visitor journeys that directly attempted reaching /admin or sensitive paths.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Main Export Console & Dynamic Progress Section */}
       <div className="bg-white border border-[#E5E7EB] rounded-sm p-5 sm:p-6 space-y-6 shadow-xs">
@@ -630,28 +442,6 @@ export default function AdminExportPage() {
             <p className="text-xs text-[#64748B] mt-0.5">
               Bundles HTML Interactive Report, Word (.DOC), PowerPoint (.PPT), Excel (.CSV), and JSON datasets into an auto-extractable archive.
             </p>
-          </div>
-
-          {/* Date Filter Pills */}
-          <div className="flex items-center gap-1 bg-[#F8FAFC] border border-[#CBD5E1] p-1 rounded-sm text-xs font-admin-mono">
-            <span className="text-[10px] text-[#64748B] px-1 flex items-center gap-1 font-bold">
-              <FaFilter className="w-2.5 h-2.5" />
-              <span>RANGE:</span>
-            </span>
-            {(["ALL", "30D", "7D", "TODAY"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setDateFilter(mode)}
-                disabled={isExporting}
-                className={`px-2 py-0.5 rounded-xs text-[10.5px] font-bold transition-all cursor-pointer ${
-                  dateFilter === mode
-                    ? "bg-black text-white shadow-xs"
-                    : "text-[#64748B] hover:text-black hover:bg-white"
-                }`}
-              >
-                {mode === "ALL" ? "All Time" : mode === "30D" ? "30 Days" : mode === "7D" ? "7 Days" : "Today"}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -667,7 +457,7 @@ export default function AdminExportPage() {
                 <span className="font-bold text-slate-900">{exportStage || "Generating export package..."}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-[#64748B]">Stage {stageNumber}/6</span>
+                <span className="text-[11px] text-[#64748B]">Stage {stageNumber}/4</span>
                 <span className="font-bold text-purple-700 bg-purple-100/70 px-2 py-0.5 rounded text-xs">
                   {exportPercent}%
                 </span>
@@ -765,18 +555,6 @@ export default function AdminExportPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {[
               {
-                id: "includeVisitors",
-                label: "Visitor Telemetry",
-                desc: "Full device fingerprints, TLS hints, and IP logs (JSON + CSV)",
-                checked: options.includeVisitors,
-              },
-              {
-                id: "includeSessions",
-                label: "Session Navigation Traces",
-                desc: "Page views, duration, referrers, entry/exit paths (JSON + CSV)",
-                checked: options.includeSessions,
-              },
-              {
                 id: "includeHtmlReport",
                 label: "Interactive Standalone HTML Viewer",
                 desc: "Self-contained index.html with live offline search and tab switching",
@@ -791,26 +569,14 @@ export default function AdminExportPage() {
               {
                 id: "includePowerPointReport",
                 label: "PowerPoint Presentation (.PPT)",
-                desc: "Interactive 4-slide executive briefing deck with keyboard controls",
+                desc: "Executive briefing slide deck with keyboard controls",
                 checked: options.includePowerPointReport,
-              },
-              {
-                id: "includeAiAnomaly",
-                label: "AI Anomaly Discovery Matrix",
-                desc: "Pre-computed heuristics & README_AI_ANALYSIS.md prompt",
-                checked: options.includeAiAnomaly,
               },
               {
                 id: "includeDatabase",
                 label: "Content Collections",
                 desc: "Blog posts, showcase projects, contact inquiries, subscribers",
                 checked: options.includeDatabase,
-              },
-              {
-                id: "includeAppeals",
-                label: "Ban Appeals & Threat Logs",
-                desc: "Appeal submissions, resolution histories, and admin notes",
-                checked: options.includeAppeals,
               },
               {
                 id: "includeSecurity",
@@ -864,7 +630,7 @@ export default function AdminExportPage() {
         </div>
       </div>
 
-      {/* Dedicated Format Downloads Section (like Facebook Takeout) */}
+      {/* Dedicated Format Downloads Section */}
       <div className="space-y-3">
         <div>
           <h3 className="text-sm font-bold text-black uppercase font-admin-mono tracking-wider">
@@ -915,7 +681,7 @@ export default function AdminExportPage() {
                 </span>
               </div>
               <p className="text-[11.5px] text-[#64748B] mt-1.5 leading-relaxed">
-                Executive Security &amp; Audit Report with formatted tables, anomaly matrices, and printable margins.
+                Executive Takeout Report with formatted tables, summaries, and printable margins.
               </p>
             </div>
             <button
@@ -933,7 +699,7 @@ export default function AdminExportPage() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-black font-admin-mono flex items-center gap-1.5">
-                  <FaBrain className="w-3.5 h-3.5 text-amber-600" />
+                  <FaFileLines className="w-3.5 h-3.5 text-amber-600" />
                   <span>PowerPoint Slide Deck (.PPT)</span>
                 </span>
                 <span className="text-[10px] font-admin-mono px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-xs font-bold">
@@ -941,7 +707,7 @@ export default function AdminExportPage() {
                 </span>
               </div>
               <p className="text-[11.5px] text-[#64748B] mt-1.5 leading-relaxed">
-                4-slide interactive executive security briefing deck with keyboard arrow navigation and print presentation mode.
+                Interactive executive briefing deck with clean presentation layout.
               </p>
             </div>
             <button
@@ -954,55 +720,107 @@ export default function AdminExportPage() {
             </button>
           </div>
 
-          {/* Format 4: Visitors Excel */}
+          {/* Format 4: Posts Excel */}
           <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between space-y-3 hover:border-black transition-colors">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-black font-admin-mono flex items-center gap-1.5">
                   <FaFileExcel className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Visitors Spreadsheet (.CSV)</span>
+                  <span>Blog Posts (.CSV)</span>
                 </span>
                 <span className="text-[10px] font-admin-mono px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-xs font-bold">
                   EXCEL READY
                 </span>
               </div>
               <p className="text-[11.5px] text-[#64748B] mt-1.5 leading-relaxed">
-                28-column spreadsheet with UTF-8 BOM including machine hashes, canvas/audio entropy, IP logs, and locations.
+                Spreadsheet containing titles, slugs, publication dates, reading time, and tags.
               </p>
             </div>
             <button
-              onClick={handleDownloadVisitorsCsv}
+              onClick={handleDownloadPostsCsv}
               disabled={isLoading || isExporting}
               className="w-full bg-[#F8FAFC] hover:bg-emerald-50 border border-[#CBD5E1] hover:border-emerald-500 text-black hover:text-emerald-700 py-2 px-3 rounded-sm text-xs font-admin-mono font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
             >
               <FaDownload className="w-3 h-3 text-emerald-600" />
-              <span>DOWNLOAD VISITORS (.CSV)</span>
+              <span>DOWNLOAD POSTS (.CSV)</span>
             </button>
           </div>
 
-          {/* Format 5: Sessions Excel */}
+          {/* Format 5: Projects Excel */}
           <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between space-y-3 hover:border-black transition-colors">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-black font-admin-mono flex items-center gap-1.5">
                   <FaFileExcel className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Sessions Spreadsheet (.CSV)</span>
+                  <span>Projects (.CSV)</span>
                 </span>
                 <span className="text-[10px] font-admin-mono px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-xs font-bold">
                   EXCEL READY
                 </span>
               </div>
               <p className="text-[11.5px] text-[#64748B] mt-1.5 leading-relaxed">
-                Full session durations, entry &amp; exit URLs, referrers, and page-by-page navigation breadcrumbs.
+                Showcase portfolio projects, descriptions, links, and pin metadata.
               </p>
             </div>
             <button
-              onClick={handleDownloadSessionsCsv}
+              onClick={handleDownloadProjectsCsv}
               disabled={isLoading || isExporting}
               className="w-full bg-[#F8FAFC] hover:bg-emerald-50 border border-[#CBD5E1] hover:border-emerald-500 text-black hover:text-emerald-700 py-2 px-3 rounded-sm text-xs font-admin-mono font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
             >
               <FaDownload className="w-3 h-3 text-emerald-600" />
-              <span>DOWNLOAD SESSIONS (.CSV)</span>
+              <span>DOWNLOAD PROJECTS (.CSV)</span>
+            </button>
+          </div>
+
+          {/* Format 6: Contact Messages Excel */}
+          <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between space-y-3 hover:border-black transition-colors">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-black font-admin-mono flex items-center gap-1.5">
+                  <FaFileExcel className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Inquiries (.CSV)</span>
+                </span>
+                <span className="text-[10px] font-admin-mono px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-xs font-bold">
+                  EXCEL READY
+                </span>
+              </div>
+              <p className="text-[11.5px] text-[#64748B] mt-1.5 leading-relaxed">
+                Contact inquiries, sender emails, inquiry categories, and timestamped messages.
+              </p>
+            </div>
+            <button
+              onClick={handleDownloadMessagesCsv}
+              disabled={isLoading || isExporting}
+              className="w-full bg-[#F8FAFC] hover:bg-emerald-50 border border-[#CBD5E1] hover:border-emerald-500 text-black hover:text-emerald-700 py-2 px-3 rounded-sm text-xs font-admin-mono font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+            >
+              <FaDownload className="w-3 h-3 text-emerald-600" />
+              <span>DOWNLOAD INQUIRIES (.CSV)</span>
+            </button>
+          </div>
+
+          {/* Format 7: Subscribers Excel */}
+          <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between space-y-3 hover:border-black transition-colors">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-black font-admin-mono flex items-center gap-1.5">
+                  <FaFileExcel className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Subscribers (.CSV)</span>
+                </span>
+                <span className="text-[10px] font-admin-mono px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-xs font-bold">
+                  EXCEL READY
+                </span>
+              </div>
+              <p className="text-[11.5px] text-[#64748B] mt-1.5 leading-relaxed">
+                Newsletter subscriber list with email addresses and subscription timestamps.
+              </p>
+            </div>
+            <button
+              onClick={handleDownloadSubscribersCsv}
+              disabled={isLoading || isExporting}
+              className="w-full bg-[#F8FAFC] hover:bg-emerald-50 border border-[#CBD5E1] hover:border-emerald-500 text-black hover:text-emerald-700 py-2 px-3 rounded-sm text-xs font-admin-mono font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+            >
+              <FaDownload className="w-3 h-3 text-emerald-600" />
+              <span>DOWNLOAD SUBSCRIBERS (.CSV)</span>
             </button>
           </div>
 
@@ -1019,7 +837,7 @@ export default function AdminExportPage() {
                 </span>
               </div>
               <p className="text-[11.5px] text-[#64748B] mt-1.5 leading-relaxed">
-                Complete audit history of admin actions, ban operations, 2FA rotations, and system events.
+                Complete audit history of admin actions, 2FA rotations, and system events.
               </p>
             </div>
             <button
@@ -1032,33 +850,7 @@ export default function AdminExportPage() {
             </button>
           </div>
 
-          {/* Format 7: AI Forensic Anomaly Package */}
-          <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between space-y-3 hover:border-black transition-colors">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-black font-admin-mono flex items-center gap-1.5">
-                  <FaBrain className="w-3.5 h-3.5 text-purple-600" />
-                  <span>AI Forensic Anomaly Bundle (.JSON)</span>
-                </span>
-                <span className="text-[10px] font-admin-mono px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded-xs font-bold">
-                  FOR LLMs
-                </span>
-              </div>
-              <p className="text-[11.5px] text-[#64748B] mt-1.5 leading-relaxed">
-                Pre-formatted forensic security prompt, heuristic matrix, and telemetry samples for drag-and-drop into Claude / ChatGPT.
-              </p>
-            </div>
-            <button
-              onClick={handleDownloadAiPackage}
-              disabled={isLoading || isExporting}
-              className="w-full bg-[#F8FAFC] hover:bg-purple-50 border border-[#CBD5E1] hover:border-purple-500 text-black hover:text-purple-700 py-2 px-3 rounded-sm text-xs font-admin-mono font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-            >
-              <FaDownload className="w-3 h-3 text-purple-600" />
-              <span>DOWNLOAD AI FORENSIC BUNDLE</span>
-            </button>
-          </div>
-
-          {/* Format 8: Complete Database Dump */}
+          {/* Format 7: Complete Database Dump */}
           <div className="bg-white border border-[#E5E7EB] p-4 rounded-sm shadow-xs flex flex-col justify-between space-y-3 hover:border-black transition-colors">
             <div>
               <div className="flex items-center justify-between">
@@ -1071,7 +863,7 @@ export default function AdminExportPage() {
                 </span>
               </div>
               <p className="text-[11.5px] text-[#64748B] mt-1.5 leading-relaxed">
-                Single raw JSON dump of all collections: posts, projects, messages, subscribers, visitors, and sessions.
+                Single raw JSON dump of all collections: posts, projects, messages, subscribers, and security configurations.
               </p>
             </div>
             <button
@@ -1084,28 +876,6 @@ export default function AdminExportPage() {
             </button>
           </div>
         </div>
-      </div>
-
-      {/* AI Anomaly Analysis Instructions Card */}
-      <div className="bg-white border border-[#E5E7EB] rounded-sm p-5 space-y-3 shadow-xs">
-        <div className="flex items-center gap-2">
-          <FaShieldHalved className="w-4 h-4 text-indigo-600" />
-          <h4 className="text-xs font-bold text-black uppercase font-admin-mono tracking-wider">
-            How to Use with AI (Claude, ChatGPT, Gemini) for Anomaly Discovery
-          </h4>
-        </div>
-        <p className="text-xs text-[#64748B] leading-relaxed">
-          The exported ZIP package is organized specifically for direct AI ingestion. To perform a forensic security audit:
-        </p>
-        <ol className="list-decimal list-inside space-y-1.5 text-xs text-[#334155] font-admin-mono pl-1">
-          <li>Download the <strong>Full Enterprise Multi-Format Takeout Package (.ZIP)</strong> or the <strong>AI Forensic Bundle (.JSON)</strong>.</li>
-          <li>
-            Attach the ZIP file (or extracted <code className="bg-[#F1F5F9] px-1 py-0.5 rounded text-black font-bold">README_AI_ANALYSIS.md</code> + <code className="bg-[#F1F5F9] px-1 py-0.5 rounded text-black font-bold">anomaly_matrix.json</code>) into your AI conversation.
-          </li>
-          <li>
-            The AI will automatically follow the pre-engineered forensic prompt to detect incognito ban evasions, bot scraping velocities, fingerprint collisions, and provide actionable security recommendations.
-          </li>
-        </ol>
       </div>
     </div>
   );

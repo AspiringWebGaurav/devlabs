@@ -23,7 +23,6 @@ export async function POST(request: NextRequest) {
 
     try {
       revalidatePath("/admin", "layout");
-      revalidatePath("/admin/visitors", "layout");
     } catch {
       // Ignored
     }

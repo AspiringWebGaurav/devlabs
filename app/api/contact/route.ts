@@ -109,26 +109,50 @@ export async function POST(request: NextRequest) {
       status: "UNREAD",
     };
 
-    const firestore = getAdminFirestore();
-    if (firestore) {
+    // Realtime Database REST persistence (Universal cross-instance sync)
+    const FIREBASE_DB_URL = (
+      process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
+      process.env.FIREBASE_DATABASE_URL ||
+      "https://portfolio-admin-default-rtdb.firebaseio.com"
+    ).replace(/\/$/, "");
+
+    if (FIREBASE_DB_URL) {
       try {
-        await firestore.collection("messages").doc(messageId).set(messageRecord, { merge: true });
-      } catch (dbErr) {
-        console.warn("Firestore message persistence note:", dbErr);
+        await fetch(`${FIREBASE_DB_URL}/messages/${messageId}.json`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(messageRecord),
+          cache: "no-store",
+        });
+      } catch (rtdbErr) {
+        console.warn("RTDB message persistence note:", rtdbErr);
       }
     }
 
+    // Firestore persistence
+    try {
+      const firestore = getAdminFirestore();
+      if (firestore) {
+        await firestore.collection("messages").doc(messageId).set(messageRecord, { merge: true });
+      }
+    } catch (dbErr) {
+      console.warn("Firestore message persistence note:", dbErr);
+    }
+
     // 7. Dispatch Dual EmailJS Notifications (Clean direct execution)
-    const emailResult = await dispatchContactEmails({
-      name: nameSanitization.sanitizedText,
-      email: email.trim().toLowerCase(),
-      category: selectedCategory,
-      message: messageSanitization.sanitizedText,
-      ip: clientIp,
-    }).catch((err) => {
+    let emailResult = { adminEmailSent: false, visitorEmailSent: false, errors: [] as string[] };
+    try {
+      emailResult = await dispatchContactEmails({
+        name: nameSanitization.sanitizedText,
+        email: email.trim().toLowerCase(),
+        category: selectedCategory,
+        message: messageSanitization.sanitizedText,
+        ip: clientIp,
+      });
+    } catch (err) {
       console.warn("Email dispatch note:", err);
-      return { adminEmailSent: false, visitorEmailSent: false, errors: [String(err)] };
-    });
+      emailResult = { adminEmailSent: false, visitorEmailSent: false, errors: [String(err)] };
+    }
 
     return NextResponse.json({
       success: true,

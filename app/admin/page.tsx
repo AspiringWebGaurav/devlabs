@@ -661,8 +661,6 @@ export default function AdminDashboardPage() {
   };
 
   const totalDocs =
-    (stats.visitorsCount ?? 0) +
-    (stats.sessionsCount ?? 0) +
     stats.postsCount +
     stats.projectsCount +
     stats.messagesCount +
@@ -1359,17 +1357,6 @@ export default function AdminDashboardPage() {
                       <td className="p-3.5 text-right pr-4">
                         <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-admin-mono font-bold">
                           ACTIVE
-                        </span>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="p-3.5 pl-4 font-admin-mono font-bold text-purple-700">visitors</td>
-                      <td className="p-3.5 text-[#64748B]">Hardware fingerprint telemetry and persistent visitor profiles</td>
-                      <td className="p-3.5 text-center font-admin-mono font-bold text-black">{stats.visitorsCount ?? 0}</td>
-                      <td className="p-3.5 font-admin-mono text-[11px] text-[#475569]">Internal Middleware / Admin Only</td>
-                      <td className="p-3.5 text-right pr-4">
-                        <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-admin-mono font-bold">
-                          TELEMETRY
                         </span>
                       </td>
                     </tr>

@@ -114,32 +114,23 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
   if (firestore) {
     try {
       const [
-        visitorsSnap,
-        sessionsSnap,
-        appealsSnap,
         postsSnap,
         projectsSnap,
         messagesSnap,
         subscribersSnap,
       ] = await Promise.allSettled([
-        firestore.collection("visitors").get(),
-        firestore.collection("visitor_sessions").get(),
-        firestore.collection("visitor_appeals").get(),
         firestore.collection("posts").get(),
         firestore.collection("projects").get(),
         firestore.collection("messages").get(),
         firestore.collection("subscribers").get(),
       ]);
 
-      const visitorsCount = visitorsSnap.status === "fulfilled" ? visitorsSnap.value.size : 0;
-      const sessionsCount = sessionsSnap.status === "fulfilled" ? sessionsSnap.value.size : 0;
-      const appealsCount = appealsSnap.status === "fulfilled" ? appealsSnap.value.size : 0;
       const postsCount = postsSnap.status === "fulfilled" ? postsSnap.value.size : (store.isPurged ? 0 : defaultPosts.length);
       const projectsCount = projectsSnap.status === "fulfilled" ? projectsSnap.value.size : (store.isPurged ? 0 : defaultProjects.length);
       const messagesCount = messagesSnap.status === "fulfilled" ? messagesSnap.value.size : (store.isPurged ? 0 : store.messages.length);
       const subscribersCount = subscribersSnap.status === "fulfilled" ? subscribersSnap.value.size : (store.isPurged ? 0 : store.subscribers.length);
 
-      const totalDocs = visitorsCount + sessionsCount + appealsCount + postsCount + projectsCount + messagesCount + subscribersCount;
+      const totalDocs = postsCount + projectsCount + messagesCount + subscribersCount;
       const isPurged = totalDocs === 0;
 
       // Estimate live payload size in bytes
@@ -150,9 +141,7 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         projectsCount,
         messagesCount,
         subscribersCount,
-        telemetryCount: sessionsCount,
-        visitorsCount,
-        sessionsCount,
+        telemetryCount: 0,
         cacheKeysCount: isPurged ? 0 : 1,
         databaseStatus: "ONLINE",
         storageUsedBytes,
@@ -161,9 +150,6 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         redisLatencyMs: 0,
         databaseType: "Firestore",
         collections: {
-          visitors: visitorsCount,
-          visitor_sessions: sessionsCount,
-          visitor_appeals: appealsCount,
           posts: postsCount,
           projects: projectsCount,
           messages: messagesCount,

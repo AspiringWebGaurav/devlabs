@@ -7,14 +7,13 @@ import { FaLocationArrow } from "react-icons/fa6";
 
 import { socialMedia } from "@/data";
 import MagicButton from "./ui/MagicButton";
-import { VisitorIdBadge } from "./visitor/VisitorIdBadge";
 import { ContactModal } from "./contact/ContactModal";
 
 const Footer = () => {
   const [isContactOpen, setIsContactOpen] = useState(false);
 
   return (
-    <footer className="w-full pt-20 pb-10" id="contact">
+    <footer className="w-full pt-20 pb-10">
       {/* Background grid */}
 
       <div className="flex flex-col items-center">
@@ -34,7 +33,7 @@ const Footer = () => {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 items-center w-full mt-20 pt-8 border-t border-white/[0.08] gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-center w-full mt-20 pt-8 border-t border-white/[0.08] gap-4">
         {/* Left: Copyright & Legal Links */}
         <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 text-xs sm:text-sm text-neutral-400 font-normal">
           <span>© {new Date().getFullYear()} Gaurav Patil</span>
@@ -56,11 +55,6 @@ const Footer = () => {
           >
             Terms of Service
           </Link>
-        </div>
-
-        {/* Center: Dynamic Verified Live Visitor ID */}
-        <div className="flex items-center justify-center">
-          <VisitorIdBadge />
         </div>
 
         {/* Right: Social Media Links */}

@@ -15,9 +15,8 @@ import { useAdminSignOut, SignOutModal } from "@/components/admin/SignOutModal";
 
 const NAV_LINKS = [
   { num: "01", label: "Database Services", href: "/admin" },
-  { num: "02", label: "Visitor Data", href: "/admin/visitors" },
-  { num: "03", label: "Admin Profile & Security", href: "/admin/settings" },
-  { num: "04", label: "Data Export & Intelligence", href: "/admin/export" },
+  { num: "02", label: "Admin Profile & Security", href: "/admin/settings" },
+  { num: "03", label: "Data Export & Intelligence", href: "/admin/export" },
 ];
 
 interface AdminSidebarProps {

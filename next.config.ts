@@ -49,6 +49,20 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   poweredByHeader: false,
   devIndicators: false,
+  compress: true,
+  images: {
+    formats: ["image/avif", "image/webp"],
+  },
+  experimental: {
+    optimizePackageImports: [
+      "react-icons",
+      "motion",
+      "three",
+      "@react-three/fiber",
+      "@react-three/drei",
+      "lucide-react",
+    ],
+  },
   serverExternalPackages: ["firebase-admin", "otplib", "qrcode"],
   transpilePackages: ["three", "three-globe"],
   // Allow cross-origin dev access from local network IPs (e.g. mobile devices)

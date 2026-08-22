@@ -375,6 +375,7 @@ export async function getAdminSecurityConfig(): Promise<AdminSecurityConfig> {
       const res = await fetch(`${REDIS_URL}/get/admin_security_config`, {
         headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
         cache: "no-store",
+        signal: AbortSignal.timeout(4000),
       });
       if (res.ok) {
         const json = await res.json();
@@ -393,11 +394,12 @@ export async function getAdminSecurityConfig(): Promise<AdminSecurityConfig> {
     }
   }
 
-// 2. Check Firebase Realtime Database
+  // 2. Check Firebase Realtime Database
   if (FIREBASE_DB_URL) {
     try {
       const res = await fetch(`${FIREBASE_DB_URL}/_system/security_config.json`, {
         cache: "no-store",
+        signal: AbortSignal.timeout(4000),
       });
       if (res.ok) {
         const parsed = await res.json();

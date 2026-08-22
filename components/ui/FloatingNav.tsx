@@ -54,51 +54,58 @@ export const FloatingNav = ({
 
     let isNavigating = false;
     let navigatingTimeout: NodeJS.Timeout;
+    let ticking = false;
 
     const handleScroll = () => {
-      if (isNavigating) return;
+      if (isNavigating || ticking) return;
+      ticking = true;
 
-      const scrollY = window.scrollY;
-      if (scrollY < 200) {
-        if (
-          window.location.pathname !== "/" &&
-          !window.location.pathname.startsWith("/blog")
-        ) {
-          window.history.replaceState(null, "", "/");
+      requestAnimationFrame(() => {
+        ticking = false;
+        if (isNavigating) return;
+
+        const scrollY = window.scrollY;
+        if (scrollY < 200) {
+          if (
+            window.location.pathname !== "/" &&
+            !window.location.pathname.startsWith("/blog")
+          ) {
+            window.history.replaceState(null, "", "/");
+          }
+          return;
         }
-        return;
-      }
 
-      const sectionIds = ["about", "projects", "testimonials", "contact"];
-      const trigger = window.innerHeight * 0.35; // 35% from top of viewport
+        const sectionIds = ["about", "projects", "testimonials", "contact"];
+        const trigger = window.innerHeight * 0.35; // 35% from top of viewport
 
-      const isAtBottom =
-        window.innerHeight + window.scrollY >=
-        document.documentElement.scrollHeight - 80;
+        const isAtBottom =
+          window.innerHeight + window.scrollY >=
+          document.documentElement.scrollHeight - 80;
 
-      let currentSection = "";
+        let currentSection = "";
 
-      if (isAtBottom) {
-        currentSection = "contact";
-      } else {
-        // Track the lowest section whose top has scrolled past the trigger point
-        for (const id of sectionIds) {
-          const el = document.getElementById(id);
-          if (el) {
-            const rect = el.getBoundingClientRect();
-            if (rect.top <= trigger) {
-              currentSection = id;
+        if (isAtBottom) {
+          currentSection = "contact";
+        } else {
+          // Track the lowest section whose top has scrolled past the trigger point
+          for (const id of sectionIds) {
+            const el = document.getElementById(id);
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              if (rect.top <= trigger) {
+                currentSection = id;
+              }
             }
           }
         }
-      }
 
-      if (currentSection) {
-        const targetPath = `/${currentSection}`;
-        if (window.location.pathname !== targetPath) {
-          window.history.replaceState(null, "", targetPath);
+        if (currentSection) {
+          const targetPath = `/${currentSection}`;
+          if (window.location.pathname !== targetPath) {
+            window.history.replaceState(null, "", targetPath);
+          }
         }
-      }
+      });
     };
 
     const onNavClickCustom = () => {

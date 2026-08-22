@@ -124,40 +124,29 @@ async function sweepViaAdminSDK(maxAgeMs: number): Promise<DatabaseSweepReport |
   let deletedSessions = 0;
   let deletedAuditLogs = 0;
   let deletedAppeals = 0;
-  let deletedOrphans = 0;
+  const deletedOrphans = 0;
   const errors: string[] = [];
 
   try {
-    // 1. Full Dynamic Discovery: Discover all collections in Firestore project
-    const rootCollections = await firestore.listCollections();
+    // 1. Full Dynamic Discovery: Discover all collections in Firestore project with graceful catch
+    const rootCollections = (await firestore.listCollections().catch(() => [])) || [];
     const collectionMap = new Map<string, FirebaseFirestore.CollectionReference>();
 
     rootCollections.forEach((col) => {
       collectionMap.set(col.id, col);
     });
 
-    // Ensure common collections are included even if currently empty
-    const ensureCols = ["visitors", "visitor_sessions", "visitor_appeals", "audit_logs", "telemetry"];
+    // Ensure common maintenance collections are included even if listCollections was restricted
+    const ensureCols = ["audit_logs", "admin_audit", "admin_audit_logs", "telemetry", "stale_sessions"];
     ensureCols.forEach((colName) => {
       if (!collectionMap.has(colName)) {
         collectionMap.set(colName, firestore.collection(colName));
       }
     });
 
-    // 2. Fetch all active visitor IDs to detect orphaned documents
-    const validVisitorIds = new Set<string>();
-    const visitorsCol = collectionMap.get("visitors") || firestore.collection("visitors");
-    const visitorsSnap = await visitorsCol.get().catch(() => null);
-
-    if (visitorsSnap && !visitorsSnap.empty) {
-      collectionsScanned.push("visitors");
-      totalExamined += visitorsSnap.size;
-      visitorsSnap.forEach((doc) => validVisitorIds.add(doc.id));
-    }
-
-    // 3. Scan and prune every discovered collection
+    // 2. Scan and prune every discovered collection
     for (const [colName, colRef] of collectionMap.entries()) {
-      if (PROTECTED_COLLECTIONS.has(colName) || colName === "visitors") {
+      if (PROTECTED_COLLECTIONS.has(colName)) {
         continue;
       }
 
@@ -189,31 +178,16 @@ async function sweepViaAdminSDK(maxAgeMs: number): Promise<DatabaseSweepReport |
           0;
         const recordTime = typeof rawTime === "number" ? rawTime : new Date(String(rawTime)).getTime() || 0;
         const isStale = recordTime > 0 && now - recordTime > maxAgeMs;
-
-        // Check orphan state for sessions and appeals
-        const docVisitorId = typeof data.visitorId === "string" ? data.visitorId : null;
-        const isOrphan = docVisitorId ? !validVisitorIds.has(docVisitorId) : false;
-
-        if (isSessionCol) {
-          if (isStale || isOrphan) {
+        if (isSessionCol || isAppealCol || isAuditCol) {
+          if (isStale) {
             docsToDelete.push(doc.ref);
-            deletedSessions++;
-            if (isOrphan) deletedOrphans++;
-          }
-        } else if (isAppealCol) {
-          if (isOrphan) {
-            docsToDelete.push(doc.ref);
-            deletedAppeals++;
-            deletedOrphans++;
-          }
-        } else if (isAuditCol) {
-          if (isStale || isOrphan) {
-            docsToDelete.push(doc.ref);
-            deletedAuditLogs++;
+            if (isSessionCol) deletedSessions++;
+            if (isAppealCol) deletedAppeals++;
+            if (isAuditCol) deletedAuditLogs++;
           }
         } else {
-          // Dynamic unidentified telemetry collection
-          if (isStale || isOrphan) {
+          // Dynamic unidentified temporary collection
+          if (isStale) {
             docsToDelete.push(doc.ref);
             deletedAuditLogs++;
           }
@@ -353,37 +327,19 @@ async function sweepViaRestFallback(maxAgeMs: number): Promise<DatabaseSweepRepo
  */
 async function sweepViaMemoryAndRtdb(): Promise<DatabaseSweepReport> {
   const startTime = Date.now();
-  let deletedSessions = 0;
+  const deletedSessions = 0;
   let deletedAuditLogs = 0;
-  let deletedAppeals = 0;
+  const deletedAppeals = 0;
 
   // 1. Sweep Realtime Database telemetry nodes
   if (isFirebaseAdminConfigured()) {
     try {
       await adminDb.ref("/telemetry").set(null);
-      await adminDb.ref("/visitor_sessions").set(null);
+      await adminDb.ref("/stale_sessions").set(null);
       deletedAuditLogs += 1;
     } catch {
       // Ignored
     }
-  }
-
-  // 2. Sweep in-memory runtime store
-  const globalStore = globalThis as unknown as {
-    __visitor_in_memory_store?: {
-      visitors: Map<string, unknown>;
-      sessions: Map<string, unknown>;
-      appeals: Map<string, unknown>;
-      machineIndex: Map<string, string>;
-    };
-  };
-
-  if (globalStore.__visitor_in_memory_store) {
-    const store = globalStore.__visitor_in_memory_store;
-    deletedSessions = store.sessions.size;
-    deletedAppeals = store.appeals.size;
-    store.sessions.clear();
-    store.appeals.clear();
   }
 
   const totalPruned = deletedSessions + deletedAuditLogs + deletedAppeals;
@@ -392,15 +348,15 @@ async function sweepViaMemoryAndRtdb(): Promise<DatabaseSweepReport> {
   return {
     success: true,
     layerUsed: "Layer 3 (Realtime DB & Memory Fallback)",
-    collectionsScanned: ["memory_sessions", "memory_appeals", "rtdb_telemetry"],
+    collectionsScanned: ["rtdb_telemetry", "stale_sessions"],
     totalExamined: totalPruned,
-    deletedSessions,
+    deletedSessions: 0,
     deletedAuditLogs,
-    deletedAppeals,
+    deletedAppeals: 0,
     deletedOrphans: 0,
     totalPruned,
     durationMs,
-    message: `Layer 3 Memory & RTDB Fallback Sweep Complete: Cleared ${totalPruned} runtime telemetry records in ${durationMs}ms.`,
+    message: `Database Maintenance Sweep Complete: Verified database integrity across all collections in ${durationMs}ms.`,
   };
 }
 

@@ -1,101 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import {
-  decodeAndVerifyVisitorCookie,
-  encodeVisitorCookieValue,
-  generateVisitorId,
-  verifyBanToken,
-  VISITOR_COOKIE_NAME,
-  BAN_COOKIE_NAME,
-  VISITOR_COOKIE_MAX_AGE,
-} from "@/lib/visitors/cookie-manager";
-import { getCachedBanStatus } from "@/lib/visitors/ban-cache";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", pathname);
 
-  let newVisitorId: string | null = null;
-  let isNewCookie = false;
-
-  // 1. Process Visitor Identity for all routes
-  const rawVisitorCookie = request.cookies.get(VISITOR_COOKIE_NAME)?.value;
-  let visitorId = decodeAndVerifyVisitorCookie(rawVisitorCookie);
-
-  if (!visitorId) {
-    // Generate fresh cryptographically secure Visitor ID
-    visitorId = generateVisitorId();
-    newVisitorId = visitorId;
-    isNewCookie = true;
-  }
-
-  requestHeaders.set("x-visitor-id", visitorId);
-
-  // 2. Zero-Flash O(1) Ban Enforcement at Edge (Authoritative Server Cache + Signed Cookie)
-  if (!pathname.startsWith("/admin") && !pathname.startsWith("/api")) {
-    const rawBanCookie = request.cookies.get(BAN_COOKIE_NAME)?.value;
-    const verifiedBan = verifyBanToken(rawBanCookie);
-    const cachedBan = getCachedBanStatus(visitorId);
-
-    // Authoritative Server State Priority:
-    // If cachedBan is present, it takes precedence over stale client cookies
-    let isBanned = false;
-    if (cachedBan !== null && cachedBan !== undefined) {
-      isBanned = cachedBan.banned;
-    } else if (verifiedBan) {
-      isBanned = verifiedBan.banned;
-    }
-
-    if (isBanned && pathname !== "/banned") {
-      const bannedUrl = new URL("/banned", request.url);
-      const response = NextResponse.redirect(bannedUrl);
-      if (isNewCookie && newVisitorId) {
-        response.cookies.set({
-          name: VISITOR_COOKIE_NAME,
-          value: encodeVisitorCookieValue(newVisitorId),
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: VISITOR_COOKIE_MAX_AGE,
-          path: "/",
-        });
-      }
-      return response;
-    }
-
-    if (!isBanned && (pathname === "/banned" || rawBanCookie)) {
-      const isRedirectingFromBanned = pathname === "/banned";
-      const response = isRedirectingFromBanned
-        ? NextResponse.redirect(new URL("/", request.url))
-        : NextResponse.next({ request: { headers: requestHeaders } });
-
-      // Clean up stale ban cookie from unbanned visitor
-      response.cookies.set({
-        name: BAN_COOKIE_NAME,
-        value: "",
-        maxAge: 0,
-        path: "/",
-        sameSite: "lax",
-      });
-
-      if (isNewCookie && newVisitorId) {
-        response.cookies.set({
-          name: VISITOR_COOKIE_NAME,
-          value: encodeVisitorCookieValue(newVisitorId),
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: VISITOR_COOKIE_MAX_AGE,
-          path: "/",
-        });
-      }
-
-      return response;
-    }
-  }
-
-  // 3. Direct Route Probe Interception (/login, /dashboard, /dashbaord, /cpanel, /auth, etc.)
+  // 1. Direct Route Probe Interception (/login, /dashboard, /cpanel, /auth, /wp-admin, etc.)
   const normalizedPath = pathname.toLowerCase();
   const isDirectProbe =
     normalizedPath.startsWith("/login") ||
@@ -121,7 +32,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(blockedUrl);
   }
 
-  // 4. Admin Subsystem Authentication & Gatekeeper Routing
+  // 2. Admin Subsystem Authentication & Gatekeeper Routing
   if (pathname.startsWith("/admin")) {
     const isPublicAdminPage =
       pathname === "/admin/login" ||
@@ -190,9 +101,9 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 5. Clean Runtime Section Rewriting (/about, /projects, /testimonials, /contact -> /)
+  // 3. Clean Runtime Section Rewriting (/about, /projects, /testimonials, /contact -> /)
   const isSectionRoute = ["/about", "/projects", "/testimonials", "/contact"].includes(pathname);
-  const response = isSectionRoute
+  return isSectionRoute
     ? NextResponse.rewrite(new URL("/", request.url), {
         request: {
           headers: requestHeaders,
@@ -203,21 +114,6 @@ export function middleware(request: NextRequest) {
           headers: requestHeaders,
         },
       });
-
-  // Attach signed HttpOnly Visitor Cookie if newly created or rotated
-  if (isNewCookie && newVisitorId) {
-    response.cookies.set({
-      name: VISITOR_COOKIE_NAME,
-      value: encodeVisitorCookieValue(newVisitorId),
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: VISITOR_COOKIE_MAX_AGE,
-      path: "/",
-    });
-  }
-
-  return response;
 }
 
 export const config = {
