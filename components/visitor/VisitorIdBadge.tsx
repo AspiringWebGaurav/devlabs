@@ -2,25 +2,34 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { FaCopy, FaCheck } from "react-icons/fa6";
+import { generateVisitorId } from "@/lib/visitors/cookie-manager";
 import { getMachineFingerprint } from "@/lib/visitors/machine-fingerprint";
 
 export const VisitorIdBadge: React.FC = () => {
-  const [visitorId, setVisitorId] = useState<string | null>(null);
+  const [visitorId, setVisitorId] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
   const fetchVisitorId = useCallback(async () => {
-    // 1. Check fast in-memory session or local cache
+    let currentId = visitorId;
+
+    // 1. Check local cache or generate instant client fallback
     if (typeof window !== "undefined") {
       const cached =
         window.sessionStorage.getItem("portfolio_vst_id") ||
         window.localStorage.getItem("portfolio_vst_id");
       if (cached && cached.startsWith("vst_")) {
+        currentId = cached;
         setVisitorId(cached);
-        return;
+      } else if (!currentId) {
+        const instantId = generateVisitorId();
+        currentId = instantId;
+        setVisitorId(instantId);
+        window.sessionStorage.setItem("portfolio_vst_id", instantId);
+        window.localStorage.setItem("portfolio_vst_id", instantId);
       }
     }
 
-    // 2. Fetch authoritative visitor ID from server endpoint
+    // 2. Fetch authoritative visitor ID from server endpoint in background
     try {
       const mfpPromise = getMachineFingerprint().catch(() => "");
       const mfp = await Promise.race([
@@ -38,30 +47,12 @@ export const VisitorIdBadge: React.FC = () => {
             window.sessionStorage.setItem("portfolio_vst_id", data.visitorId);
             window.localStorage.setItem("portfolio_vst_id", data.visitorId);
           }
-          return;
         }
       }
     } catch {
-      // Ignored
+      // Ignored - client ID already active
     }
-
-    // 3. Fallback direct retry
-    try {
-      const res = await fetch("/api/visitors/me", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        if (data && data.success && data.visitorId) {
-          setVisitorId(data.visitorId);
-          if (typeof window !== "undefined") {
-            window.sessionStorage.setItem("portfolio_vst_id", data.visitorId);
-            window.localStorage.setItem("portfolio_vst_id", data.visitorId);
-          }
-        }
-      }
-    } catch {
-      // Ignored
-    }
-  }, []);
+  }, [visitorId]);
 
   useEffect(() => {
     fetchVisitorId();
@@ -91,38 +82,31 @@ export const VisitorIdBadge: React.FC = () => {
     }
   };
 
-  if (!visitorId) {
-    return (
-      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-white/[0.04] bg-white/[0.015] text-[11px] font-mono text-neutral-600 animate-pulse select-none">
-        <span className="tracking-tight text-neutral-600">id:</span>
-        <span className="font-normal text-neutral-600">vst_...</span>
-      </div>
-    );
-  }
+  const displayId = visitorId || "vst_ID";
 
   return (
     <button
       type="button"
       onClick={handleCopy}
       title="Click to copy your unique Visitor ID"
-      className="group inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-white/[0.04] bg-white/[0.015] hover:bg-white/[0.04] hover:border-white/[0.08] transition-all duration-200 cursor-pointer select-none text-[11px] font-mono text-neutral-500 hover:text-neutral-300"
+      className="group inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/[0.12] transition-all duration-200 cursor-pointer select-none text-[11px] font-mono text-neutral-400 hover:text-neutral-200 shadow-sm"
     >
       <span className="tracking-tight text-neutral-500 group-hover:text-neutral-400 transition-colors">
         id:
       </span>
 
-      <span className="font-normal text-neutral-400 group-hover:text-neutral-200 transition-colors">
-        {visitorId}
+      <span className="font-normal text-neutral-300 group-hover:text-white transition-colors">
+        {displayId}
       </span>
 
       <span className="ml-0.5 text-neutral-500 group-hover:text-neutral-300 transition-colors">
         {copied ? (
-          <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono">
+          <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-semibold">
             <FaCheck className="w-2.5 h-2.5" />
             <span>copied</span>
           </span>
         ) : (
-          <FaCopy className="w-2.5 h-2.5 opacity-40 group-hover:opacity-80 transition-opacity" />
+          <FaCopy className="w-2.5 h-2.5 opacity-50 group-hover:opacity-100 transition-opacity" />
         )}
       </span>
     </button>
