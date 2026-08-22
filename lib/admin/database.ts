@@ -1,14 +1,11 @@
 import { posts as defaultPosts } from "@/data/blog/posts";
 import { projects as defaultProjects } from "@/data/index";
 import { BlogPost } from "@/types/blog";
-import { adminDb, isFirebaseAdminConfigured } from "@/lib/admin/firebase-admin";
+import { getAdminFirestore, adminDb, isFirebaseAdminConfigured } from "@/lib/admin/firebase-admin";
 import type { DataSnapshot } from "firebase-admin/database";
-
 import type { DatabaseStats } from "@/types/admin";
-export type { DatabaseStats };
 
-const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
-const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+export type { DatabaseStats };
 
 // Local runtime fallback cache
 interface RuntimeStore {
@@ -58,84 +55,127 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = 4000, fallback: T): Pro
   ]);
 }
 
-const FIREBASE_DB_URL = (
-  process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
-  process.env.FIREBASE_DATABASE_URL ||
-  "https://portfolio-admin-default-rtdb.firebaseio.com"
-).replace(/\/$/, "");
+/**
+ * Data Access Layer: Returns active blog posts from Cloud Firestore or fallback.
+ */
+export async function getActiveDbPosts(): Promise<BlogPost[]> {
+  const store = getRuntimeStore();
+  if (store.isPurged) return [];
+
+  const firestore = getAdminFirestore();
+  if (firestore) {
+    try {
+      const snap = await firestore.collection("posts").get();
+      if (!snap.empty) {
+        const posts: BlogPost[] = [];
+        snap.forEach((doc) => posts.push(doc.data() as BlogPost));
+        return posts;
+      }
+    } catch {
+      // Fall through to store
+    }
+  }
+
+  return store.posts;
+}
 
 /**
- * Real-time Database Telemetry Aggregator.
+ * Data Access Layer: Returns active projects from Cloud Firestore or fallback.
+ */
+export async function getActiveDbProjects(): Promise<typeof defaultProjects> {
+  const store = getRuntimeStore();
+  if (store.isPurged) return [];
+
+  const firestore = getAdminFirestore();
+  if (firestore) {
+    try {
+      const snap = await firestore.collection("projects").get();
+      if (!snap.empty) {
+        const projects: typeof defaultProjects = [];
+        snap.forEach((doc) => projects.push(doc.data() as (typeof defaultProjects)[0]));
+        return projects;
+      }
+    } catch {
+      // Fall through to store
+    }
+  }
+
+  return store.projects;
+}
+
+/**
+ * Real-time Database Telemetry Aggregator querying Cloud Firestore & fallback systems.
  */
 export async function getDatabaseStats(): Promise<DatabaseStats> {
   const store = getRuntimeStore();
-  let redisLatency = 0;
-  let redisKeys = store.isPurged ? 0 : 1;
+  const firestore = getAdminFirestore();
 
-  // 1. Upstash Redis Telemetry
-  if (REDIS_URL && REDIS_TOKEN) {
+  // 1. Direct Cloud Firestore Inspection (Primary Database)
+  if (firestore) {
     try {
-      const startPing = Date.now();
-      const res = await withTimeout<Response | null>(
-        fetch(`${REDIS_URL}/dbsize`, {
-          headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
-          cache: "no-store",
-        }),
-        2500,
-        null
-      );
-      redisLatency = Date.now() - startPing;
+      const [
+        visitorsSnap,
+        sessionsSnap,
+        appealsSnap,
+        postsSnap,
+        projectsSnap,
+        messagesSnap,
+        subscribersSnap,
+      ] = await Promise.allSettled([
+        firestore.collection("visitors").get(),
+        firestore.collection("visitor_sessions").get(),
+        firestore.collection("visitor_appeals").get(),
+        firestore.collection("posts").get(),
+        firestore.collection("projects").get(),
+        firestore.collection("messages").get(),
+        firestore.collection("subscribers").get(),
+      ]);
 
-      if (res && res.ok) {
-        const sizeData = await res.json();
-        redisKeys = typeof sizeData.result === "number" ? sizeData.result : 0;
-      }
-    } catch {
-      redisKeys = store.isPurged ? 0 : 1;
+      const visitorsCount = visitorsSnap.status === "fulfilled" ? visitorsSnap.value.size : 0;
+      const sessionsCount = sessionsSnap.status === "fulfilled" ? sessionsSnap.value.size : 0;
+      const appealsCount = appealsSnap.status === "fulfilled" ? appealsSnap.value.size : 0;
+      const postsCount = postsSnap.status === "fulfilled" ? postsSnap.value.size : (store.isPurged ? 0 : defaultPosts.length);
+      const projectsCount = projectsSnap.status === "fulfilled" ? projectsSnap.value.size : (store.isPurged ? 0 : defaultProjects.length);
+      const messagesCount = messagesSnap.status === "fulfilled" ? messagesSnap.value.size : (store.isPurged ? 0 : store.messages.length);
+      const subscribersCount = subscribersSnap.status === "fulfilled" ? subscribersSnap.value.size : (store.isPurged ? 0 : store.subscribers.length);
+
+      const totalDocs = visitorsCount + sessionsCount + appealsCount + postsCount + projectsCount + messagesCount + subscribersCount;
+      const isPurged = totalDocs === 0;
+
+      // Estimate live payload size in bytes
+      const storageUsedBytes = totalDocs * 1240;
+
+      return {
+        postsCount,
+        projectsCount,
+        messagesCount,
+        subscribersCount,
+        telemetryCount: sessionsCount,
+        visitorsCount,
+        sessionsCount,
+        cacheKeysCount: isPurged ? 0 : 1,
+        databaseStatus: "ONLINE",
+        storageUsedBytes,
+        lastPurgedAt: store.lastPurgedAt,
+        isPurged,
+        redisLatencyMs: 0,
+        databaseType: "Firestore",
+        collections: {
+          visitors: visitorsCount,
+          visitor_sessions: sessionsCount,
+          visitor_appeals: appealsCount,
+          posts: postsCount,
+          projects: projectsCount,
+          messages: messagesCount,
+          subscribers: subscribersCount,
+        },
+      };
+    } catch (err) {
+      console.warn("Firestore getDatabaseStats note:", err);
     }
   }
 
-  // 2. Query Firebase Realtime Database via REST API (fastest, zero-config on Vercel)
-  if (FIREBASE_DB_URL) {
-    try {
-      const res = await withTimeout<Response | null>(
-        fetch(`${FIREBASE_DB_URL}/.json`, { cache: "no-store" }),
-        3000,
-        null
-      );
-      if (res && res.ok) {
-        const val = await res.json();
-        if (val && typeof val === "object") {
-          const postsCount = val.posts ? Object.keys(val.posts).length : 0;
-          const projectsCount = val.projects ? Object.keys(val.projects).length : 0;
-          const messagesCount = val.messages ? Object.keys(val.messages).length : 0;
-          const subscribersCount = val.subscribers ? Object.keys(val.subscribers).length : 0;
-          const isPurged =
-            val.meta?.purged === true ||
-            (postsCount === 0 && projectsCount === 0 && messagesCount === 0 && subscribersCount === 0);
-          const payloadBytes = isPurged ? 0 : new TextEncoder().encode(JSON.stringify(val)).length;
-
-          return {
-            postsCount,
-            projectsCount,
-            messagesCount,
-            subscribersCount,
-            telemetryCount: val.telemetry ? Object.keys(val.telemetry).length : 0,
-            cacheKeysCount: isPurged ? 0 : redisKeys,
-            databaseStatus: isPurged ? "OFFLINE" : "ONLINE",
-            storageUsedBytes: payloadBytes,
-            lastPurgedAt: val.meta?.lastPurgedAt || store.lastPurgedAt,
-            isPurged,
-            redisLatencyMs: redisLatency,
-          };
-        }
-      }
-    } catch {
-      // Fall through to Admin SDK / Runtime
-    }
-  }
-
-  // 3. Query Firebase Realtime Database via Admin SDK if configured
+  // 2. Query Firebase Realtime Database via Admin SDK if configured
   if (isFirebaseAdminConfigured()) {
     try {
       const snapshot = await withTimeout<DataSnapshot | null>(
@@ -162,12 +202,13 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
             messagesCount,
             subscribersCount,
             telemetryCount: val.telemetry ? Object.keys(val.telemetry).length : 0,
-            cacheKeysCount: isPurged ? 0 : redisKeys,
+            cacheKeysCount: isPurged ? 0 : 1,
             databaseStatus: isPurged ? "OFFLINE" : "ONLINE",
             storageUsedBytes: payloadBytes,
             lastPurgedAt: val.meta?.lastPurgedAt || store.lastPurgedAt,
             isPurged,
-            redisLatencyMs: redisLatency,
+            redisLatencyMs: 0,
+            databaseType: "RealtimeDB",
           };
         }
       }
@@ -176,7 +217,7 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     }
   }
 
-  // 4. Memory Cache Fallback
+  // 3. Memory Cache Fallback
   const totalLiveDocs =
     store.posts.length + store.projects.length + store.messages.length + store.subscribers.length;
   const liveStorePayload = {
@@ -195,17 +236,18 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     messagesCount: store.messages.length,
     subscribersCount: store.subscribers.length,
     telemetryCount: store.telemetryNodes.length,
-    cacheKeysCount: store.isPurged ? 0 : redisKeys,
+    cacheKeysCount: store.isPurged ? 0 : 1,
     databaseStatus: store.isPurged ? "OFFLINE" : "ONLINE",
     storageUsedBytes: calculatedBytes,
     lastPurgedAt: store.lastPurgedAt,
     isPurged: store.isPurged || totalLiveDocs === 0,
-    redisLatencyMs: redisLatency,
+    redisLatencyMs: 0,
+    databaseType: "Firestore",
   };
 }
 
 /**
- * Nuclear Database Purge to exactly 0 documents via Direct Firebase REST API & Admin SDK.
+ * Nuclear Database Purge to exactly 0 documents via Cloud Firestore & Admin SDK.
  */
 export async function purgeEntireDatabase(options: {
   preserveAuth?: boolean;
@@ -213,104 +255,58 @@ export async function purgeEntireDatabase(options: {
   success: boolean;
   purgedAt: string;
 }> {
-  const preserveAuth = options.preserveAuth !== false;
   const store = getRuntimeStore();
   const purgedAt = new Date().toISOString();
+  const firestore = getAdminFirestore();
+  const preserveAuth = options.preserveAuth !== false;
 
-  // 1. Wipe Firebase Realtime DB via Direct REST API (Failsafe & Fast)
-  if (FIREBASE_DB_URL) {
+  // 1. Wipe Firestore collections (batched safely in chunks of 450 to avoid Firestore 500-op limit)
+  if (firestore) {
     try {
-      if (preserveAuth) {
-        await Promise.allSettled([
-          fetch(`${FIREBASE_DB_URL}/posts.json`, { method: "DELETE", cache: "no-store" }),
-          fetch(`${FIREBASE_DB_URL}/projects.json`, { method: "DELETE", cache: "no-store" }),
-          fetch(`${FIREBASE_DB_URL}/messages.json`, { method: "DELETE", cache: "no-store" }),
-          fetch(`${FIREBASE_DB_URL}/subscribers.json`, { method: "DELETE", cache: "no-store" }),
-          fetch(`${FIREBASE_DB_URL}/telemetry.json`, { method: "DELETE", cache: "no-store" }),
-          fetch(`${FIREBASE_DB_URL}/meta.json`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              purged: true,
-              lastPurgedAt: purgedAt,
-              authPreserved: true,
-            }),
-            cache: "no-store",
-          }),
-        ]);
-      } else {
-        await fetch(`${FIREBASE_DB_URL}/.json`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            meta: {
-              purged: true,
-              lastPurgedAt: purgedAt,
-              authPreserved: false,
-            },
-          }),
-          cache: "no-store",
-        });
+      const collectionsToWipe = [
+        "posts",
+        "projects",
+        "messages",
+        "subscribers",
+        "visitors",
+        "visitor_sessions",
+        "visitor_appeals",
+      ];
+      if (!preserveAuth) {
+        collectionsToWipe.push("admin_sessions");
+      }
+      for (const colName of collectionsToWipe) {
+        const snap = await firestore.collection(colName).get();
+        if (!snap.empty) {
+          for (let i = 0; i < snap.docs.length; i += 450) {
+            const chunk = snap.docs.slice(i, i + 450);
+            const batch = firestore.batch();
+            chunk.forEach((doc) => batch.delete(doc.ref));
+            await batch.commit();
+          }
+        }
       }
     } catch (err) {
-      console.warn("Firebase RTDB REST wipe note:", err);
+      console.warn("Firestore purge note:", err);
     }
   }
 
-  // 2. Wipe Firebase Realtime DB using Admin SDK Service Account Key (if configured)
+  // 2. Wipe Realtime DB if configured
   if (isFirebaseAdminConfigured()) {
     try {
-      if (preserveAuth) {
-        await withTimeout<void>(
-          Promise.all([
-            adminDb.ref("/posts").set(null),
-            adminDb.ref("/projects").set(null),
-            adminDb.ref("/messages").set(null),
-            adminDb.ref("/subscribers").set(null),
-            adminDb.ref("/telemetry").set(null),
-            adminDb.ref("/meta").set({
-              purged: true,
-              lastPurgedAt: purgedAt,
-              authPreserved: true,
-            }),
-          ]).then(() => undefined),
-          3000,
-          undefined
-        );
-      } else {
-        await withTimeout<void>(
-          adminDb.ref("/").set({
-            meta: {
-              purged: true,
-              lastPurgedAt: purgedAt,
-              authPreserved: false,
-            },
-          }),
-          3000,
-          undefined
-        );
-      }
-    } catch (err) {
-      console.warn("Firebase Admin SDK wipe note:", err);
+      await adminDb.ref("/posts").set(null);
+      await adminDb.ref("/projects").set(null);
+      await adminDb.ref("/messages").set(null);
+      await adminDb.ref("/subscribers").set(null);
+      await adminDb.ref("/visitors").set(null);
+      await adminDb.ref("/visitor_sessions").set(null);
+      await adminDb.ref("/visitor_appeals").set(null);
+    } catch {
+      // Ignored
     }
   }
 
-  // 3. Flush Redis Cache
-  if (REDIS_URL && REDIS_TOKEN) {
-    try {
-      await withTimeout<Response | null>(
-        fetch(`${REDIS_URL}/flushdb`, {
-          headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
-        }),
-        2500,
-        null
-      );
-    } catch (err) {
-      console.warn("Redis flush note:", err);
-    }
-  }
-
-  // 4. Wipe Runtime Memory Cache
+  // 3. Update memory store
   store.posts = [];
   store.projects = [];
   store.messages = [];
@@ -319,63 +315,66 @@ export async function purgeEntireDatabase(options: {
   store.isPurged = true;
   store.lastPurgedAt = purgedAt;
 
-  return {
-    success: true,
-    purgedAt,
+  // Clear global in-memory visitor stores
+  const globalStore = globalThis as unknown as {
+    __visitor_in_memory_store?: {
+      visitors: Map<string, unknown>;
+      sessions: Map<string, unknown>;
+      appeals: Map<string, unknown>;
+      machineIndex: Map<string, string>;
+    };
   };
+  if (globalStore.__visitor_in_memory_store) {
+    globalStore.__visitor_in_memory_store.visitors.clear();
+    globalStore.__visitor_in_memory_store.sessions.clear();
+    globalStore.__visitor_in_memory_store.appeals.clear();
+    globalStore.__visitor_in_memory_store.machineIndex.clear();
+  }
+
+  return { success: true, purgedAt };
 }
 
 /**
- * Seed Default Database via Direct Firebase REST API & Admin SDK.
+ * Seeds default database records into Cloud Firestore and runtime stores.
  */
 export async function seedDefaultDatabase(): Promise<{
   success: boolean;
+  seededAt: string;
+  counts: { posts: number; projects: number; messages: number; subscribers: number };
 }> {
   const store = getRuntimeStore();
+  const seededAt = new Date().toISOString();
+  const firestore = getAdminFirestore();
 
-  const seedPayload = {
-    posts: defaultPosts.reduce((acc, p) => ({ ...acc, [p.id]: p }), {}),
-    projects: defaultProjects.reduce((acc, p) => ({ ...acc, [p.id]: p }), {}),
-    messages: {
-      msg_01: {
-        id: "msg_01",
-        name: "Acme Enterprise",
-        email: "contact@acme.com",
-        message: "Looking for full-stack consultation.",
-        date: new Date().toISOString(),
-      },
-    },
-    subscribers: {
-      sub_01: { id: "sub_01", email: "contact@gauravpatil.online", subscribedAt: new Date().toISOString() },
-    },
-    meta: {
-      purged: false,
-      lastPurgedAt: null,
-      seededAt: new Date().toISOString(),
-    },
-  };
-
-  if (FIREBASE_DB_URL) {
+  // 1. Seed Cloud Firestore
+  if (firestore) {
     try {
-      await fetch(`${FIREBASE_DB_URL}/.json`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(seedPayload),
-        cache: "no-store",
-      });
+      const batch = firestore.batch();
+      for (const post of defaultPosts) {
+        const docRef = firestore.collection("posts").doc(post.slug);
+        batch.set(docRef, post, { merge: true });
+      }
+      for (const project of defaultProjects) {
+        const docRef = firestore.collection("projects").doc(String(project.id));
+        batch.set(docRef, project, { merge: true });
+      }
+      await batch.commit();
     } catch (err) {
-      console.warn("Firebase RTDB REST seed note:", err);
+      console.warn("Firestore seed note:", err);
     }
   }
 
+  // 2. Seed Realtime DB if configured
   if (isFirebaseAdminConfigured()) {
     try {
-      await withTimeout<void>(adminDb.ref("/").set(seedPayload), 3000, undefined);
-    } catch (err) {
-      console.warn("Firebase Admin SDK seed note:", err);
+      await adminDb.ref("/posts").set(defaultPosts);
+      await adminDb.ref("/projects").set(defaultProjects);
+    } catch {
+      // Ignored
     }
   }
 
+  // 3. Update memory store
   store.posts = [...defaultPosts];
   store.projects = [...defaultProjects];
   store.messages = [
@@ -384,38 +383,22 @@ export async function seedDefaultDatabase(): Promise<{
       name: "Acme Enterprise",
       email: "contact@acme.com",
       message: "Looking for full-stack consultation.",
-      date: new Date().toISOString(),
+      date: seededAt,
     },
   ];
-  store.subscribers = [{ id: "sub_01", email: "contact@gauravpatil.online", subscribedAt: new Date().toISOString() }];
+  store.subscribers = [
+    { id: "sub_01", email: "contact@gauravpatil.online", subscribedAt: seededAt },
+  ];
   store.isPurged = false;
-  store.lastPurgedAt = null;
 
   return {
     success: true,
+    seededAt,
+    counts: {
+      posts: store.posts.length,
+      projects: store.projects.length,
+      messages: store.messages.length,
+      subscribers: store.subscribers.length,
+    },
   };
-}
-
-/**
- * Live Post Fetcher for Portfolio DAL.
- */
-export async function getActiveDbPosts(): Promise<BlogPost[]> {
-  if (isFirebaseAdminConfigured()) {
-    try {
-      const snapshot = await withTimeout<DataSnapshot | null>(
-        adminDb.ref("/posts").once("value"),
-        3000,
-        null
-      );
-      if (snapshot && snapshot.exists()) {
-        const data = snapshot.val();
-        if (!data) return [];
-        return Object.values(data);
-      }
-    } catch {
-      // Fallback to runtime
-    }
-  }
-
-  return getRuntimeStore().posts;
 }

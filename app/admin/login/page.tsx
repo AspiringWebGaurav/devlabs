@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { authenticateWithGooglePreOTP, setClientAdminSession } from "@/lib/admin/auth";
 import { AdminUser } from "@/types/admin";
 import { AdminLoader } from "@/components/admin/AdminLoader";
-import { LegalModal } from "@/components/admin/LegalModal";
 import {
   FaShieldHalved,
   FaEnvelope,
@@ -56,12 +55,6 @@ export default function AdminLoginPage() {
   const [activeTargetEmail, setActiveTargetEmail] = useState("");
   const [maskedEmailDisplay, setMaskedEmailDisplay] = useState("");
 
-  // Legal Modal State
-  const [legalModal, setLegalModal] = useState<{ isOpen: boolean; tab: "terms" | "privacy" }>({
-    isOpen: false,
-    tab: "terms",
-  });
-
   // Email OTP Input State (6 individual digits)
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const emailInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -102,12 +95,64 @@ export default function AdminLoginPage() {
     setIsVerifying(false);
   }, []);
 
-  // Trigger error shake animation
-  const triggerShake = useCallback((msg: string) => {
+  // Keep focus firmly locked on Email OTP first box on error/shake
+  const focusEmailOtpFirst = useCallback(() => {
+    requestAnimationFrame(() => {
+      emailInputRefs.current[0]?.focus();
+      emailInputRefs.current[0]?.select();
+    });
+    setTimeout(() => {
+      emailInputRefs.current[0]?.focus();
+      emailInputRefs.current[0]?.select();
+    }, 50);
+    setTimeout(() => {
+      emailInputRefs.current[0]?.focus();
+      emailInputRefs.current[0]?.select();
+    }, 150);
+    setTimeout(() => {
+      emailInputRefs.current[0]?.focus();
+      emailInputRefs.current[0]?.select();
+    }, 400);
+  }, []);
+
+  // Keep focus firmly locked on TOTP first box on error/shake
+  const focusTotpFirst = useCallback(() => {
+    requestAnimationFrame(() => {
+      totpInputRefs.current[0]?.focus();
+      totpInputRefs.current[0]?.select();
+    });
+    setTimeout(() => {
+      totpInputRefs.current[0]?.focus();
+      totpInputRefs.current[0]?.select();
+    }, 50);
+    setTimeout(() => {
+      totpInputRefs.current[0]?.focus();
+      totpInputRefs.current[0]?.select();
+    }, 150);
+    setTimeout(() => {
+      totpInputRefs.current[0]?.focus();
+      totpInputRefs.current[0]?.select();
+    }, 400);
+  }, []);
+
+  // Trigger error shake animation while locking cursor in OTP box
+  const triggerShake = useCallback((msg: string, focusTarget?: "EMAIL" | "TOTP") => {
     setErrorMsg(msg);
     setShakeError(true);
-    setTimeout(() => setShakeError(false), 380);
-  }, []);
+    if (focusTarget === "EMAIL") {
+      focusEmailOtpFirst();
+    } else if (focusTarget === "TOTP") {
+      focusTotpFirst();
+    }
+    setTimeout(() => {
+      setShakeError(false);
+      if (focusTarget === "EMAIL") {
+        focusEmailOtpFirst();
+      } else if (focusTarget === "TOTP") {
+        focusTotpFirst();
+      }
+    }, 380);
+  }, [focusEmailOtpFirst, focusTotpFirst]);
 
   // Countdown Timers for Email OTP & Google Authenticator
   useEffect(() => {
@@ -158,7 +203,22 @@ export default function AdminLoginPage() {
     setTimeout(() => setSuccessPhase(3), 700);
     setTimeout(() => setSuccessPhase(4), 1050);
     setTimeout(() => {
-      router.replace("/admin");
+      let targetRoute = "/admin";
+      if (typeof window !== "undefined") {
+        const targetFromSession = sessionStorage.getItem("admin_target_route");
+        const fromParam = new URLSearchParams(window.location.search).get("from");
+        const lastRoute = localStorage.getItem("admin_last_route");
+
+        if (targetFromSession && targetFromSession.startsWith("/admin") && targetFromSession !== "/admin/login") {
+          targetRoute = targetFromSession;
+          sessionStorage.removeItem("admin_target_route");
+        } else if (fromParam && fromParam.startsWith("/admin") && fromParam !== "/admin/login") {
+          targetRoute = fromParam;
+        } else if (lastRoute && lastRoute.startsWith("/admin") && lastRoute !== "/admin/login") {
+          targetRoute = lastRoute;
+        }
+      }
+      router.replace(targetRoute);
       router.refresh();
     }, 1400);
   };
@@ -204,10 +264,18 @@ export default function AdminLoginPage() {
         // Scenarios B & D: Email OTP is Required
         setAuthStep("DESTINATION");
       } else {
-        triggerShake(res.error || "Access Denied: You are not an admin.");
+        triggerShake(res.error || "Access Denied: This email account is not authorized as an administrator.");
       }
-    } catch {
-      triggerShake("Google authentication handshake failed. Please try again.");
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string };
+      const errCode =
+        e?.code || (typeof e?.message === "string" ? e.message.match(/auth\/[a-zA-Z0-9_-]+/)?.[0] : "");
+
+      if (errCode === "auth/popup-closed-by-user" || errCode === "auth/cancelled-popup-request") {
+        triggerShake("Google sign-in popup was closed before completing authentication. Please select your authorized admin account.");
+      } else {
+        triggerShake(e?.message || "Access Denied: This email is not authorized. You are not an administrator.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -418,16 +486,20 @@ export default function AdminLoginPage() {
           setAttemptsLeft(data.attemptsLeft);
         }
         setOtpDigits(["", "", "", "", "", ""]);
-        emailInputRefs.current[0]?.focus();
-        triggerShake(data.error || "Invalid verification code.");
+        setIsVerifying(false);
+        focusEmailOtpFirst();
+        triggerShake(data.error || "Invalid verification code.", "EMAIL");
       }
     } catch (err: unknown) {
       clearTimeout(timeoutId);
       const error = err as Error;
+      setIsVerifying(false);
+      focusEmailOtpFirst();
       triggerShake(
         error?.name === "AbortError"
           ? "Verification timed out. Please check network."
-          : "Network error during verification. Please try again."
+          : "Network error during verification. Please try again.",
+        "EMAIL"
       );
     } finally {
       setIsVerifying(false);
@@ -622,16 +694,20 @@ export default function AdminLoginPage() {
         }
 
         setTotpDigits(["", "", "", "", "", ""]);
-        totpInputRefs.current[0]?.focus();
-        triggerShake(data.error || "Invalid Google Authenticator code.");
+        setIsVerifying(false);
+        focusTotpFirst();
+        triggerShake(data.error || "Invalid Google Authenticator code.", "TOTP");
       }
     } catch (err: unknown) {
       clearTimeout(timeoutId);
       const error = err as Error;
+      setIsVerifying(false);
+      focusTotpFirst();
       triggerShake(
         error?.name === "AbortError"
           ? "Verification timed out. Please check network."
-          : "Network error during verification. Please try again."
+          : "Network error during verification. Please try again.",
+        "TOTP"
       );
     } finally {
       setIsVerifying(false);
@@ -779,21 +855,21 @@ export default function AdminLoginPage() {
 
                 <p className="text-[11.5px] font-normal text-[#64748B] text-center pt-0.5 leading-relaxed">
                   By signing in you agree to our{" "}
-                  <button
-                    type="button"
-                    onClick={() => setLegalModal({ isOpen: true, tab: "terms" })}
-                    className="underline text-[#64748B] hover:text-black transition-colors cursor-pointer font-medium"
+                  <Link
+                    href="/admin/terms"
+                    target="_blank"
+                    className="underline text-[#64748B] hover:text-black transition-colors font-medium cursor-pointer"
                   >
                     terms
-                  </button>{" "}
+                  </Link>{" "}
                   and{" "}
-                  <button
-                    type="button"
-                    onClick={() => setLegalModal({ isOpen: true, tab: "privacy" })}
-                    className="underline text-[#64748B] hover:text-black transition-colors cursor-pointer font-medium"
+                  <Link
+                    href="/admin/privacy"
+                    target="_blank"
+                    className="underline text-[#64748B] hover:text-black transition-colors font-medium cursor-pointer"
                   >
                     privacy policy
-                  </button>
+                  </Link>
                   .
                 </p>
               </div>
@@ -903,8 +979,9 @@ export default function AdminLoginPage() {
                       onChange={(e) => handleEmailDigitChange(idx, e.target.value)}
                       onKeyDown={(e) => handleEmailKeyDown(idx, e)}
                       onPaste={handleEmailPaste}
+                      onFocus={(e) => e.target.select()}
                       disabled={isVerifying}
-                      className={`w-10 h-12 sm:w-12 sm:h-13 text-center text-xl font-bold rounded-sm border outline-none transition-all select-none ${shakeError
+                      className={`w-10 h-12 sm:w-12 sm:h-13 text-center text-xl font-bold rounded-sm border outline-none transition-all ${shakeError
                         ? "border-rose-500 bg-rose-50/60 text-rose-700 shadow-xs ring-1 ring-rose-300"
                         : digit
                           ? "border-black bg-white text-black shadow-xs"
@@ -1053,8 +1130,9 @@ export default function AdminLoginPage() {
                           onChange={(e) => handleTotpDigitChange(idx, e.target.value, true)}
                           onKeyDown={(e) => handleTotpKeyDown(idx, e)}
                           onPaste={(e) => handleTotpPaste(e, true)}
+                          onFocus={(e) => e.target.select()}
                           disabled={isVerifying}
-                          className={`w-9 h-11 sm:w-10 sm:h-12 text-center text-lg font-bold rounded-sm border outline-none transition-all select-none ${shakeError
+                          className={`w-9 h-11 sm:w-10 sm:h-12 text-center text-lg font-bold rounded-sm border outline-none transition-all ${shakeError
                             ? "border-rose-500 bg-rose-50/60 text-rose-700 shadow-xs ring-1 ring-rose-300"
                             : digit
                               ? "border-black bg-white text-black shadow-xs"
@@ -1142,8 +1220,9 @@ export default function AdminLoginPage() {
                       onChange={(e) => handleTotpDigitChange(idx, e.target.value, false)}
                       onKeyDown={(e) => handleTotpKeyDown(idx, e)}
                       onPaste={(e) => handleTotpPaste(e, false)}
+                      onFocus={(e) => e.target.select()}
                       disabled={isVerifying}
-                      className={`w-10 h-12 sm:w-12 sm:h-13 text-center text-xl font-bold rounded-sm border outline-none transition-all select-none ${shakeError
+                      className={`w-10 h-12 sm:w-12 sm:h-13 text-center text-xl font-bold rounded-sm border outline-none transition-all ${shakeError
                         ? "border-rose-500 bg-rose-50/60 text-rose-700 shadow-xs ring-1 ring-rose-300"
                         : digit
                           ? "border-black bg-white text-black shadow-xs"
@@ -1212,13 +1291,6 @@ export default function AdminLoginPage() {
       <footer className="w-full px-6 sm:px-12 pb-3 sm:pb-4 flex items-center justify-center text-xs text-[#737373] font-mono text-center">
         <span>&copy; {new Date().getFullYear()} admin panel. All rights reserved.</span>
       </footer>
-
-      {/* Admin Legal & Compliance Modal */}
-      <LegalModal
-        isOpen={legalModal.isOpen}
-        onClose={() => setLegalModal((prev) => ({ ...prev, isOpen: false }))}
-        initialTab={legalModal.tab}
-      />
     </div>
   );
 }

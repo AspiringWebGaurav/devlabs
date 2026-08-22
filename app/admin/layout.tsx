@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AdminHeader } from "@/components/admin/AdminHeader";
@@ -10,7 +10,7 @@ import {
   getClientAdminSession,
   setClientAdminSession,
   clearClientAdminSession,
-  touchAdminSession,
+  isAuthorizedAdminEmail,
 } from "@/lib/admin/auth";
 import { AdminUser } from "@/types/admin";
 
@@ -24,8 +24,6 @@ const adminMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const INACTIVITY_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours inactivity limit
-
 export default function AdminLayout({
   children,
 }: {
@@ -38,13 +36,11 @@ export default function AdminLayout({
   const lastActiveRef = useRef<number>(Date.now());
 
   const isLoginPage = pathname === "/admin/login";
-
-  // Gracefully handle logout on session expiration
-  const handleSessionExpire = useCallback(async () => {
-    await clearClientAdminSession();
-    setCurrentUser(null);
-    router.push("/admin/login?reason=session_expired");
-  }, [router]);
+  const isPublicLegalPage =
+    pathname === "/admin/terms" ||
+    pathname === "/admin/privacy" ||
+    pathname === "/admin/blocked";
+  const isStandalonePage = isLoginPage || isPublicLegalPage;
 
   // Enforce Clean Light Theme on <html> and <body> for all Admin views
   useEffect(() => {
@@ -60,6 +56,39 @@ export default function AdminLayout({
       htmlEl.style.colorScheme = "dark";
       bodyEl.style.backgroundColor = "";
       bodyEl.style.color = "";
+    };
+  }, []);
+
+  // Isolate Admin: Strip and suppress any Switchyy overlays/locks from Admin Panel
+  useEffect(() => {
+    const stripSwitchy = () => {
+      document.documentElement.classList.remove("switchy-lock");
+      document.body.classList.remove("switchy-lock");
+      const overlay = document.getElementById("switchy-overlay");
+      if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      const lock = document.getElementById("switchy-early-lock");
+      if (lock && lock.parentNode) lock.parentNode.removeChild(lock);
+      const badge = document.getElementById("switchy-debug-badge");
+      if (badge && badge.parentNode) badge.parentNode.removeChild(badge);
+    };
+
+    stripSwitchy();
+
+    const observer = new MutationObserver(() => {
+      if (
+        document.getElementById("switchy-overlay") ||
+        document.getElementById("switchy-early-lock") ||
+        document.documentElement.classList.contains("switchy-lock") ||
+        document.body.classList.contains("switchy-lock")
+      ) {
+        stripSwitchy();
+      }
+    });
+
+    observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
     };
   }, []);
 
@@ -81,7 +110,8 @@ export default function AdminLayout({
 
   // Initial Auth Check with dual client/server verification and failsafe timeout
   useEffect(() => {
-    if (isLoginPage) {
+    // If on a standalone page (login, terms, privacy), skip auth redirect
+    if (isStandalonePage) {
       setIsCheckingAuth(false);
       return;
     }
@@ -94,12 +124,17 @@ export default function AdminLayout({
       if (
         localSession.isAuthenticated &&
         localSession.user &&
-        localSession.user.email.trim().toLowerCase() === "gauravpatil9262@gmail.com"
+        (localSession.user.role === "superadmin" || (await isAuthorizedAdminEmail(localSession.user.email)))
       ) {
         if (isMounted) {
           setCurrentUser(localSession.user);
           lastActiveRef.current = Date.now();
           setIsCheckingAuth(false);
+          // Persist current active route & sub-tab query
+          if (!isStandalonePage && typeof window !== "undefined") {
+            const currentFullPath = pathname + window.location.search;
+            localStorage.setItem("admin_last_route", currentFullPath);
+          }
         }
         return;
       }
@@ -115,13 +150,18 @@ export default function AdminLayout({
           if (
             data.authenticated &&
             data.user &&
-            data.user.email.trim().toLowerCase() === "gauravpatil9262@gmail.com"
+            (data.user.role === "superadmin" || (await isAuthorizedAdminEmail(data.user.email)))
           ) {
             setClientAdminSession(data.user);
             if (isMounted) {
               setCurrentUser(data.user);
               lastActiveRef.current = Date.now();
               setIsCheckingAuth(false);
+              // Persist current active route & sub-tab query
+              if (!isStandalonePage && typeof window !== "undefined") {
+                const currentFullPath = pathname + window.location.search;
+                localStorage.setItem("admin_last_route", currentFullPath);
+              }
             }
             return;
           }
@@ -130,10 +170,14 @@ export default function AdminLayout({
         // Fall through to unauthenticated handler
       }
 
-      // 3. If unauthenticated, clear any stale state and redirect cleanly
+      // 3. If unauthenticated, clear any stale state and redirect cleanly without ugly URL query params
       await clearClientAdminSession();
       if (isMounted) {
         setIsCheckingAuth(false);
+        const currentTarget = pathname + (typeof window !== "undefined" ? window.location.search : "");
+        if (typeof window !== "undefined" && currentTarget && currentTarget !== "/admin/login") {
+          sessionStorage.setItem("admin_target_route", currentTarget);
+        }
         router.replace("/admin/login");
       }
     };
@@ -151,53 +195,16 @@ export default function AdminLayout({
       isMounted = false;
       clearTimeout(timeout);
     };
-  }, [pathname, isLoginPage, router]);
+  }, [pathname, isStandalonePage, router]);
 
-  // Background Session Heartbeat & Inactivity Monitor
-  useEffect(() => {
-    if (isLoginPage) return;
-
-    // 1. Periodic check every 15 seconds
-    const interval = setInterval(() => {
-      const session = getClientAdminSession();
-      const now = Date.now();
-
-      // Check TTL expiry
-      if (!session.isAuthenticated || !session.user) {
-        handleSessionExpire();
-        return;
-      }
-
-      // Check inactivity
-      if (now - lastActiveRef.current > INACTIVITY_TIMEOUT_MS) {
-        handleSessionExpire();
-      }
-    }, 15000);
-
-    // 2. Activity listeners (resets inactivity timer & touches session)
-    const handleUserActivity = () => {
-      lastActiveRef.current = Date.now();
-      touchAdminSession();
-    };
-
-    window.addEventListener("mousemove", handleUserActivity, { passive: true });
-    window.addEventListener("keydown", handleUserActivity, { passive: true });
-    window.addEventListener("click", handleUserActivity, { passive: true });
-    window.addEventListener("scroll", handleUserActivity, { passive: true });
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("mousemove", handleUserActivity);
-      window.removeEventListener("keydown", handleUserActivity);
-      window.removeEventListener("click", handleUserActivity);
-      window.removeEventListener("scroll", handleUserActivity);
-    };
-  }, [isLoginPage, handleSessionExpire]);
-
-  // Login page has its own full-bleed layout
-  if (isLoginPage) {
+  // Standalone admin pages (login, terms, privacy, blocked) have their own full-bleed standalone layout
+  if (isStandalonePage) {
     return (
-      <div className={`${adminSans.variable} ${adminMono.variable} font-admin-sans antialiased`}>
+      <div className={`${adminSans.variable} ${adminMono.variable} font-admin-sans antialiased min-h-screen bg-[#FAFAFA] text-black`}>
+        <style dangerouslySetInnerHTML={{ __html: `
+          #switchy-overlay, #switchy-early-lock, #switchy-debug-badge { display: none !important; visibility: hidden !important; pointer-events: none !important; opacity: 0 !important; }
+          .switchy-lock { overflow: auto !important; touch-action: auto !important; overscroll-behavior: auto !important; }
+        `}} />
         {children}
       </div>
     );
@@ -209,6 +216,10 @@ export default function AdminLayout({
         style={{ minHeight: "100vh", backgroundColor: "#FAFAFA", width: "100%" }}
         className={`${adminSans.variable} ${adminMono.variable} font-admin-sans antialiased`}
       >
+        <style dangerouslySetInnerHTML={{ __html: `
+          #switchy-overlay, #switchy-early-lock, #switchy-debug-badge { display: none !important; visibility: hidden !important; pointer-events: none !important; opacity: 0 !important; }
+          .switchy-lock { overflow: auto !important; touch-action: auto !important; overscroll-behavior: auto !important; }
+        `}} />
         <AdminLoader
           label="VERIFYING SESSION"
           sublabel="Authenticating administrator credentials..."
@@ -219,13 +230,20 @@ export default function AdminLayout({
   }
 
   const getSectionTitle = () => {
-    if (pathname === "/admin") return "DATABASE";
+    if (pathname === "/admin") return "DATABASE SERVICES";
+    if (pathname.startsWith("/admin/visitors")) return "VISITOR DATA";
+    if (pathname.startsWith("/admin/settings")) return "ADMIN PROFILE & SECURITY";
+    if (pathname.startsWith("/admin/export")) return "DATA EXPORT & INTELLIGENCE";
     const segment = pathname.replace("/admin/", "").replace("/admin", "").replace("/", "");
-    return segment.toUpperCase() || "DATABASE";
+    return segment.toUpperCase() || "DATABASE SERVICES";
   };
 
   return (
     <div className={`${adminSans.variable} ${adminMono.variable} font-admin-sans h-screen flex flex-col bg-[#FAFAFA] text-[#0F172A] antialiased selection:bg-black selection:text-white overflow-hidden animate-in fade-in duration-300`}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        #switchy-overlay, #switchy-early-lock, #switchy-debug-badge { display: none !important; visibility: hidden !important; pointer-events: none !important; opacity: 0 !important; }
+        .switchy-lock { overflow: auto !important; touch-action: auto !important; overscroll-behavior: auto !important; }
+      `}} />
       {/* Background Hairline Grid */}
       <div className="fixed inset-0 bg-[linear-gradient(to_right,#F0F0F0_1px,transparent_1px),linear-gradient(to_bottom,#F0F0F0_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none -z-10 opacity-70" />
 
@@ -234,7 +252,7 @@ export default function AdminLayout({
 
       {/* Body: Independent Scrolling Sidebar + Independent Scrolling Main Area (Full Space) */}
       <div className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
-        <AdminSidebar />
+        <AdminSidebar user={currentUser} />
         <main className="flex-1 h-full overflow-y-auto p-0">
           {children}
         </main>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { seedDefaultDatabase } from "@/lib/admin/database";
-import { ADMIN_COOKIE_NAME } from "@/lib/admin/auth";
+import { ADMIN_COOKIE_NAME, isAuthorizedAdminEmail } from "@/lib/admin/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!session || session.email?.trim().toLowerCase() !== "gauravpatil9262@gmail.com") {
-      return NextResponse.json({ success: false, error: "Forbidden: Only gauravpatil9262@gmail.com is authorized." }, { status: 403 });
+    if (!session || !(await isAuthorizedAdminEmail(session.email || ""))) {
+      return NextResponse.json({ success: false, error: "Forbidden: Unauthorized administrator." }, { status: 403 });
     }
 
     // 2. Restore Default Showcase Data

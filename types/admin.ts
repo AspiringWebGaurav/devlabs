@@ -22,12 +22,24 @@ export interface DatabaseStats {
   messagesCount: number;
   subscribersCount: number;
   telemetryCount: number;
+  visitorsCount?: number;
+  sessionsCount?: number;
   cacheKeysCount: number;
   databaseStatus: "ONLINE" | "DEGRADED" | "OFFLINE";
   storageUsedBytes: number;
   lastPurgedAt: string | null;
   isPurged: boolean;
   redisLatencyMs: number;
+  databaseType?: "Firestore" | "RealtimeDB";
+  collections?: {
+    visitors: number;
+    visitor_sessions: number;
+    visitor_appeals?: number;
+    posts: number;
+    projects: number;
+    messages: number;
+    subscribers: number;
+  };
 }
 
 export interface AdminMetric {
