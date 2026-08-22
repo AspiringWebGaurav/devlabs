@@ -1,11 +1,14 @@
-import * as admin from "firebase-admin";
+import { App, getApps, initializeApp, cert } from "firebase-admin/app";
+import { getFirestore, Firestore } from "firebase-admin/firestore";
+import { getDatabase, Database } from "firebase-admin/database";
 
-let _adminApp: admin.app.App | null = null;
+let _adminApp: App | null = null;
 
-export function getAdminApp(): admin.app.App | null {
+export function getAdminApp(): App | null {
   if (_adminApp) return _adminApp;
-  if (admin.apps.length > 0) {
-    _adminApp = admin.apps[0];
+  const existingApps = getApps();
+  if (existingApps.length > 0) {
+    _adminApp = existingApps[0];
     return _adminApp;
   }
 
@@ -16,8 +19,8 @@ export function getAdminApp(): admin.app.App | null {
   if (projectId && clientEmail && privateKey) {
     try {
       privateKey = privateKey.replace(/\\n/g, "\n");
-      _adminApp = admin.initializeApp({
-        credential: admin.credential.cert({
+      _adminApp = initializeApp({
+        credential: cert({
           projectId,
           clientEmail,
           privateKey,
@@ -34,12 +37,12 @@ export function getAdminApp(): admin.app.App | null {
   return null;
 }
 
-export function getAdminFirestore(): admin.firestore.Firestore | null {
+export function getAdminFirestore(): Firestore | null {
   const app = getAdminApp();
-  return app ? app.firestore() : null;
+  return app ? getFirestore(app) : null;
 }
 
-export function getAdminDb(): admin.database.Database | null {
+export function getAdminDb(): Database | null {
   const app = getAdminApp();
-  return app ? app.database() : null;
+  return app ? getDatabase(app) : null;
 }
