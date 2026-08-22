@@ -27,25 +27,16 @@ A state-of-the-art, high-performance developer portfolio and enterprise administ
 - **Tier 1 (Google OAuth Identity Verification)**: Restricts administrative access exclusively to authorized Google Workspace master principal.
 - **Tier 2 (Stateless HMAC Email OTP)**: Cryptographically signed 6-digit challenge codes dispatched via dedicated transactional email relay with 10-minute expiry and rate-limit shields.
 - **Tier 3 (RFC 6238 TOTP Google Authenticator)**: Multi-factor authenticator enrollment, QR provisioning, and window-skew validation via `otplib`.
-- **Hardware & Device Fingerprinting**: Captures IP, user-agent, operating system, and hardware architecture on every session authentication.
-- **Sliding Session Management**: Tamper-proof HTTP-only cookie tokens with automated expiration validation and frosted-glass sign-out termination.
+- **Strict Admin Subsystem Isolation**: Scoped strictly inside `/admin` with Swiss minimalist styling and zero bleed into the portfolio.
+- **Dynamic Route Gatekeeper**: Unauthenticated `/admin` requests automatically redirect to `/admin/login`.
+- **Single Administrator Identity**: Locked exclusively to `gauravpatil9262`.
 
 ### 3. 🚀 Dynamic Turnstile Contact & Dual Email Pipeline
-- **Zero-Gap Cloudflare Turnstile Verification**: Dynamic container space allocation with `MutationObserver` &mdash; collapses to `0px` when idle and renders challenge elements on demand.
-- **Non-Blocking Dual EmailJS Pipeline**: Sequential dispatching of **Admin Lead Briefs** (`contact_form`) and **Visitor Confirmations** (`user_confirmation`) with safety buffer delays.
+- **Zero-Gap Cloudflare Turnstile Verification**: Dynamic challenge elements rendered on demand.
+- **Non-Blocking Dual EmailJS Pipeline**: Real-time dispatching of **Admin Lead Briefs** (`contact_form`) and **Visitor Confirmations** (`user_confirmation`).
 - **Anti-Spam & DMARC Deliverability**: Domain-aligned envelope headers, invisible inbox preheaders, and pre-wrap executive message layout.
 - **Profanity & Abuse Sanitization**: Automatic multi-tier dictionary scanning and text cleaning before persistence.
-- **Dual Database Persistence**: Instant synchronous recording to Cloud Firestore `messages` and Realtime Database.
-
-### 4. 📊 Real-Time Visitor Telemetry & Intelligence
-- **High-Resolution Telemetry**: Captures client IP, country, city, browser engine, operating system, device family, session duration, and route traversal history (`/api/visitors`).
-- **Live Active Visitor Counter**: Real-time presence detection and 24-hour activity analytics dashboard.
-- **Automated IP Banning Defense Gateway**: 1-click IP banning with sub-millisecond edge middleware interception, redirecting banned threats to `/banned` with detailed violation notices.
-- **Blocked Visitors Management**: Comprehensive administrator interface (`/admin/blocked`) for real-time unban operations and threat audits.
-
-### 5. 🧹 Database Sweeper & Multi-Format Exporter
-- **Automated Database Sweeper**: 1-click comprehensive database purge for test messages, old telemetry logs, and expired OTP records across Cloud Firestore and Realtime Database.
-- **Multi-Format Streaming Exporter**: Instant client-side and server-side data generation supporting **JSON (Structured)**, **CSV (Spreadsheet-Ready)**, and **ZIP Archive Packaging** via `jszip`.
+- **Realtime Database Persistence**: Instant synchronous recording to Firebase Realtime Database `messages`.
 
 ---
 
