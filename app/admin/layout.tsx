@@ -29,10 +29,12 @@ export default function AdminLayout({
 }>) {
   return (
     <div
-      className={`${adminSans.variable} ${adminMono.variable} min-h-screen bg-[#FAFAFA] text-[#000000] font-sans antialiased`}
+      className={`${adminSans.variable} ${adminMono.variable} min-h-screen bg-[#FAFAFA] text-[#000000] font-sans antialiased relative`}
       style={{ colorScheme: "light" }}
     >
-      {children}
+      {/* Subtle Swiss grid background lines */}
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#E2E8F0_1px,transparent_1px)] [background-size:24px_24px] opacity-70" />
+      <div className="relative z-10">{children}</div>
     </div>
   );
 }

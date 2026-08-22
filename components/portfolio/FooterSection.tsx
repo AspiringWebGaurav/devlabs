@@ -6,16 +6,14 @@ import Image from "next/image";
 import { FaLocationArrow } from "react-icons/fa6";
 
 import { socialMedia } from "@/data";
-import MagicButton from "./ui/MagicButton";
-import { ContactModal } from "./contact/ContactModal";
+import MagicButton from "@/components/ui/MagicButton";
+import { ContactModal } from "@/components/contact/ContactModal";
 
-const Footer = () => {
+export const FooterSection = () => {
   const [isContactOpen, setIsContactOpen] = useState(false);
 
   return (
     <footer className="w-full pt-20 pb-10">
-      {/* Background grid */}
-
       <div className="flex flex-col items-center">
         <h1 className="heading lg:max-w-[45vw]">
           Ready to take <span className="text-purple">your</span> digital
@@ -82,5 +80,3 @@ const Footer = () => {
     </footer>
   );
 };
-
-export default Footer;

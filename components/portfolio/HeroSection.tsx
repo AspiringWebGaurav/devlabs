@@ -3,12 +3,11 @@
 import { FaLocationArrow, FaChevronDown } from "react-icons/fa6";
 import { motion, useScroll, useTransform } from "motion/react";
 
-import MagicButton from "../components/ui/MagicButton";
-import { Spotlight } from "./ui/Spotlight";
-import { TextGenerateEffect } from "./ui/TextGenerateEffect";
+import MagicButton from "@/components/ui/MagicButton";
+import { Spotlight } from "@/components/ui/Spotlight";
+import { TextGenerateEffect } from "@/components/ui/TextGenerateEffect";
 
-const Hero = () => {
-  // Live reload validation test: Webpack HMR active
+export const HeroSection = () => {
   const { scrollY } = useScroll();
   const indicatorOpacity = useTransform(scrollY, [0, 100], [1, 0]);
   const indicatorY = useTransform(scrollY, [0, 100], [0, 20]);
@@ -28,10 +27,7 @@ const Hero = () => {
 
   return (
     <div className="pb-12 pt-28 md:pb-16 md:pt-36 relative">
-      {/**
-       *  UI: Spotlights
-       *  Link: https://ui.aceternity.com/components/spotlight
-       */}
+      {/* Spotlights */}
       <div>
         <Spotlight
           className="-top-40 -left-10 md:-left-32 md:-top-20 h-screen"
@@ -44,16 +40,11 @@ const Hero = () => {
         <Spotlight className="left-80 top-28 h-[80vh] w-[50vw]" fill="blue" />
       </div>
 
-      {/**
-       *  UI: grid
-       *  change bg color to bg-black-100 and reduce grid color from
-       *  0.2 to 0.03
-       */}
+      {/* Grid Pattern Background */}
       <div
         className="h-screen w-full dark:bg-black-100 bg-white dark:bg-grid-white/[0.03] bg-grid-black-100/[0.2]
        absolute top-0 left-0 flex items-center justify-center"
       >
-        {/* Radial gradient for the container to give a faded look */}
         <div
           className="absolute pointer-events-none inset-0 flex items-center justify-center dark:bg-black-100
          bg-white [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]"
@@ -66,11 +57,6 @@ const Hero = () => {
             Dynamic Web Magic with Next.js
           </p>
 
-          {/**
-           *  Link: https://ui.aceternity.com/components/text-generate-effect
-           *
-           *  change md:text-6xl, add more responsive code
-           */}
           <TextGenerateEffect
             words="Transforming Concepts into Seamless User Experiences"
             className="text-center text-[40px] md:text-5xl lg:text-6xl"
@@ -101,50 +87,37 @@ const Hero = () => {
               y: indicatorY,
               scale: indicatorScale,
             }}
-            className="mt-8 sm:mt-12 flex flex-col items-center justify-center cursor-pointer group select-none"
+            className="mt-8 md:mt-10 flex flex-col items-center gap-2 cursor-pointer select-none group"
             onClick={handleScrollToAbout}
           >
-            <motion.div
-              animate={{ y: [0, -4, 0] }}
-              transition={{
-                duration: 2.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-white/[0.12] bg-[#04071D]/80 backdrop-blur-xl hover:border-purple/50 hover:bg-[#0c0e23]/90 transition-all duration-300 shadow-[0_8px_24px_rgba(0,0,0,0.35),0_0_15px_rgba(203,172,249,0.12)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.45),0_0_25px_rgba(203,172,249,0.25)]"
-            >
-              {/* Animated Sleek Mouse Icon */}
-              <div className="w-4 h-6 rounded-full border-[1.5px] border-white-200/50 flex items-start justify-center pt-1 group-hover:border-purple transition-colors">
-                <motion.div
-                  animate={{
-                    y: [0, 5, 0],
-                    opacity: [1, 0.35, 1],
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  className="w-1 h-1.5 rounded-full bg-purple shadow-[0_0_6px_#CBACF9]"
-                />
-              </div>
-
-              {/* Refined Letter-Spaced Typography */}
-              <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] text-white-200/90 group-hover:text-white transition-colors font-medium">
-                Scroll to explore
-              </span>
-
-              {/* Pulsing Chevron Indicator */}
+            <span className="text-[10px] md:text-xs font-mono uppercase tracking-[0.25em] text-[#BEC1DD]/60 group-hover:text-purple transition-colors duration-300">
+              Scroll Down
+            </span>
+            <div className="w-5 h-8 md:w-6 md:h-9 rounded-full border border-white/20 group-hover:border-purple/50 flex justify-center items-start p-1 transition-colors duration-300">
               <motion.div
-                animate={{ y: [0, 2, 0] }}
+                animate={{
+                  y: [0, 8, 0],
+                  opacity: [0.8, 0.2, 0.8],
+                }}
                 transition={{
-                  duration: 1.5,
+                  duration: 1.6,
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
-              >
-                <FaChevronDown className="w-2.5 h-2.5 text-purple/80 group-hover:text-purple transition-colors" />
-              </motion.div>
+                className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-purple"
+              />
+            </div>
+            <motion.div
+              animate={{
+                y: [0, 3, 0],
+              }}
+              transition={{
+                duration: 1.2,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <FaChevronDown className="w-3 h-3 text-[#BEC1DD]/40 group-hover:text-purple transition-colors duration-300" />
             </motion.div>
           </motion.div>
         </div>
@@ -152,5 +125,3 @@ const Hero = () => {
     </div>
   );
 };
-
-export default Hero;

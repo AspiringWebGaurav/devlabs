@@ -1,11 +1,10 @@
 "use client";
 
 import { FaLocationArrow } from "react-icons/fa6";
-
 import { projects } from "@/data";
-import { PinContainer } from "./ui/3d-pin";
+import { PinContainer } from "@/components/ui/3d-pin";
 
-const RecentProjects = () => {
+export const ProjectsSection = () => {
   return (
     <div className="py-20">
       <h1 className="heading">
@@ -71,5 +70,3 @@ const RecentProjects = () => {
     </div>
   );
 };
-
-export default RecentProjects;

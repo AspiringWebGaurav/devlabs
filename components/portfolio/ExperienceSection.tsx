@@ -1,9 +1,8 @@
 import React from "react";
-
 import { workExperience } from "@/data";
-import { Button } from "./ui/MovingBorders";
+import { Button } from "@/components/ui/MovingBorders";
 
-const Experience = () => {
+export const ExperienceSection = () => {
   return (
     <div className="py-20 w-full">
       <h1 className="heading">
@@ -47,5 +46,3 @@ const Experience = () => {
     </div>
   );
 };
-
-export default Experience;

@@ -55,6 +55,23 @@ export function setClientAdminSession(session: AdminSession): void {
 }
 
 /**
+ * Client-Side Helper: Retrieves and parses the admin session from cookies.
+ */
+export function getClientAdminSession(): AdminSession | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${ADMIN_COOKIE_NAME}=`));
+  if (!match) return null;
+  try {
+    const raw = decodeURIComponent(match.split("=")[1]);
+    return JSON.parse(raw) as AdminSession;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Client-Side Helper: Clears the admin session cookie.
  */
 export function clearClientAdminSession(): void {

@@ -1,19 +1,46 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Hero from "@/components/Hero";
+import { HeroSection } from "@/components/portfolio";
 import { FloatingNav } from "@/components/ui/FloatingNav";
 import { navItems } from "@/data";
 import { AdaptiveLazySection } from "@/components/ui/AdaptiveLazySection";
 import ScrollToTop from "@/components/ui/ScrollToTop";
 
-// Dynamically chunk and defer below-the-fold modules
-const Grid = dynamic(() => import("@/components/Grid"), { ssr: false });
-const RecentProjects = dynamic(() => import("@/components/RecentProjects"), { ssr: false });
-const Clients = dynamic(() => import("@/components/Clients"), { ssr: false });
-const Experience = dynamic(() => import("@/components/Experience"), { ssr: false });
-const Approach = dynamic(() => import("@/components/Approach"), { ssr: false });
-const Footer = dynamic(() => import("@/components/Footer"), { ssr: false });
+import {
+  GridSectionSkeleton,
+  ProjectsSectionSkeleton,
+  TestimonialsSectionSkeleton,
+  ExperienceSectionSkeleton,
+  ApproachSectionSkeleton,
+  FooterSectionSkeleton,
+} from "@/components/portfolio/skeletons";
+
+// Dynamically chunk and defer below-the-fold modules with dedicated skeletons
+const GridSection = dynamic(
+  () => import("@/components/portfolio").then((m) => m.GridSection),
+  { ssr: false, loading: () => <GridSectionSkeleton /> }
+);
+const ProjectsSection = dynamic(
+  () => import("@/components/portfolio").then((m) => m.ProjectsSection),
+  { ssr: false, loading: () => <ProjectsSectionSkeleton /> }
+);
+const TestimonialsSection = dynamic(
+  () => import("@/components/portfolio").then((m) => m.TestimonialsSection),
+  { ssr: false, loading: () => <TestimonialsSectionSkeleton /> }
+);
+const ExperienceSection = dynamic(
+  () => import("@/components/portfolio").then((m) => m.ExperienceSection),
+  { ssr: false, loading: () => <ExperienceSectionSkeleton /> }
+);
+const ApproachSection = dynamic(
+  () => import("@/components/portfolio").then((m) => m.ApproachSection),
+  { ssr: false, loading: () => <ApproachSectionSkeleton /> }
+);
+const FooterSection = dynamic(
+  () => import("@/components/portfolio").then((m) => m.FooterSection),
+  { ssr: false, loading: () => <FooterSectionSkeleton /> }
+);
 
 export default function Home() {
   return (
@@ -21,31 +48,31 @@ export default function Home() {
       <div className="max-w-7xl w-full">
         <FloatingNav navItems={navItems} />
         {/* Critical first fold: hydrates synchronously */}
-        <Hero />
+        <HeroSection />
 
-        {/* Screen-Adaptive lazy-loaded sections with anticipatory margins */}
-        <AdaptiveLazySection id="about" minHeight="600px">
-          <Grid />
+        {/* Screen-Adaptive lazy-loaded sections with dedicated skeleton fallbacks */}
+        <AdaptiveLazySection id="about" minHeight="600px" placeholder={<GridSectionSkeleton />}>
+          <GridSection />
         </AdaptiveLazySection>
 
-        <AdaptiveLazySection id="projects" minHeight="700px">
-          <RecentProjects />
+        <AdaptiveLazySection id="projects" minHeight="700px" placeholder={<ProjectsSectionSkeleton />}>
+          <ProjectsSection />
         </AdaptiveLazySection>
 
-        <AdaptiveLazySection id="testimonials" minHeight="500px">
-          <Clients />
+        <AdaptiveLazySection id="testimonials" minHeight="500px" placeholder={<TestimonialsSectionSkeleton />}>
+          <TestimonialsSection />
         </AdaptiveLazySection>
 
-        <AdaptiveLazySection minHeight="450px">
-          <Experience />
+        <AdaptiveLazySection minHeight="450px" placeholder={<ExperienceSectionSkeleton />}>
+          <ExperienceSection />
         </AdaptiveLazySection>
 
-        <AdaptiveLazySection minHeight="600px">
-          <Approach />
+        <AdaptiveLazySection minHeight="600px" placeholder={<ApproachSectionSkeleton />}>
+          <ApproachSection />
         </AdaptiveLazySection>
 
-        <AdaptiveLazySection id="contact" minHeight="400px">
-          <Footer />
+        <AdaptiveLazySection id="contact" minHeight="400px" placeholder={<FooterSectionSkeleton />}>
+          <FooterSection />
         </AdaptiveLazySection>
 
         <ScrollToTop />

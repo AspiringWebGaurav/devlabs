@@ -10,3 +10,11 @@
 7. **No Commit/Push Rule**: NEVER execute `git commit` or `git push` without explicit user permission.
 8. **No Routine Production Build Checks (Dev Server Stability)**: NEVER execute `npm run build` or `next build` automatically after routine code edits. Running production builds mutates `.next` build caches and corrupts the active `npm run dev` local server, causing local crashes and missing module errors. ONLY run `npm run build` when the user explicitly instructs to run a production build or prepare for a git push, at which point all warnings and errors must be thoroughly and robustly resolved.
 9. **No Unsanctioned Background Schedulers or Cron Jobs**: NEVER create, configure, or deploy any automated background cron jobs, Cloud Schedulers, Cloud Functions, background worker tasks, periodic pollers, or visitor ban/unban logic without explicit, exclusive permission from the user.
+10. **Isolated Component Skeleton Loaders & Progressive Streaming**: Every dynamic or below-the-fold component/section must declare its own dedicated skeleton loader in `next/dynamic` (`loading: () => <SectionSkeleton />`) and `AdaptiveLazySection` (`placeholder={<SectionSkeleton />}`). If a single heavy module or 3D canvas is delayed over the network, it must stream and load independently without blocking, freezing, or delaying the rest of the portfolio, ensuring zero Cumulative Layout Shift (CLS = 0).
+
+
+---
+
+## Architectural Documentation & Change Log
+- Full study notes and domain architecture blueprint are documented in [architecture_and_changes_summary.md](file:///c:/github/devlabs/.agents/notes/architecture_and_changes_summary.md).
+
