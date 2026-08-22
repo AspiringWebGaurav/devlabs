@@ -6,9 +6,8 @@ import { revalidatePath } from "next/cache";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/admin/database/cleanup
- * Full-Authority 3-Layer Sweeper: Scans the entire Firestore project, enumerates all collections,
- * and purges stale sessions (>24h), orphaned appeals, and old audit/telemetry logs.
+ * POST /api/admin/database/sweep
+ * Full-Authority Sweeper endpoint for Data Export & Maintenance page.
  */
 export async function POST(request: NextRequest) {
   if (!isAuthorizedAdminSession(request)) {
@@ -24,12 +23,14 @@ export async function POST(request: NextRequest) {
     try {
       revalidatePath("/admin", "layout");
       revalidatePath("/admin/visitors", "layout");
+      revalidatePath("/admin/export", "layout");
     } catch {
       // Ignored
     }
 
     return NextResponse.json({
-      ...report,
+      success: true,
+      report,
       message: report.message,
     });
   } catch (error: unknown) {

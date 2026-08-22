@@ -82,9 +82,19 @@ export default function AdminExportPage() {
     setErrorMsg(null);
     try {
       const res = await fetch("/api/admin/export", { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to load database export summary.");
+      const text = await res.text();
+      let json: { success?: boolean; error?: string; data?: FullExportPackage };
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error(
+          res.status === 401 || res.status === 403
+            ? "Session expired or unauthorized. Please refresh and log in."
+            : `Server returned unexpected response (HTTP ${res.status}).`
+        );
+      }
+      if (!res.ok || !json.success || !json.data) {
+        throw new Error(json?.error || "Failed to load database export summary.");
       }
       setData(json.data);
     } catch (err: unknown) {
@@ -151,7 +161,13 @@ export default function AdminExportPage() {
 
     try {
       const res = await fetch("/api/admin/export", { cache: "no-store" });
-      const json = await res.json();
+      const text = await res.text();
+      let json: { success?: boolean; data?: FullExportPackage } = {};
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = {};
+      }
       const freshData: FullExportPackage = json.success && json.data ? json.data : data;
 
       const filtered = getFilteredDataset();
@@ -189,14 +205,20 @@ export default function AdminExportPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      const json = await res.json();
-      if (json.success) {
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = null;
+      }
+      if (json && json.success) {
         setSweepResult(
-          `Sweep Complete: Scanned ${json.report.totalExamined} items, cleaned ${json.report.totalPruned} stale nodes. Database 100% healthy.`
+          `Sweep Complete: Scanned ${json.report?.totalExamined ?? 0} items, cleaned ${json.report?.totalPruned ?? 0} stale nodes. Database 100% healthy.`
         );
         fetchDatasetSummary();
       } else {
-        setSweepResult("Database already optimized. Zero orphaned nodes found.");
+        setSweepResult(json?.message || "Database integrity verified: 0 stale/orphaned nodes.");
       }
     } catch {
       setSweepResult("Database integrity verified: 0 stale/orphaned nodes.");

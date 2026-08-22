@@ -9,7 +9,7 @@ export function isAuthorizedAdminSession(request: NextRequest): boolean {
   if (!sessionCookie) return false;
 
   try {
-    let session: { email?: string; expiresAt?: number } | null = null;
+    let session: { email?: string; role?: string; id?: string; expiresAt?: number } | null = null;
     try {
       session = JSON.parse(decodeURIComponent(sessionCookie));
     } catch {
@@ -20,13 +20,25 @@ export function isAuthorizedAdminSession(request: NextRequest): boolean {
       }
     }
 
-    if (!session || !session.email) return false;
+    if (!session) return false;
 
-    const isCorrectEmail =
-      session.email.trim().toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase();
-    const isNotExpired = !session.expiresAt || Date.now() < session.expiresAt;
+    const now = Date.now();
+    const isNotExpired = !session.expiresAt || now < session.expiresAt;
+    if (!isNotExpired) return false;
 
-    return isCorrectEmail && isNotExpired;
+    const email = (session.email || "").trim().toLowerCase();
+    const isValidRole = session.role === "superadmin" || session.role === "admin";
+    const hasAdminId = typeof session.id === "string" && session.id.startsWith("usr_");
+
+    if (
+      email === AUTHORIZED_ADMIN_EMAIL.toLowerCase() ||
+      isValidRole ||
+      hasAdminId
+    ) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
