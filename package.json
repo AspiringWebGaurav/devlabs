@@ -1,13 +1,14 @@
 {
   "name": "gaurav-portfolio",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:webpack": "next dev",
     "dev:turbo": "next dev --turbo",
     "clean": "node -e \"const fs=require('fs'); fs.rmSync('.next',{recursive:true,force:true});\"",
-    "dev:clean": "npm run clean && next dev",
-    "dev:clear": "npm run clean && next dev",
+    "dev:clean": "npm run clean && next dev --turbo",
+    "dev:clear": "npm run clean && next dev --turbo",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -15,11 +16,13 @@
   "dependencies": {
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
+    "@types/jszip": "^3.4.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
     "firebase": "^11.4.0",
     "firebase-admin": "^14.2.0",
+    "jszip": "^3.10.1",
     "lottie-react": "^2.4.2",
     "mini-svg-data-uri": "^1.4.4",
     "motion": "^12.43.0",
@@ -33,7 +36,8 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.176.0",
-    "three-globe": "^2.45.2"
+    "three-globe": "^2.45.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",

@@ -93,3 +93,9 @@ desktop.ini
 .eslintcache
 .stylelintcache
 .hintrc
+
+# ==========================================
+# Scratch & Local Diagnostic Scripts
+# ==========================================
+/scratch
+/scratch/
