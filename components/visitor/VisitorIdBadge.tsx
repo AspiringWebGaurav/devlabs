@@ -9,18 +9,25 @@ export const VisitorIdBadge: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   const fetchVisitorId = useCallback(async () => {
-    // 1. Check fast in-memory session cache
+    // 1. Check fast in-memory session or local cache
     if (typeof window !== "undefined") {
-      const cached = window.sessionStorage.getItem("portfolio_vst_id");
+      const cached =
+        window.sessionStorage.getItem("portfolio_vst_id") ||
+        window.localStorage.getItem("portfolio_vst_id");
       if (cached && cached.startsWith("vst_")) {
         setVisitorId(cached);
         return;
       }
     }
 
-    // 2. Fetch authoritative verified visitor ID from server endpoint using machine fingerprint
+    // 2. Fetch authoritative visitor ID from server endpoint
     try {
-      const mfp = await getMachineFingerprint().catch(() => "");
+      const mfpPromise = getMachineFingerprint().catch(() => "");
+      const mfp = await Promise.race([
+        mfpPromise,
+        new Promise<string>((resolve) => setTimeout(() => resolve(""), 80)),
+      ]);
+
       const url = mfp ? `/api/visitors/me?mfp=${encodeURIComponent(mfp)}` : "/api/visitors/me";
       const res = await fetch(url, { cache: "no-store" });
       if (res.ok) {
@@ -29,6 +36,7 @@ export const VisitorIdBadge: React.FC = () => {
           setVisitorId(data.visitorId);
           if (typeof window !== "undefined") {
             window.sessionStorage.setItem("portfolio_vst_id", data.visitorId);
+            window.localStorage.setItem("portfolio_vst_id", data.visitorId);
           }
           return;
         }
@@ -37,23 +45,22 @@ export const VisitorIdBadge: React.FC = () => {
       // Ignored
     }
 
-    // 3. Fallback retry after 1200ms
-    setTimeout(async () => {
-      try {
-        const res = await fetch("/api/visitors/me", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json().catch(() => null);
-          if (data && data.success && data.visitorId) {
-            setVisitorId(data.visitorId);
-            if (typeof window !== "undefined") {
-              window.sessionStorage.setItem("portfolio_vst_id", data.visitorId);
-            }
+    // 3. Fallback direct retry
+    try {
+      const res = await fetch("/api/visitors/me", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data && data.success && data.visitorId) {
+          setVisitorId(data.visitorId);
+          if (typeof window !== "undefined") {
+            window.sessionStorage.setItem("portfolio_vst_id", data.visitorId);
+            window.localStorage.setItem("portfolio_vst_id", data.visitorId);
           }
         }
-      } catch {
-        // Ignored
       }
-    }, 1200);
+    } catch {
+      // Ignored
+    }
   }, []);
 
   useEffect(() => {

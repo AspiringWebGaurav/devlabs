@@ -102,31 +102,38 @@ async function getAudioFingerprint(): Promise<string> {
 
     if (!AudioCtx) return "no-audio-ctx";
 
-    const context = new AudioCtx(1, 44100, 44100);
-    const oscillator = context.createOscillator();
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(10000, context.currentTime);
+    const renderAudio = async () => {
+      const context = new AudioCtx(1, 44100, 44100);
+      const oscillator = context.createOscillator();
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(10000, context.currentTime);
 
-    const compressor = context.createDynamicsCompressor();
-    compressor.threshold.setValueAtTime(-50, context.currentTime);
-    compressor.knee.setValueAtTime(40, context.currentTime);
-    compressor.ratio.setValueAtTime(12, context.currentTime);
-    compressor.attack.setValueAtTime(0, context.currentTime);
-    compressor.release.setValueAtTime(0.25, context.currentTime);
+      const compressor = context.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-50, context.currentTime);
+      compressor.knee.setValueAtTime(40, context.currentTime);
+      compressor.ratio.setValueAtTime(12, context.currentTime);
+      compressor.attack.setValueAtTime(0, context.currentTime);
+      compressor.release.setValueAtTime(0.25, context.currentTime);
 
-    oscillator.connect(compressor);
-    compressor.connect(context.destination);
-    oscillator.start(0);
+      oscillator.connect(compressor);
+      compressor.connect(context.destination);
+      oscillator.start(0);
 
-    const audioBuffer = await context.startRendering();
-    const channelData = audioBuffer.getChannelData(0);
+      const audioBuffer = await context.startRendering();
+      const channelData = audioBuffer.getChannelData(0);
 
-    let audioHash = 0;
-    for (let i = 4500; i < 5000; i++) {
-      audioHash += Math.abs(channelData[i]);
-    }
+      let audioHash = 0;
+      for (let i = 4500; i < 5000; i++) {
+        audioHash += Math.abs(channelData[i]);
+      }
 
-    return audioHash.toString();
+      return audioHash.toString();
+    };
+
+    return await Promise.race([
+      renderAudio(),
+      new Promise<string>((resolve) => setTimeout(() => resolve("audio-timeout"), 150)),
+    ]);
   } catch {
     return "audio-error";
   }
