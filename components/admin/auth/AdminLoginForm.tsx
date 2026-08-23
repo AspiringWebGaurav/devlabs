@@ -11,6 +11,7 @@ import {
   FaXmark,
 } from "react-icons/fa6";
 import { GoogleAuthButton, AuthButtonState } from "./GoogleAuthButton";
+import { SignInOverlay } from "./SignInOverlay";
 
 export const AdminLoginForm: React.FC = () => {
   const searchParams = useSearchParams();
@@ -232,6 +233,9 @@ export const AdminLoginForm: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Authorizing Superadmin Overlay */}
+      <SignInOverlay isOpen={authState === "connecting"} />
     </div>
   );
 };

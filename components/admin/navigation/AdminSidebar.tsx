@@ -5,13 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FaDatabase, FaRightFromBracket } from "react-icons/fa6";
 import { useAdminSession } from "@/components/admin/context";
-import { AdminProfileCard, AdminProfileModal } from "@/components/admin/profile";
+import { AdminProfileCard } from "@/components/admin/profile";
 import { SignOutOverlay } from "@/components/admin/auth/SignOutOverlay";
 
 export const AdminSidebar: React.FC = () => {
   const pathname = usePathname();
   const { user, signOut } = useAdminSession();
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
@@ -27,6 +26,8 @@ export const AdminSidebar: React.FC = () => {
       icon: FaDatabase,
     },
   ];
+
+  const isProfileActive = pathname === "/admin/profile";
 
   return (
     <>
@@ -67,12 +68,12 @@ export const AdminSidebar: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom: User Profile & Sign-Out */}
+        {/* Bottom: User Profile Tab Trigger & Sign-Out */}
         <div className="pt-4 border-t border-[#F1F5F9] space-y-3">
-          {/* Interactive Profile Card Trigger */}
+          {/* Profile Card acts as Tab Trigger */}
           <AdminProfileCard
             user={user}
-            onClick={() => setIsProfileOpen(true)}
+            isActive={isProfileActive}
           />
 
           {/* Clean Sign Out Action Button */}
@@ -89,13 +90,6 @@ export const AdminSidebar: React.FC = () => {
           </button>
         </div>
       </aside>
-
-      {/* Swiss Light Profile Modal */}
-      <AdminProfileModal
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        user={user}
-      />
 
       {/* Zero-Residual Sign Out Overlay */}
       <SignOutOverlay isOpen={isSigningOut} />
