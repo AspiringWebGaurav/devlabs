@@ -3,6 +3,8 @@ import {
   PRIMARY_ADMIN_EMAIL,
   PRIMARY_ADMIN_NAME,
   PRIMARY_ADMIN_ROLE,
+  ADMIN_SESSION_TTL_MS,
+  ADMIN_SESSION_MAX_AGE_SECONDS,
 } from "./constants";
 
 export interface AdminSession {
@@ -26,7 +28,7 @@ export function isAuthorizedAdminEmail(email?: string | null): boolean {
 }
 
 /**
- * Creates a structured session payload for the authenticated superadmin.
+ * Creates a structured session payload for the authenticated superadmin with configurable 5-hour TTL.
  */
 export function createAdminSessionPayload(
   email: string,
@@ -41,17 +43,17 @@ export function createAdminSessionPayload(
     role: PRIMARY_ADMIN_ROLE,
     avatar: avatar || undefined,
     loggedInAt: now,
-    expiresAt: now + 7 * 24 * 60 * 60 * 1000, // 7 days TTL
+    expiresAt: now + ADMIN_SESSION_TTL_MS,
   };
 }
 
 /**
- * Client-Side Helper: Sets the admin_session cookie with a 7-day expiration.
+ * Client-Side Helper: Sets the admin_session cookie with the centralized TTL.
  */
 export function setClientAdminSession(session: AdminSession): void {
   if (typeof document === "undefined") return;
   const serialized = encodeURIComponent(JSON.stringify(session));
-  const maxAge = 7 * 24 * 60 * 60; // 7 days in seconds
+  const maxAge = ADMIN_SESSION_MAX_AGE_SECONDS;
   const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
   document.cookie = `${ADMIN_COOKIE_NAME}=${serialized}; path=/; max-age=${maxAge}; SameSite=Lax${
     isSecure ? "; Secure" : ""

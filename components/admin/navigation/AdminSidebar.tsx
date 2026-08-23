@@ -1,81 +1,22 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FaDatabase, FaRightFromBracket } from "react-icons/fa6";
-import { getClientAdminSession, clearClientAdminSession } from "@/lib/admin/auth";
-import { getFirebaseAuth, signOut } from "@/lib/admin/firebase";
+import { useAdminSession } from "@/components/admin/context";
 import { AdminProfileCard, AdminProfileModal } from "@/components/admin/profile";
 import { SignOutOverlay } from "@/components/admin/auth/SignOutOverlay";
-import type { AdminUser } from "@/types/admin";
 
 export const AdminSidebar: React.FC = () => {
   const pathname = usePathname();
-  const [user, setUser] = useState<AdminUser | null>(null);
+  const { user, signOut } = useAdminSession();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  useEffect(() => {
-    const session = getClientAdminSession();
-    if (session) {
-      setUser({
-        id: session.id,
-        email: session.email,
-        name: session.name,
-        role: session.role,
-        avatar: session.avatar,
-      });
-    }
-
-    // Also synchronize profile state with server session
-    fetch("/api/admin/auth/session")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.authenticated && data.user) {
-          setUser(data.user);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // Complete, zero-residual enterprise sign out
   const handleSignOut = async () => {
     setIsSigningOut(true);
-
-    try {
-      // 1. Invalidate server cookie & authorization session
-      await fetch("/api/admin/auth/session", { method: "DELETE" });
-    } catch {
-      // Continue cleanup even if offline
-    }
-
-    try {
-      // 2. Clear client session cookie
-      clearClientAdminSession();
-    } catch {
-      // Ignore
-    }
-
-    try {
-      // 3. Clear Firebase Client Auth SDK session
-      const auth = getFirebaseAuth();
-      await signOut(auth);
-    } catch {
-      // Ignore
-    }
-
-    try {
-      // 4. Clear client caches
-      sessionStorage.clear();
-    } catch {
-      // Ignore
-    }
-
-    // 5. Clean redirect with no leftover states
-    setTimeout(() => {
-      window.location.replace("/admin/login?signedOut=true");
-    }, 450);
+    await signOut();
   };
 
   const navItems = [

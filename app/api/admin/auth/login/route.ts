@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthorizedAdminEmail, createAdminSessionPayload } from "@/lib/admin/auth";
-import { ADMIN_COOKIE_NAME, PRIMARY_ADMIN_EMAIL } from "@/lib/admin/constants";
+import { ADMIN_COOKIE_NAME, PRIMARY_ADMIN_EMAIL, ADMIN_SESSION_MAX_AGE_SECONDS } from "@/lib/admin/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       httpOnly: false, // Accessible to client session utilities
       secure: isSecure,
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days TTL
+      maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
       path: "/",
     });
 

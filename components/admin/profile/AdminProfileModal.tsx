@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { FaXmark, FaShieldHalved, FaGoogle } from "react-icons/fa6";
 import type { AdminUser } from "@/types/admin";
+import { ADMIN_SESSION_TTL_HOURS } from "@/lib/admin/constants";
 
 interface AdminProfileModalProps {
   isOpen: boolean;
@@ -95,7 +96,7 @@ export const AdminProfileModal: React.FC<AdminProfileModalProps> = ({
             </div>
             <div className="flex items-center justify-between text-[#64748B]">
               <span>Session Duration</span>
-              <span className="text-black font-semibold">7 Days (Rolling TTL)</span>
+              <span className="text-black font-semibold">{ADMIN_SESSION_TTL_HOURS} Hours (Auto-Expiring Security TTL)</span>
             </div>
             <div className="flex items-center justify-between text-[#64748B]">
               <span>Storage Policy</span>

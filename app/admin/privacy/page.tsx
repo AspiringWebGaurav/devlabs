@@ -1,7 +1,8 @@
 import React from "react";
 import Link from "next/link";
-import { FaArrowLeft } from "react-icons/fa6";
+import { FaArrowLeft, FaShieldHalved, FaLock, FaUserCheck, FaCookieBite, FaInbox, FaRobot, FaFingerprint } from "react-icons/fa6";
 import { AdminFooter } from "@/components/admin";
+import { ADMIN_SESSION_TTL_HOURS } from "@/lib/admin/constants";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -12,17 +13,17 @@ export const metadata: Metadata = {
 
 export default function AdminPrivacyPage() {
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#FFFFFF] text-black relative overflow-hidden">
-      {/* 1. Edge-to-Edge Top Navigation Bar with Exact Shiro Proportions */}
-      <header className="w-full bg-[#FFFFFF] px-6 sm:px-12 py-5 flex items-center justify-between sticky top-0 z-30">
+    <div className="min-h-screen flex flex-col justify-between bg-[#FAFAFA] text-black relative">
+      {/* 1. Edge-to-Edge Sticky Top Navigation Header */}
+      <header className="w-full bg-[#FFFFFF] px-6 sm:px-10 lg:px-12 py-4 flex items-center justify-between sticky top-0 z-30 border-b border-[#E5E7EB] shadow-2xs select-none">
         <div className="flex items-center gap-3">
           <Link
             href="/admin"
-            className="font-admin-sans text-[22px] sm:text-[26px] font-extrabold tracking-tight text-black hover:opacity-80 transition-opacity"
+            className="font-admin-sans text-xl sm:text-2xl font-extrabold tracking-tight text-black hover:opacity-80 transition-opacity"
           >
             admin panel<span className="text-[#7C3AED]">.</span>
           </Link>
-          <span className="text-[#94A3B8] font-admin-mono text-sm">/</span>
+          <span className="text-[#CBD5E1] font-admin-mono text-sm">/</span>
           <span className="font-admin-mono text-xs uppercase tracking-widest text-[#64748B] font-semibold">
             Privacy Policy
           </span>
@@ -30,120 +31,195 @@ export default function AdminPrivacyPage() {
 
         <Link
           href="/admin/login"
-          className="inline-flex items-center gap-1.5 text-xs font-admin-mono text-[#64748B] hover:text-black transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-admin-mono font-semibold text-[#64748B] hover:text-black bg-[#FAFAFA] hover:bg-[#F1F5F9] border border-[#CBD5E1] rounded-sm transition-all shadow-2xs"
         >
           <FaArrowLeft className="w-3 h-3 text-[#7C3AED]" />
           <span>Back to Login</span>
         </Link>
-
-        {/* Exact Shiro Horizontal Dashed Divider (4px dash, 4px gap) */}
-        <div className="absolute bottom-0 inset-x-0 h-px pointer-events-none">
-          <svg className="w-full h-px text-[#CBD5E1] overflow-visible">
-            <line x1="0" y1="0" x2="100%" y2="0" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
-          </svg>
-        </div>
       </header>
 
-      {/* 2. Architectural Dashed Grid Canvas & Reading Container */}
-      <main className="flex-1 w-full bg-[#FFFFFF] flex flex-col relative z-10">
-        {/* Background Dashed Grid Columns (Exact Shiro Vector Dimensions: 4px dash, 4px gap) */}
-        <div className="absolute inset-0 pointer-events-none flex justify-center">
-          <div className="w-full max-w-5xl h-full relative">
-            <div className="absolute left-0 inset-y-0 w-px">
-              <svg className="w-px h-full text-[#CBD5E1] overflow-visible">
-                <line x1="0" y1="0" x2="0" y2="100%" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
-              </svg>
-            </div>
-            <div className="absolute right-0 inset-y-0 w-px">
-              <svg className="w-px h-full text-[#CBD5E1] overflow-visible">
-                <line x1="0" y1="0" x2="0" y2="100%" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
-              </svg>
-            </div>
+      {/* 2. Full-Width Architectural Reading Canvas */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-12 relative z-10 flex flex-col">
+        {/* Hero Title Banner */}
+        <div className="w-full bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-10 rounded-none sm:rounded-sm shadow-2xs mb-8 space-y-3">
+          <div>
+            <span className="font-admin-mono text-[11px] tracking-[0.25em] text-[#7C3AED] uppercase font-bold">
+              Data Governance & Privacy Framework
+            </span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-admin-sans text-black tracking-tight">
+            Administrator Privacy Policy
+          </h1>
+          <p className="text-sm sm:text-base text-[#475569] font-admin-sans max-w-4xl leading-relaxed">
+            Transparent disclosure of identity verification claims, session token security, contact form communication governance, and telemetry processing inside the Gaurav Portfolio administration subsystem.
+          </p>
+          <div className="flex flex-wrap items-center gap-4 pt-3 text-xs font-admin-mono text-[#94A3B8] border-t border-[#F1F5F9]">
+            <span>Last Updated: August 2026</span>
+            <span>·</span>
+            <span>Version: 1.0.0 (Phase 0 Standard)</span>
+            <span>·</span>
+            <span className="text-[#10B981] font-semibold">Compliance: Strict</span>
           </div>
         </div>
 
-        <div className="w-full max-w-5xl mx-auto px-6 sm:px-12 py-10 sm:py-14 space-y-10 relative z-10">
-          {/* Header Title Section */}
-          <div className="space-y-3 border-b border-[#E2E8F0] pb-8">
-            <div className="flex items-center gap-2">
-              <span className="font-admin-mono text-[10px] tracking-[0.25em] text-[#7C3AED] uppercase font-bold">
-                Security & Compliance
-              </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+        {/* 2-Column Responsive Layout: Left Sticky Meta & Right Expansive Clauses */}
+        <div className="w-full flex flex-col lg:flex-row gap-8 items-start">
+          {/* Left Sticky Meta Column */}
+          <div className="w-full lg:w-80 shrink-0 space-y-5 lg:sticky lg:top-24">
+            {/* Quick Specs Card */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-5 sm:p-6 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <h3 className="font-admin-sans font-bold text-sm text-black uppercase tracking-wider flex items-center gap-2">
+                <FaFingerprint className="w-3.5 h-3.5 text-[#7C3AED]" />
+                <span>Privacy Specs</span>
+              </h3>
+              <div className="space-y-3 text-xs font-admin-mono border-t border-[#F1F5F9] pt-3">
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>OAuth Scopes</span>
+                  <span className="font-semibold text-black">openid, email, profile</span>
+                </div>
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>Session Cookie</span>
+                  <span className="font-semibold text-black">admin_session (Lax)</span>
+                </div>
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>Cookie Lifespan</span>
+                  <span className="font-semibold text-black">{ADMIN_SESSION_TTL_HOURS} Hours Strict</span>
+                </div>
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>Data Region</span>
+                  <span className="font-semibold text-black">asia-southeast1</span>
+                </div>
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>Bot Protection</span>
+                  <span className="font-semibold text-[#10B981]">Cloudflare Turnstile</span>
+                </div>
+              </div>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold font-admin-sans text-black tracking-tight">
-              Administrator Privacy Policy
-            </h1>
-            <p className="text-sm text-[#475569] font-admin-sans max-w-2xl leading-relaxed">
-              Data governance, session encryption, and authentication handling practices within the Gaurav Portfolio administration console.
-            </p>
-            <div className="flex flex-wrap items-center gap-4 pt-2 text-xs font-admin-mono text-[#94A3B8]">
-              <span>Last Updated: August 2026</span>
-              <span>·</span>
-              <span>Version: 0.0.1</span>
-              <span>·</span>
-              <span className="text-[#10B981] font-semibold">Status: Active</span>
+
+            {/* Direct Login Shortcut Card */}
+            <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-5 rounded-none sm:rounded-sm space-y-3 shadow-2xs">
+              <span className="font-admin-mono text-[10px] uppercase tracking-widest text-[#64748B] font-bold block">
+                Session Control
+              </span>
+              <p className="text-xs text-[#334155] font-admin-sans leading-relaxed">
+                Administrative session tokens are isolated strictly to this browser and clear completely upon logout.
+              </p>
+              <Link
+                href="/admin/login"
+                className="w-full inline-flex items-center justify-center gap-2 py-2 px-3 text-xs font-admin-mono font-bold uppercase tracking-wider bg-[#000000] hover:bg-[#18181B] text-white rounded-sm transition-all shadow-2xs"
+              >
+                <FaLock className="w-3 h-3 text-white" />
+                <span>Authenticate Session</span>
+              </Link>
             </div>
           </div>
 
-          {/* Section Blocks */}
-          <div className="space-y-6">
-            {/* Section 1 */}
-            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-[2px] shadow-xs space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="font-admin-mono text-xs font-bold text-[#7C3AED]">01.</span>
-                <h2 className="text-base font-bold font-admin-sans text-black">
-                  Authentication & Profile Information
-                </h2>
+          {/* Right Wide Column: Modular Policy Clauses */}
+          <div className="flex-1 min-w-0 space-y-6">
+            {/* Clause 1 */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                  <FaUserCheck className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div>
+                  <span className="font-admin-mono text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider block">
+                    Section 01
+                  </span>
+                  <h2 className="text-lg font-bold font-admin-sans text-black">
+                    Authentication Claims & Identity Processing
+                  </h2>
+                </div>
               </div>
-              <p className="text-xs sm:text-sm text-[#475569] font-admin-sans leading-relaxed">
-                When authenticating via Google OAuth 2.0, the console receives identity claims including the verified primary email address, profile display name, and avatar image URL. This information is strictly used for access control validation and session state rendering.
+              <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
+                When authenticating via Google OAuth 2.0 PKCE, the application requests the minimal standard scopes: <code>openid</code>, <code>email</code>, and <code>profile</code>. We extract and verify the user&apos;s primary email address, full display name, and avatar image URL. This identity data is utilized exclusively for server-side whitelist verification, session context hydration, and displaying profile credentials in the administrative console. We never sell, track, or share administrator credentials with third parties.
               </p>
             </div>
 
-            {/* Section 2 */}
-            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-[2px] shadow-xs space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="font-admin-mono text-xs font-bold text-[#7C3AED]">02.</span>
-                <h2 className="text-base font-bold font-admin-sans text-black">
-                  Cookie Storage & Local Session Retention
-                </h2>
+            {/* Clause 2 */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                  <FaCookieBite className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div>
+                  <span className="font-admin-mono text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider block">
+                    Section 02
+                  </span>
+                  <h2 className="text-lg font-bold font-admin-sans text-black">
+                    Cookie Storage & Strict {ADMIN_SESSION_TTL_HOURS}-Hour Session Retention
+                  </h2>
+                </div>
               </div>
-              <p className="text-xs sm:text-sm text-[#475569] font-admin-sans leading-relaxed">
-                The application utilizes a single session cookie (<code>admin_session</code>) to maintain administrative state across dashboard routes. The cookie is configured with SameSite protection and automatically expires after 7 days.
+              <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
+                The application relies on a single cookie (<code>admin_session</code>) to maintain authenticated state. This cookie operates under a strict Time-To-Live (TTL) of <strong>{ADMIN_SESSION_TTL_HOURS} Hours</strong> (18,000 seconds) and is secured with <code>SameSite=Lax</code> and HTTPS <code>Secure</code> flags in production. A short-lived cryptographic PKCE cookie (<code>oauth_code_verifier</code>) is maintained ephemerally for 300 seconds during authentication handshakes and is destroyed immediately upon callback verification.
               </p>
             </div>
 
-            {/* Section 3 */}
-            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-[2px] shadow-xs space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="font-admin-mono text-xs font-bold text-[#7C3AED]">03.</span>
-                <h2 className="text-base font-bold font-admin-sans text-black">
-                  Inquiries & Client Communication Data
-                </h2>
+            {/* Clause 3 */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                  <FaInbox className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div>
+                  <span className="font-admin-mono text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider block">
+                    Section 03
+                  </span>
+                  <h2 className="text-lg font-bold font-admin-sans text-black">
+                    Inquiries & Contact Communication Governance
+                  </h2>
+                </div>
               </div>
-              <p className="text-xs sm:text-sm text-[#475569] font-admin-sans leading-relaxed">
-                Inbound contact requests are persisted in Firebase Realtime Database in the <code>asia-southeast1</code> region. Inbound messages undergo automated profanity sanitization prior to storage and relay.
+              <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
+                Inbound client inquiries, recruiter messages, and contact form submissions are persisted in Google Cloud Firebase Realtime Database in the <code>asia-southeast1</code> region. Inbound submissions undergo automated profanity sanitization and rate-limiting validation prior to storage. Communication logs are accessed strictly through server-mediated repositories and are preserved for legitimate professional correspondence.
               </p>
             </div>
 
-            {/* Section 4 */}
-            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-[2px] shadow-xs space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="font-admin-mono text-xs font-bold text-[#7C3AED]">04.</span>
-                <h2 className="text-base font-bold font-admin-sans text-black">
-                  Bot Detection & Security Telemetry
-                </h2>
+            {/* Clause 4 */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                  <FaRobot className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div>
+                  <span className="font-admin-mono text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider block">
+                    Section 04
+                  </span>
+                  <h2 className="text-lg font-bold font-admin-sans text-black">
+                    Bot Detection & Telemetry Privacy
+                  </h2>
+                </div>
               </div>
-              <p className="text-xs sm:text-sm text-[#475569] font-admin-sans leading-relaxed">
-                Cloudflare Turnstile is employed on visitor interaction surfaces to prevent spam and automated bot submissions. Verification tokens are validated ephemerally with zero persistent cross-site tracking.
+              <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
+                Cloudflare Turnstile is utilized on public contact surfaces to prevent automated bot submissions and spam attacks. Cloudflare evaluates visitor challenges ephemerally with zero persistent tracking cookies. Vercel Web Analytics and Speed Insights collect aggregate, anonymized performance telemetry without collecting personally identifiable information (PII).
+              </p>
+            </div>
+
+            {/* Clause 5 */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                  <FaShieldHalved className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div>
+                  <span className="font-admin-mono text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider block">
+                    Section 05
+                  </span>
+                  <h2 className="text-lg font-bold font-admin-sans text-black">
+                    Server Cache Policy & Zero Data Leakage
+                  </h2>
+                </div>
+              </div>
+              <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
+                All administrative views and API routes are configured with <code>no-store</code> cache directives (<code>export const dynamic = &quot;force-dynamic&quot;</code>). Authenticated data is never stored in public intermediary caches or Next.js Data Cache layers, guaranteeing that private inquiries and session states are never leaked to unauthorized visitors.
               </p>
             </div>
           </div>
         </div>
       </main>
 
-      {/* 3. Centered Swiss Neutral Footer */}
+      {/* 3. Swiss Neutral Footer */}
       <AdminFooter text={`© ${new Date().getFullYear()} Gaurav Portfolio · Secure Admin Architecture`} />
     </div>
   );

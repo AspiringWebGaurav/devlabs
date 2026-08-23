@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminEmail, createAdminSessionPayload } from "@/lib/admin/auth";
-import { ADMIN_COOKIE_NAME } from "@/lib/admin/constants";
+import { ADMIN_COOKIE_NAME, ADMIN_SESSION_MAX_AGE_SECONDS } from "@/lib/admin/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       httpOnly: false,
       secure: isSecure,
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days TTL
+      maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
       path: "/",
     });
 
