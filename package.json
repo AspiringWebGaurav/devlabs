@@ -3,11 +3,11 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbo",
     "dev:webpack": "next dev",
     "dev:turbo": "next dev --turbo",
     "clear": "node -e \"const fs=require('fs'); fs.rmSync('.next',{recursive:true,force:true}); console.log('.next cleared.');\"",
-    "clean": "node -e \"const fs=require('fs'); fs.rmSync('.next',{recursive:true,force:true}); fs.rmSync('node_modules',{recursive:true,force:true}); console.log('.next and node_modules cleaned.');\"",
+    "clean": "node -e \"const fs=require('fs'); fs.rmSync('.next',{recursive:true,force:true}); fs.rmSync('node_modules',{recursive:true,force:true}); fs.rmSync('package-lock.json',{force:true}); console.log('.next, node_modules, and package-lock.json cleaned.');\"",
     "dev:clear": "npm run clear && next dev --turbo",
     "dev:clean": "npm run clean && npm install && next dev --turbo",
     "build": "next build",

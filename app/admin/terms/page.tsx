@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
-import { FaShieldHalved, FaArrowLeft } from "react-icons/fa6";
+import { FaArrowLeft } from "react-icons/fa6";
+import { AdminFooter } from "@/components/admin";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -142,18 +143,8 @@ export default function AdminTermsPage() {
         </div>
       </main>
 
-      {/* 3. Centered Footer with Exact Shiro Dashed Divider */}
-      <footer className="w-full bg-[#FFFFFF] py-5 px-6 sm:px-12 text-center font-admin-sans flex items-center justify-center gap-2 z-20 relative">
-        <div className="absolute top-0 inset-x-0 h-px pointer-events-none">
-          <svg className="w-full h-px text-[#CBD5E1] overflow-visible">
-            <line x1="0" y1="0" x2="100%" y2="0" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
-          </svg>
-        </div>
-        <FaShieldHalved className="w-3.5 h-3.5 text-[#7C3AED]" />
-        <span className="font-medium text-[#64748B] tracking-tight text-[11px]">
-          © {new Date().getFullYear()} Gaurav Portfolio · Secure Admin Architecture
-        </span>
-      </footer>
+      {/* 3. Centered Swiss Neutral Footer */}
+      <AdminFooter text={`© ${new Date().getFullYear()} Gaurav Portfolio · Secure Admin Architecture`} />
     </div>
   );
 }

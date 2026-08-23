@@ -67,16 +67,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    optimizePackageImports: [
-      "react-icons",
-      "motion",
-      "three",
-      "@react-three/fiber",
-      "@react-three/drei",
-      "lucide-react",
-    ],
-  },
   serverExternalPackages: ["firebase-admin", "otplib", "qrcode"],
   transpilePackages: ["three", "three-globe"],
   // Allow cross-origin dev access from local network IPs (e.g. mobile devices)

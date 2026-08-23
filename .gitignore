@@ -29,6 +29,16 @@
 !.env.example
 
 # ==========================================
+# AI Agent Workspaces, Rules & Notes (Local Only)
+# ==========================================
+/.agents
+/.agents/
+/.gemini
+/.gemini/
+/.claude
+/.claude/
+
+# ==========================================
 # Vercel & Deployment
 # ==========================================
 .vercel

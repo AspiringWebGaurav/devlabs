@@ -2,8 +2,7 @@
 
 import React, { Suspense } from "react";
 import Link from "next/link";
-import { FaShieldHalved } from "react-icons/fa6";
-import { AdminLoginForm } from "@/components/admin";
+import { AdminLoginForm, AdminFooter } from "@/components/admin";
 
 export default function AdminLoginPage() {
   return (
@@ -64,19 +63,8 @@ export default function AdminLoginPage() {
         </div>
       </main>
 
-      {/* 3. Centered Footer with Exact Shiro Dashed Divider */}
-      <footer className="w-full bg-[#FFFFFF] py-5 px-6 sm:px-12 text-center font-admin-sans flex items-center justify-center gap-2 z-20 relative">
-        {/* Exact Shiro Horizontal Dashed Divider (4px dash, 4px gap) */}
-        <div className="absolute top-0 inset-x-0 h-px pointer-events-none">
-          <svg className="w-full h-px text-[#CBD5E1] overflow-visible">
-            <line x1="0" y1="0" x2="100%" y2="0" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
-          </svg>
-        </div>
-        <FaShieldHalved className="w-3.5 h-3.5 text-[#7C3AED]" />
-        <span className="font-medium text-[#64748B] tracking-tight text-[11px]">
-          Protected by Gaurav Portfolio Security Architecture
-        </span>
-      </footer>
+      {/* 3. Perfectly Centered Swiss Neutral Footer */}
+      <AdminFooter />
     </div>
   );
 }
