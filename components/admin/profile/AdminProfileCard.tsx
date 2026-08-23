@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
 import { FaChevronRight } from "react-icons/fa6";
 import type { AdminUser } from "@/types/admin";
 
@@ -30,15 +29,14 @@ export const AdminProfileCard: React.FC<AdminProfileCardProps> = ({
       className="w-full text-left flex items-center gap-2.5 bg-[#F8FAFC] hover:bg-[#F1F5F9] active:bg-[#E2E8F0] border border-[#E2E8F0] hover:border-[#CBD5E1] p-2.5 rounded-sm transition-all duration-150 cursor-pointer group shadow-2xs"
       title="View Administrator Profile & Credentials"
     >
-      {/* Dynamic Profile Avatar */}
-      <div className="relative w-8 h-8 rounded-full overflow-hidden border border-[#CBD5E1] group-hover:border-[#94A3B8] bg-[#18181B] shrink-0 transition-all duration-150">
+      {/* Dynamic Profile Avatar with no-referrer for Google CDN */}
+      <div className="relative w-8 h-8 rounded-full overflow-hidden border border-[#CBD5E1] group-hover:border-[#94A3B8] bg-[#18181B] shrink-0 transition-all duration-150 flex items-center justify-center">
         {user?.avatar && !imageError ? (
-          <Image
+          <img
             src={user.avatar}
             alt={displayName}
-            fill
-            unoptimized
-            className="object-cover group-hover:scale-105 transition-transform duration-150"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
             onError={() => setImageError(true)}
           />
         ) : (

@@ -27,6 +27,16 @@ export const AdminSidebar: React.FC = () => {
         avatar: session.avatar,
       });
     }
+
+    // Also synchronize profile state with server session
+    fetch("/api/admin/auth/session")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.authenticated && data.user) {
+          setUser(data.user);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Complete, zero-residual enterprise sign out
@@ -71,7 +81,7 @@ export const AdminSidebar: React.FC = () => {
   const navItems = [
     {
       id: "01",
-      label: "Overview",
+      label: "Portfolio Services",
       href: "/admin",
       icon: FaDatabase,
     },
@@ -79,7 +89,7 @@ export const AdminSidebar: React.FC = () => {
 
   return (
     <>
-      <aside className="w-full md:w-64 bg-[#FFFFFF] border-r border-[#E5E7EB] shrink-0 p-4 sm:p-5 flex flex-col justify-between h-full min-h-[calc(100vh-57px)]">
+      <aside className="w-full md:w-64 bg-[#FFFFFF] border-r border-[#E5E7EB] shrink-0 p-4 sm:p-5 flex flex-col justify-between md:sticky md:top-[57px] md:h-[calc(100vh-57px)] select-none">
         {/* Top: Navigation */}
         <div className="space-y-6">
           <div>

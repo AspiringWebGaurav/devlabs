@@ -69,6 +69,9 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["firebase-admin", "otplib", "qrcode"],
   transpilePackages: ["three", "three-globe"],
+  turbopack: {
+    resolveAlias: {},
+  },
   // Allow cross-origin dev access from local network IPs (e.g. mobile devices)
   // @ts-ignore - Next.js 15 allowedDevOrigins option
   allowedDevOrigins: [
@@ -77,26 +80,6 @@ const nextConfig: NextConfig = {
     "192.168.0.154:3000",
     "192.168.0.154",
   ],
-
-  webpack: (config, { dev, isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        net: false,
-        tls: false,
-        fs: false,
-        child_process: false,
-        http2: false,
-      };
-    }
-    if (dev && !isServer) {
-      config.watchOptions = {
-        poll: 800,
-        aggregateTimeout: 300,
-      };
-    }
-    return config;
-  },
 
   async headers() {
     return [
