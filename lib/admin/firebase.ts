@@ -2,6 +2,8 @@ import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithPopup,
   signOut,
   Auth,
@@ -43,18 +45,23 @@ export const getFirebaseRtdb = (): Database => {
   return _rtdb;
 };
 
-let _googleProvider: GoogleAuthProvider | null = null;
-export const getGoogleProvider = (): GoogleAuthProvider => {
-  if (!_googleProvider) {
-    _googleProvider = new GoogleAuthProvider();
-    _googleProvider.setCustomParameters({
+export const getGoogleProvider = (emailHint?: string): GoogleAuthProvider => {
+  const provider = new GoogleAuthProvider();
+  if (emailHint) {
+    provider.setCustomParameters({
+      login_hint: emailHint,
+    });
+  } else {
+    provider.setCustomParameters({
       prompt: "select_account",
     });
   }
-  return _googleProvider;
+  return provider;
 };
 
 export {
+  signInWithRedirect,
+  getRedirectResult,
   signInWithPopup,
   signOut,
 };

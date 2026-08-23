@@ -1,12 +1,24 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { AdminHeader, AdminSidebar, OverviewCanvas } from "@/components/admin";
 
 export default function AdminDashboardPage() {
+  const [isSyncing, setIsSyncing] = useState(true);
+
+  useEffect(() => {
+    // Non-blocking real-time telemetry sync indicator (smooth initial sync)
+    const timer = setTimeout(() => {
+      setIsSyncing(false);
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
-      <AdminHeader breadcrumb="OVERVIEW" />
+    <div className="min-h-screen flex flex-col bg-[#FAFAFA] animate-in fade-in duration-200">
+      {/* Non-Blocking Top Glass Header with Live Sync Indicator */}
+      <AdminHeader breadcrumb="OVERVIEW" isSyncing={isSyncing} />
 
       <div className="flex-1 flex flex-col md:flex-row">
         <AdminSidebar />

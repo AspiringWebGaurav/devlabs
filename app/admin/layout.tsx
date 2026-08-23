@@ -29,7 +29,7 @@ export default function AdminLayout({
 }>) {
   return (
     <div
-      className={`${adminSans.variable} ${adminMono.variable} min-h-screen bg-[#FAFAFA] text-[#000000] font-sans antialiased relative`}
+      className={`${adminSans.variable} ${adminMono.variable} font-admin-sans min-h-screen bg-[#FAFAFA] text-[#000000] antialiased relative selection:bg-black selection:text-white`}
       style={{ colorScheme: "light" }}
     >
       {/* Subtle Swiss grid background lines */}

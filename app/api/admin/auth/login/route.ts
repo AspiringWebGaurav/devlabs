@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthorizedAdminEmail, createAdminSessionPayload } from "@/lib/admin/auth";
-import { ADMIN_COOKIE_NAME } from "@/lib/admin/constants";
+import { ADMIN_COOKIE_NAME, PRIMARY_ADMIN_EMAIL } from "@/lib/admin/constants";
 
 export const dynamic = "force-dynamic";
 
 const LoginSchema = z.object({
   email: z.string().email("A valid email is required."),
   avatar: z.string().url().optional(),
+  name: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -28,21 +29,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, avatar } = parsed.data;
+    const { email, avatar, name } = parsed.data;
 
     // Strict identity check: only gauravpatil9262 is permitted
     if (!isAuthorizedAdminEmail(email)) {
       return NextResponse.json(
         {
           success: false,
-          error: "Access Denied: You are not authorized to access this administrator console.",
+          isUnauthorizedAccount: true,
+          unauthorizedEmail: email,
+          error: `Access Denied: The account "${email}" is not authorized. Access is strictly restricted to primary superadmin (${PRIMARY_ADMIN_EMAIL}).`,
         },
         { status: 403 }
       );
     }
 
-    // Create session payload
-    const session = createAdminSessionPayload(email, avatar);
+    // Create session payload with dynamic name and avatar
+    const session = createAdminSessionPayload(email, avatar, name);
     const serialized = encodeURIComponent(JSON.stringify(session));
 
     const response = NextResponse.json({
@@ -60,18 +63,18 @@ export async function POST(request: NextRequest) {
     response.cookies.set({
       name: ADMIN_COOKIE_NAME,
       value: serialized,
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      httpOnly: false, // Accessible by client session state machine
-      sameSite: "lax",
+      httpOnly: false, // Accessible to client session utilities
       secure: isSecure,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60, // 7 days TTL
+      path: "/",
     });
 
     return response;
-  } catch (err: unknown) {
-    const error = err as Error;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal authentication error.";
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to process admin authentication." },
+      { success: false, error: message },
       { status: 500 }
     );
   }

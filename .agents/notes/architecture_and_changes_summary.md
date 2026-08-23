@@ -163,6 +163,12 @@ c:\github\devlabs
    - `npm run clean`: Deletes both `node_modules` and `.next`.
    - `npm run dev:clear`: Clears `.next` and boots `next dev --turbo`.
    - `npm run dev:clean`: Deep clean, reinstalls packages, and boots `next dev --turbo`.
+6. **Direct Google OAuth 2.0 PKCE Authentication & Zero-Residual Lifecycle**:
+   - Implemented standard RFC 7636 PKCE flow (`app/api/admin/auth/google/route.ts` & `app/api/admin/auth/callback/route.ts`), completely eliminating secondary floating popup windows with 100% in-tab navigation.
+   - Dynamic account chooser (`prompt: "select_account"`) dynamically presenting all available Google accounts on the user's browser.
+   - Strict Superadmin authorization enforcement (`isAuthorizedAdminEmail`), routing unauthorized accounts to clean, privacy-preserving Swiss Access Denied alerts.
+   - Dynamic Google User Profile Picture & Display Name extraction from `userinfo`, replacing all static placeholder fallbacks.
+   - Distinct loader architecture: Full-card multi-stage progress loader (`AdminPanelLoader.tsx`) for login transitions, zero-residual enterprise sign-out overlay (`SignOutOverlay.tsx`), and non-blocking 2px neon top progress line + glass sync indicator in `AdminHeader.tsx` during live telemetry sync.
 
 ---
 

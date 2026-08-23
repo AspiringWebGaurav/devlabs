@@ -9,10 +9,10 @@ export const OverviewCanvas: React.FC = () => {
       <div className="w-12 h-12 rounded-full bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center mb-4">
         <FaCube className="w-5 h-5 text-[#94A3B8]" />
       </div>
-      <h2 className="text-base font-bold font-sans text-black">
+      <h2 className="text-base font-bold font-admin-sans text-black">
         Admin Framework Ready
       </h2>
-      <p className="text-xs text-[#64748B] font-sans max-w-md mt-1.5 leading-relaxed">
+      <p className="text-xs text-[#64748B] font-admin-sans max-w-md mt-1.5 leading-relaxed">
         Clean modular structure initialized. Ready for custom CMS, analytics, or feature integrations.
       </p>
     </div>

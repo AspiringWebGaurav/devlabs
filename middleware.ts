@@ -41,8 +41,13 @@ export function middleware(request: NextRequest) {
       }
     }
 
-    // Case A: Unauthenticated user trying to access /admin dashboard -> redirect to /admin/login
-    if (!isAuthenticated && pathname !== "/admin/login") {
+    const isPublicAdminRoute =
+      pathname === "/admin/login" ||
+      pathname === "/admin/terms" ||
+      pathname === "/admin/privacy";
+
+    // Case A: Unauthenticated user trying to access protected /admin routes -> redirect to /admin/login
+    if (!isAuthenticated && !isPublicAdminRoute) {
       const loginUrl = new URL("/admin/login", request.url);
       const response = NextResponse.redirect(loginUrl);
       if (sessionCookie) {

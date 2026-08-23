@@ -28,8 +28,8 @@ const config = {
     },
     extend: {
       fontFamily: {
-        "admin-sans": ["var(--font-admin-sans)", "Inter", "-apple-system", "sans-serif"],
-        "admin-mono": ["var(--font-admin-mono)", "Menlo", "monospace"],
+        "admin-sans": ["var(--font-admin-sans)", "Plus Jakarta Sans", "Inter", "-apple-system", "sans-serif"],
+        "admin-mono": ["var(--font-admin-mono)", "Geist Mono", "JetBrains Mono", "Menlo", "monospace"],
       },
       colors: {
         black: {

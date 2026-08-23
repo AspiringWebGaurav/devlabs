@@ -28,14 +28,18 @@ export function isAuthorizedAdminEmail(email?: string | null): boolean {
 /**
  * Creates a structured session payload for the authenticated superadmin.
  */
-export function createAdminSessionPayload(email: string, avatar?: string): AdminSession {
+export function createAdminSessionPayload(
+  email: string,
+  avatar?: string,
+  name?: string
+): AdminSession {
   const now = Date.now();
   return {
     id: "usr_admin_gaurav",
     email: email.trim().toLowerCase(),
-    name: PRIMARY_ADMIN_NAME,
+    name: name?.trim() || PRIMARY_ADMIN_NAME,
     role: PRIMARY_ADMIN_ROLE,
-    avatar: avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    avatar: avatar || undefined,
     loggedInAt: now,
     expiresAt: now + 7 * 24 * 60 * 60 * 1000, // 7 days TTL
   };

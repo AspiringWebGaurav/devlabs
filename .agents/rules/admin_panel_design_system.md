@@ -10,36 +10,46 @@ The codebase consists of two strictly isolated visual and architectural subsyste
 * **Rule**: Global `tailwind.config.ts` or `app/globals.css` MUST NEVER be modified with admin-specific font overrides or global styling that alters the main portfolio.
 
 ### B. Admin Subsystem (`/admin/*`)
-* **Visual Identity**: Minimalist Swiss light system (`#FFFFFF`, `#FAFAFA`, stark `#000000`, muted `#64748B`, hairline `#E5E7EB` grid).
-* **Typography Isolation**: Scoped exclusively to `app/admin/layout.tsx` via `font-admin-sans` (`var(--font-admin-sans)`) and `font-admin-mono` (`var(--font-admin-mono)`).
+* **Visual Identity**: Minimalist Swiss light system (`#FFFFFF` pure white canvas, stark `#000000`, slate `#475569`, muted `#64748B`, hairline `#CBD5E1` / `#E2E8F0` dashed guides, and accent purple `#7C3AED`).
+* **Typography Isolation**: Scoped exclusively to `app/admin/layout.tsx` via `font-admin-sans` (`Geist` / `Plus Jakarta Sans` / `Inter`) and `font-admin-mono` (`Geist Mono` / `JetBrains Mono`).
 * **Codebase Directory Isolation**:
-  - `app/admin/*`: Route pages (`/admin`, `/admin/login`, `/admin/posts`, `/admin/posts/new`, `/admin/projects`, `/admin/settings`, `/admin/messages`, `/admin/subscribers`).
-  - `components/admin/*`: Dedicated admin UI components (`AdminHeader`, `AdminSidebar`, `AdminMetricsCard`, `AdminAnalyticsChart`, `AdminTable`, `AdminPostEditor`).
-  - `lib/admin/*`: Admin data access layer and cryptographic auth helpers.
+  - `app/admin/*`: Route pages (`/admin`, `/admin/login`, `/admin/terms`, `/admin/privacy`).
+  - `components/admin/*`: Dedicated admin UI modules (`navigation/`, `profile/`, `overview/`, `auth/`, `skeletons/`).
+  - `lib/admin/*`: Admin data access layer, Firebase SDKs, and Google Identity Services (GIS).
   - `types/admin.ts`: TypeScript contracts for admin sessions and metrics.
 
 ---
 
-## 2. Admin UI/UX Tokens & Geometry
+## 2. Admin UI/UX Color Scheme Tokens & Geometry
 
-* **Background**: Pure `#FFFFFF` and `#FAFAFA` with subtle 4rem hairline grid lines (`#F0F0F0`).
-* **Card Geometry**: Crisp, high-precision rectangle with thin 1px hairline border (`border border-[#E5E7EB] rounded-none sm:rounded-[2px]`).
-* **Section Dividers**: Hairline horizontal dividers (`border-t border-[#E5E7EB]`) bisecting card sections.
-* **Headings**: `font-admin-sans font-semibold text-black tracking-[-0.035em]`.
-* **Eyebrow Tags**: `font-admin-mono text-[11px] tracking-[0.2em] text-[#64748B] uppercase font-normal`.
-* **Buttons**:
-  - Primary: Solid Stark Black (`bg-black text-white py-3.5 px-4 rounded-sm font-admin-mono text-xs font-bold uppercase tracking-wider hover:bg-[#18181B] active:scale-[0.99] transition-all duration-200`).
-  - Secondary: White background with 1px border (`bg-white border border-[#E5E7EB] text-black hover:bg-[#F9FAFB] rounded-sm text-xs font-admin-mono`).
-* **Analytics Curves**: Purple gradient (`#A855F7` to `#CBACF9`) for area charts and metric highlights.
+* **Canvas Background**: Pure `#FFFFFF` (solid pure white) across all admin views.
+* **Architectural Grid Guides**:
+  - Horizontal Dividers: `border-dashed border-[#CBD5E1]` on top navbar bottom and footer top.
+  - Vertical Framing Columns: `border-x border-dashed border-[#CBD5E1]` framing a centered `max-w-5xl` container, with center guideline `border-r border-dashed border-[#E2E8F0]`.
+* **Top Navigation Bar**: True edge-to-edge layout (`px-6 sm:px-12`) with brand `admin panel.` (`font-admin-mono font-black text-black`) and accent dot (`text-[#7C3AED]`).
+* **Card Geometry**: Crisp, high-precision rectangle with thin hairline border (`border border-[#E2E8F0] bg-white rounded-none sm:rounded-[2px] shadow-2xs`).
+* **Typography Hierarchy**:
+  - Headings: `font-admin-sans font-bold text-2xl tracking-[-0.035em] text-black`.
+  - Subtitles & Body: `font-admin-sans font-normal text-xs sm:text-sm text-[#475569] leading-relaxed`.
+  - Muted Text / Agreement: `font-admin-sans text-[11px] text-[#64748B]`.
+  - Action Buttons: `font-admin-mono text-xs font-bold uppercase tracking-[0.16em] bg-black text-white hover:bg-[#18181B] active:scale-[0.99]`.
+  - Links: `text-[#64748B] hover:text-black underline decoration-[#CBD5E1] hover:decoration-black underline-offset-3 transition-colors duration-150`.
+* **Footer Color Synchronization**:
+  - Icon: Shield icon strictly synchronized to brand accent purple (`<FaShieldHalved className="w-3.5 h-3.5 text-[#7C3AED]" />`).
+  - Text: `font-admin-sans text-[11px] font-medium text-[#64748B] tracking-tight`.
+  - Divider: Edge-to-edge `border-t border-dashed border-[#CBD5E1] py-5 px-6 sm:px-12`.
 
 ---
 
-## 3. Encrypted Authentication & Zero Plaintext Credentials
+## 3. Direct OAuth 2.0 PKCE Authentication & Zero Residual State
 
-* **Google Authentication**: Single-click **`CONTINUE WITH GOOGLE`** button.
-* **3-Factor Multi-Layer Verification**: Google OAuth + Live Email OTP + Google Authenticator (RFC 6238 TOTP).
-* **Zero Hardcoded Secrets**: No plaintext passwords or sensitive credentials committed to code.
-* **Access Control**: Unauthorized Google accounts are strictly rejected (`"Access Denied: Admin Google account required."`).
+* **Direct Google OAuth 2.0 PKCE**: Standard RFC 7636 PKCE code exchange flow via `/api/admin/auth/google` and `/api/admin/auth/callback`. Eliminates all secondary popup windows with 100% in-tab navigation across all environments (`localhost:3000`, `devlabs.eu.cc`, `gauravpatil.online`).
+* **Strict Superadmin Authorization**: Validates incoming Google accounts against `isAuthorizedAdminEmail(email)` (`gauravpatil9262@gmail.com`). Non-superadmin accounts receive clean, non-leaking `[!] Unauthorized account. Access is restricted.` notifications.
+* **Separation of Loaders**:
+  - Full-card multi-stage progress loader (`AdminPanelLoader.tsx`) for login transitions.
+  - Dedicated zero-residual sign-out overlay (`SignOutOverlay.tsx`) for logout transitions.
+  - Non-blocking 2px neon top progress line + glass sync indicator in `AdminHeader.tsx` during live telemetry sync without blocking the dashboard.
+* **Zero-Residual Sign-Out**: 5-step clean detach (server cookie deletion, client cookie clearing, Firebase SDK sign-out, storage purge, clean redirect to `/admin/login?signedOut=true`).
 
 ---
 
