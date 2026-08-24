@@ -88,7 +88,9 @@ export async function GET(request: NextRequest) {
     const session = createAdminSessionPayload(email, avatar, name);
     const serialized = encodeURIComponent(JSON.stringify(session));
 
-    const response = NextResponse.redirect(new URL("/admin", baseUrl));
+    const response = NextResponse.redirect(
+      new URL("/admin/authenticating", baseUrl)
+    );
     const isSecure = process.env.NODE_ENV === "production";
 
     response.cookies.set({

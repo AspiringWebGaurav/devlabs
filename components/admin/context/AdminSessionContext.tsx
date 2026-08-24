@@ -61,29 +61,33 @@ export const AdminSessionProvider: React.FC<AdminSessionProviderProps> = ({
 
   const signOut = useCallback(async () => {
     try {
-      // 1. Server Session Deletion
-      await fetch("/api/admin/auth/session", { method: "DELETE" }).catch(() => null);
-
-      // 2. Client Cookie Clear
+      // 1. Clear Client Cookie & Local Storage Synchronously
       clearClientAdminSession();
-
-      // 3. Firebase Auth SDK SignOut
-      try {
-        const auth = getFirebaseAuth();
-        await firebaseSignOut(auth);
-      } catch {
-        // Continue clean sign-out if SDK already detached
-      }
-
-      // 4. Clear Session Storage
       if (typeof window !== "undefined") {
         window.sessionStorage.clear();
-        // 5. In-Tab Navigation to Login
-        window.location.href = "/admin/login?signedOut=true";
+      }
+
+      // 2. Server Session Deletion (Fire-and-forget / non-blocking)
+      fetch("/api/admin/auth/session", {
+        method: "DELETE",
+        keepalive: true,
+      }).catch(() => null);
+
+      // 3. Firebase Auth SDK SignOut (Non-blocking / background)
+      try {
+        const auth = getFirebaseAuth();
+        firebaseSignOut(auth).catch(() => {});
+      } catch {
+        // SDK detached
+      }
+
+      // 4. In-Tab Direct Navigation to Login
+      if (typeof window !== "undefined") {
+        window.location.replace("/admin/login?signedOut=true");
       }
     } catch {
       if (typeof window !== "undefined") {
-        window.location.href = "/admin/login?signedOut=true";
+        window.location.replace("/admin/login?signedOut=true");
       }
     }
   }, []);

@@ -13,8 +13,11 @@ export const AdminSidebar: React.FC = () => {
   const { user, signOut } = useAdminSession();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const handleSignOut = async () => {
+  const handleInitiateSignOut = () => {
     setIsSigningOut(true);
+  };
+
+  const handleExecuteSignOut = async () => {
     await signOut();
   };
 
@@ -78,7 +81,7 @@ export const AdminSidebar: React.FC = () => {
 
           {/* Clean Sign Out Action Button */}
           <button
-            onClick={handleSignOut}
+            onClick={handleInitiateSignOut}
             disabled={isSigningOut}
             className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-admin-mono text-[#991B1B] hover:text-[#FFFFFF] bg-[#FEF2F2] hover:bg-[#DC2626] border border-[#FCA5A5] hover:border-[#DC2626] rounded-sm transition-all duration-150 cursor-pointer shadow-2xs active:scale-[0.99] disabled:opacity-60"
             title="Sign out of Admin Console"
@@ -91,8 +94,11 @@ export const AdminSidebar: React.FC = () => {
         </div>
       </aside>
 
-      {/* Zero-Residual Sign Out Overlay */}
-      <SignOutOverlay isOpen={isSigningOut} />
+      {/* Dynamic Smooth Sign Out Overlay */}
+      <SignOutOverlay
+        isOpen={isSigningOut}
+        onComplete={handleExecuteSignOut}
+      />
     </>
   );
 };

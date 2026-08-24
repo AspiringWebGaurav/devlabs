@@ -37,21 +37,21 @@ export const FooterSection = () => {
           <span>© {new Date().getFullYear()} Gaurav Patil</span>
           <span className="text-neutral-600">·</span>
           <Link
-            href="/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-purple transition-colors duration-200"
-          >
-            Privacy Policy
-          </Link>
-          <span className="text-neutral-600">·</span>
-          <Link
             href="/terms"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-purple transition-colors duration-200"
           >
-            Terms of Service
+            Terms
+          </Link>
+          <span className="text-neutral-600">·</span>
+          <Link
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-purple transition-colors duration-200"
+          >
+            Privacy
           </Link>
         </div>
 

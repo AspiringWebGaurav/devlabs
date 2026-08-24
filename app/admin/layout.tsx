@@ -50,11 +50,24 @@ export default async function AdminLayout({
 
   return (
     <>
-      {/* 1. Frame-0 Server Style: Prevents dark theme flash when opening admin in new tabs */}
+      {/* 1. Frame-0 Synchronous Script: Instantly removes .dark class before paint */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            try {
+              document.documentElement.classList.remove('dark');
+              document.documentElement.style.backgroundColor = '#FAFAFA';
+              document.documentElement.style.colorScheme = 'light';
+            } catch (e) {}
+          `,
+        }}
+      />
+
+      {/* 2. Unbreakable Frame-0 Server Style: Prevents dark theme flash permanently */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
-            :root, html, body {
+            html, html.dark, body, body.dark, :root, :root.dark {
               background-color: #FAFAFA !important;
               color: #000000 !important;
               color-scheme: light !important;
@@ -63,12 +76,13 @@ export default async function AdminLayout({
         }}
       />
 
-      {/* 2. Client Class Enforcer: Cleans .dark class on mount and restores on unmount */}
+      {/* 3. Client Class Enforcer: Cleans .dark class on mount and restores on unmount */}
       <AdminThemeEnforcer />
 
       <div
+        data-admin="true"
         className={`${adminSans.variable} ${adminMono.variable} font-admin-sans min-h-screen bg-[#FAFAFA] text-[#000000] antialiased relative selection:bg-black selection:text-white`}
-        style={{ colorScheme: "light" }}
+        style={{ colorScheme: "light", backgroundColor: "#FAFAFA" }}
       >
         {/* Subtle Swiss grid background lines */}
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#E2E8F0_1px,transparent_1px)] [background-size:24px_24px] opacity-70" />

@@ -78,6 +78,11 @@
   body {
     @apply bg-background text-foreground;
   }
+  body:has([data-admin="true"]),
+  [data-admin="true"] {
+    background-color: #FAFAFA !important;
+    color: #000000 !important;
+  }
   button {
     @apply active:outline-none;
   }

@@ -1,70 +1,49 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaShieldHalved, FaCircleCheck } from "react-icons/fa6";
 
-interface AdminPanelLoaderProps {
-  onComplete?: () => void;
-  fullScreen?: boolean;
-}
-
-export const AdminPanelLoader: React.FC<AdminPanelLoaderProps> = ({
-  onComplete,
-  fullScreen = true,
-}) => {
-  const [progress, setProgress] = useState(4);
-  const [isFinishing, setIsFinishing] = useState(false);
+export const AdminAuthenticatingClient: React.FC = () => {
+  const [progress, setProgress] = useState(6);
+  const redirectedRef = useRef(false);
 
   useEffect(() => {
-    // Deliberate, smooth dynamic progress ticker
+    // Dynamic smooth progress ticker (~2.2s duration)
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
+          if (!redirectedRef.current) {
+            redirectedRef.current = true;
+            setTimeout(() => {
+              window.location.replace("/admin");
+            }, 350);
+          }
           return 100;
         }
 
-        let inc = 1;
-        if (prev < 25) {
-          inc = Math.random() > 0.3 ? 2 : 1;
-        } else if (prev < 65) {
-          inc = Math.random() > 0.4 ? 2 : 1;
-        } else if (prev < 90) {
-          inc = Math.random() > 0.3 ? 2 : 1;
-        } else {
-          inc = Math.random() > 0.5 ? 2 : 1;
-        }
+        let inc = 2;
+        if (prev < 25) inc = Math.random() > 0.3 ? 3 : 2;
+        else if (prev < 65) inc = Math.random() > 0.4 ? 3 : 2;
+        else if (prev < 90) inc = Math.random() > 0.3 ? 3 : 2;
+        else inc = 2;
 
-        return Math.min(prev + inc, 100);
+        const next = Math.min(prev + inc, 100);
+        if (next === 100 && !redirectedRef.current) {
+          redirectedRef.current = true;
+          setTimeout(() => {
+            window.location.replace("/admin");
+          }, 350);
+        }
+        return next;
       });
-    }, 32);
+    }, 30);
 
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (progress === 100 && !isFinishing) {
-      setIsFinishing(true);
-      // Hold briefly at 100% before smooth reveal
-      const timer = setTimeout(() => {
-        if (onComplete) {
-          onComplete();
-        }
-      }, 420);
-      return () => clearTimeout(timer);
-    }
-  }, [progress, isFinishing, onComplete]);
-
-  const containerClasses = fullScreen
-    ? "fixed inset-0 z-50 bg-[#FAFAFA] flex flex-col items-center justify-center p-4 select-none animate-in fade-in duration-200"
-    : "min-h-screen w-full bg-[#FAFAFA] flex flex-col items-center justify-center p-4 select-none";
-
   return (
-    <div
-      className={`${containerClasses} ${
-        isFinishing ? "opacity-0 transition-opacity duration-300" : "opacity-100"
-      }`}
-    >
+    <div className="min-h-screen w-full bg-[#FAFAFA] flex flex-col items-center justify-center p-4 select-none">
       <div className="w-full max-w-sm bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-7 rounded-none sm:rounded-[2px] shadow-2xs space-y-4 animate-in zoom-in-95 duration-200">
         {/* Brand Header & Live Percentage */}
         <div className="flex items-center justify-between pb-3 border-b border-[#F1F5F9]">
