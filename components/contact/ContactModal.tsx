@@ -978,7 +978,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   <div className="w-full flex items-center justify-center min-h-[65px] transition-all duration-300 animate-in fade-in zoom-in-95">
                     <div
                       ref={turnstileContainerRef}
-                      className="rounded-xl overflow-hidden shadow-lg border border-white/[0.1] bg-black/40 flex items-center justify-center transition-transform duration-200"
+                      className="w-full max-w-[300px] flex items-center justify-center min-h-[65px] transition-transform duration-200"
                       style={{ minHeight: "65px" }}
                     />
                   </div>
