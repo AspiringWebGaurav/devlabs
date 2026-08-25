@@ -88,11 +88,19 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
+  const roleScrollRef = useRef<HTMLDivElement | null>(null);
   const pendingSubmitPayloadRef = useRef<{
     name: string;
     email: string;
     message: string;
   } | null>(null);
+
+  const scrollRoles = (direction: "left" | "right") => {
+    if (roleScrollRef.current) {
+      const scrollAmount = direction === "left" ? -140 : 140;
+      roleScrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
 
   // =========================================================================
   // 1. Reset Form & Auto-Flush Cached State
@@ -400,12 +408,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         turnstileWidgetIdRef.current = null;
       }
 
-      const isNarrow = window.innerWidth < 380;
-
       const widgetId = window.turnstile.render(turnstileContainerRef.current, {
         sitekey: TURNSTILE_SITE_KEY,
         theme: "dark",
-        size: isNarrow ? "compact" : "flexible",
+        size: "normal",
         action: "contact_inquiry",
         callback: (token: string) => {
           if (isMountedRef.current) {
@@ -539,12 +545,13 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       {/* 
         Centered Luxury Modal Frame with Dynamic Keyboard Focus Adjustment:
         - Perfectly centered vertically & horizontally on all screens (mobile, tablet, desktop).
-        - Smoothly translates upward when the mobile virtual keyboard opens so the focused field is always visible.
-        - Auto-adjusts height cleanly when Cloudflare Turnstile challenge expands upon submit.
+        - Strictly single-view with ZERO internal vertical scrollbars across all screen heights.
+        - Smoothly translates upward when virtual keyboard opens so focused field remains visible.
+        - Dynamic Cloudflare Turnstile challenge expands smoothly ABOVE submit button without shaking.
       */}
       <div
-        className={`w-full max-w-[95vw] sm:max-w-xl md:max-w-2xl bg-[#0B0F19]/95 backdrop-blur-2xl border border-white/[0.15] rounded-2xl sm:rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_rgba(124,58,237,0.25)] relative text-white flex flex-col p-4 sm:p-6 md:p-8 max-h-[90dvh] sm:max-h-[88vh] overflow-y-auto sm:overflow-hidden overscroll-contain transition-all duration-300 ease-out animate-in zoom-in-95 ${
-          isInputFocused ? "-translate-y-10 sm:translate-y-0" : "translate-y-0"
+        className={`w-full max-w-[94vw] sm:max-w-xl md:max-w-2xl bg-[#0B0F19]/95 backdrop-blur-2xl border border-white/[0.15] rounded-2xl sm:rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_rgba(124,58,237,0.25)] relative text-white flex flex-col p-3.5 sm:p-6 md:p-7 max-h-[94dvh] sm:max-h-[88vh] overflow-hidden overscroll-contain transition-all duration-300 ease-out animate-in zoom-in-95 ${
+          isInputFocused ? "-translate-y-12 sm:translate-y-0" : "translate-y-0"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -555,78 +562,106 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         <div className="absolute -top-12 -right-12 w-64 h-64 bg-[#7C3AED]/12 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-[#6366F1]/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Header */}
-        <div className="flex items-start justify-between pb-3 sm:pb-4 border-b border-white/[0.1] relative z-10 shrink-0">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                Get in touch
-              </h2>
-              {!isOnline && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 border border-amber-500/30 text-amber-300">
-                  <IoCloudOfflineOutline className="w-3.5 h-3.5" />
-                  <span>Offline</span>
-                </span>
-              )}
+        {/* Header (Only shown when not on success screen) */}
+        {!isSuccess && (
+          <div className="flex items-start justify-between pb-2 sm:pb-3 border-b border-white/[0.08] relative z-10 shrink-0">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  Get in touch
+                </h2>
+                {!isOnline && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                    <IoCloudOfflineOutline className="w-3.5 h-3.5" />
+                    <span>Offline</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm text-neutral-300 mt-1 leading-snug">
+                Have a project, job opportunity, or inquiry? Send a direct message.
+              </p>
             </div>
-            <p className="text-xs sm:text-sm text-neutral-300 mt-1 leading-relaxed">
-              Have a project, job opportunity, or inquiry? Send a direct message.
-            </p>
-          </div>
 
-          <button
-            type="button"
-            onClick={handleClose}
-            aria-label="Close modal"
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/[0.08] hover:bg-white/[0.15] border border-white/[0.15] text-white flex items-center justify-center shadow-md active:scale-90 transition-all touch-manipulation cursor-pointer shrink-0 ml-2"
-          >
-            <IoClose className="w-5 h-5 text-white" />
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label="Close modal"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/[0.08] hover:bg-white/[0.15] border border-white/[0.15] text-white flex items-center justify-center shadow-md active:scale-90 transition-all touch-manipulation cursor-pointer shrink-0 ml-2"
+            >
+              <IoClose className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+            </button>
+          </div>
+        )}
 
         {/* Modal Body */}
-        <div className="pt-3 sm:pt-4 relative z-10 flex-1 flex flex-col justify-between">
+        <div className={`relative z-10 flex-1 flex flex-col justify-between overflow-hidden ${!isSuccess ? "pt-2 sm:pt-3" : "pt-0"}`}>
           {isSuccess && submittedData ? (
             /* ============================================================= */
-            /* SUCCESS CONFIRMATION SCREEN                                   */
+            /* ENHANCED SUCCESS CONFIRMATION SCREEN (CLEAN LUXURY)           */
             /* ============================================================= */
-            <div className="py-4 sm:py-6 text-center space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-200 my-auto">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <IoCheckmarkCircle className="w-8 h-8 sm:w-9 sm:h-9" />
-              </div>
-
-              <div className="space-y-1.5">
-                <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                  Message Sent Successfully
-                </h3>
-                <p className="text-sm text-neutral-300 leading-relaxed max-w-md mx-auto">
-                  Thank you, <span className="text-white font-medium">{submittedData.name}</span>. Your message has been forwarded directly to Gaurav Patil.
-                </p>
-              </div>
-
-              {/* Brevo Auto-Reply Confirmation */}
-              <div className="bg-[#111625] border border-white/[0.1] rounded-xl sm:rounded-2xl p-3.5 sm:p-4 text-left text-xs sm:text-sm space-y-1.5 max-w-md mx-auto">
-                <div className="flex items-center gap-1.5 font-medium text-[#CBACF9] text-xs sm:text-sm">
-                  <IoShieldCheckmarkOutline className="w-4 h-4 text-[#A78BFA]" />
-                  <span>Confirmation delivered to your inbox</span>
+            <div className="flex-1 flex flex-col justify-between py-2 sm:py-3 animate-in fade-in zoom-in-95 duration-300">
+              {/* Top Bar with Clean Header & Close Button */}
+              <div className="flex items-center justify-between pb-2 border-b border-white/[0.08] shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="text-xs sm:text-sm font-semibold text-emerald-400 tracking-wide">
+                    Message Delivered
+                  </span>
                 </div>
-                <p className="text-neutral-300 text-xs sm:text-xs leading-relaxed">
-                  An automated receipt was dispatched to <span className="text-white font-mono">{submittedData.email}</span> from <span className="text-purple">hello@gauravservices.eu.cc</span>.
-                </p>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  aria-label="Close modal"
+                  className="w-8 h-8 rounded-full bg-white/[0.08] hover:bg-white/[0.15] border border-white/[0.15] text-white flex items-center justify-center shadow-md active:scale-90 transition-all touch-manipulation cursor-pointer shrink-0"
+                >
+                  <IoClose className="w-4 h-4 text-white" />
+                </button>
               </div>
 
-              <div className="flex gap-3 pt-2 max-w-md mx-auto">
+              {/* Central Celebration & Confirmation */}
+              <div className="text-center space-y-3 sm:space-y-4 my-auto px-2 py-3">
+                {/* Glowing Emerald Checkmark */}
+                <div className="relative inline-block">
+                  <div className="absolute inset-0 rounded-full bg-emerald-500/25 blur-xl animate-pulse" />
+                  <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border-2 border-emerald-500/40 text-emerald-400 mx-auto flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                    <IoCheckmarkCircle className="w-8 h-8 sm:w-9 sm:h-9" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h3 className="text-lg sm:text-2xl font-bold text-white tracking-tight">
+                    Thank you, {submittedData.name}!
+                  </h3>
+                  <p className="text-sm sm:text-base text-neutral-300 leading-relaxed max-w-sm sm:max-w-md mx-auto">
+                    Your message has been forwarded directly to Gaurav Patil. You will receive a response shortly.
+                  </p>
+                </div>
+
+                {/* Clean, Subtle Receipt Confirmation Pill */}
+                <div className="bg-[#111625]/90 border border-white/[0.1] rounded-2xl p-3 sm:p-4 text-center text-xs sm:text-sm space-y-1 max-w-md mx-auto shadow-sm">
+                  <div className="flex items-center justify-center gap-1.5 font-medium text-[#CBACF9]">
+                    <IoShieldCheckmarkOutline className="w-4 h-4 text-[#A78BFA] shrink-0" />
+                    <span>Confirmation dispatched to your inbox</span>
+                  </div>
+                  <p className="text-neutral-400 text-xs sm:text-xs">
+                    Receipt sent to <span className="text-white font-mono">{submittedData.email}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-2 max-w-md mx-auto w-full shrink-0">
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="flex-1 py-3 px-4 rounded-xl text-sm font-medium bg-white/[0.06] hover:bg-white/[0.1] text-neutral-100 border border-white/[0.1] transition-colors touch-manipulation active:scale-[0.98]"
+                  className="flex-1 py-2.5 sm:py-3 px-3 rounded-xl text-xs sm:text-sm font-medium bg-white/[0.06] hover:bg-white/[0.12] text-neutral-200 border border-white/[0.1] transition-all touch-manipulation active:scale-[0.98] cursor-pointer"
                 >
                   Send another
                 </button>
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="flex-1 py-3 px-4 rounded-xl text-sm font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-lg shadow-[#7C3AED]/25 transition-all touch-manipulation active:scale-[0.98]"
+                  className="flex-1 py-2.5 sm:py-3 px-3 rounded-xl text-xs sm:text-sm font-bold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-lg shadow-[#7C3AED]/30 transition-all touch-manipulation active:scale-[0.98] cursor-pointer"
                 >
                   Done
                 </button>
@@ -636,48 +671,82 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             /* ============================================================= */
             /* SINGLE-VIEW RESPONSIVE TOUCH & FOCUS OPTIMIZED FORM           */
             /* ============================================================= */
-            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 flex-1 flex flex-col justify-between">
+            <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-3 flex-1 flex flex-col justify-between overflow-hidden">
               {/* Error Message Alert */}
               {submissionError && (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs sm:text-sm animate-in fade-in shrink-0">
-                  <IoAlertCircle className="w-4.5 h-4.5 shrink-0 text-red-400" />
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs animate-in fade-in shrink-0">
+                  <IoAlertCircle className="w-4 h-4 shrink-0 text-red-400" />
                   <span className="truncate leading-tight">{submissionError}</span>
                 </div>
               )}
 
-              {/* 1. Who is reaching out? (Horizontal Scrollable on Mobile / Wrapped on Desktop) */}
-              <div className="space-y-1.5 shrink-0">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300">
-                  I am a
-                </label>
-                <div className="flex items-center gap-2 overflow-x-auto sm:flex-wrap pb-1 sm:pb-0 scrollbar-none touch-pan-x -mx-1 px-1">
-                  {USER_ROLES.map((role) => {
-                    const isSelected = selectedRole === role.label;
-                    return (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => setSelectedRole(role.label)}
-                        className={`inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap transition-all touch-manipulation active:scale-95 cursor-pointer shrink-0 ${
-                          isSelected
-                            ? "bg-[#7C3AED]/30 border border-[#7C3AED] text-white font-semibold shadow-sm shadow-[#7C3AED]/35"
-                            : "bg-white/[0.04] border border-white/[0.09] text-neutral-300 hover:text-white hover:bg-white/[0.08]"
-                        }`}
-                      >
-                        <span className="text-sm">{role.icon}</span>
-                        <span>{role.label}</span>
-                      </button>
-                    );
-                  })}
+              {/* 1. Who is reaching out? (Mobile Single Horizontal Scrollable Row / Desktop Clean Flex Wrap) */}
+              <div className="space-y-1 shrink-0">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                    I am a
+                  </label>
+                  {/* Subtle Interactive Scroll Buttons (Mobile Only) */}
+                  <div className="flex sm:hidden items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => scrollRoles("left")}
+                      aria-label="Scroll roles left"
+                      className="w-5 h-5 rounded-md bg-white/[0.05] hover:bg-white/[0.12] border border-white/[0.08] text-neutral-400 hover:text-white flex items-center justify-center text-xs transition-all active:scale-90 cursor-pointer"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollRoles("right")}
+                      aria-label="Scroll roles right"
+                      className="w-5 h-5 rounded-md bg-white/[0.05] hover:bg-white/[0.12] border border-white/[0.08] text-neutral-400 hover:text-white flex items-center justify-center text-xs transition-all active:scale-90 cursor-pointer"
+                    >
+                      ›
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-1 pt-0.5 text-[11px] sm:text-xs text-neutral-400">
+                <div className="relative -mx-1 px-1">
+                  <div
+                    ref={roleScrollRef}
+                    className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none touch-pan-x snap-x scroll-smooth select-none pr-8 sm:pr-0 sm:flex-wrap sm:overflow-visible sm:gap-2"
+                  >
+                    {USER_ROLES.map((role) => {
+                      const isSelected = selectedRole === role.label;
+                      return (
+                        <button
+                          key={role.id}
+                          type="button"
+                          onClick={() => setSelectedRole(role.label)}
+                          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-xs whitespace-nowrap transition-all touch-manipulation active:scale-95 cursor-pointer shrink-0 sm:shrink snap-start ${
+                            isSelected
+                              ? "bg-[#7C3AED]/30 border border-[#7C3AED] text-white font-semibold shadow-sm shadow-[#7C3AED]/35"
+                              : "bg-white/[0.04] border border-white/[0.09] text-neutral-300 hover:text-white hover:bg-white/[0.08]"
+                          }`}
+                        >
+                          <span className="text-sm">{role.icon}</span>
+                          <span>{role.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Soft right-edge gradient fade with click-to-scroll affordance (Mobile Only) */}
+                  <div
+                    onClick={() => scrollRoles("right")}
+                    aria-label="Scroll more roles"
+                    className="absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-[#0B0F19] via-[#0B0F19]/80 to-transparent flex items-center justify-end pr-0.5 cursor-pointer sm:hidden"
+                  >
+                    <span className="text-xs text-neutral-400 animate-pulse font-bold">›</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-neutral-400 pt-0.5">
                   <span>You have the right to stay anonymous &amp; confidential.</span>
                   <div className="flex items-center gap-1.5">
                     <a
                       href="/privacy?focus=contact#anonymity"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#CBACF9] hover:underline hover:text-white transition-colors"
+                      className="text-[#CBACF9] hover:underline hover:text-white font-medium transition-colors"
                     >
                       Privacy Policy
                     </a>
@@ -686,7 +755,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                       href="/terms?focus=contact#anonymity"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#CBACF9] hover:underline hover:text-white transition-colors"
+                      className="text-[#CBACF9] hover:underline hover:text-white font-medium transition-colors"
                     >
                       Terms
                     </a>
@@ -695,17 +764,17 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               </div>
 
               {/* 2. Name & Email (Mobile Stacked / Desktop 2-Col Grid) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5 shrink-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-3 shrink-0">
                 {/* Full Name */}
-                <div className="space-y-1">
+                <div className="space-y-0.5 sm:space-y-1">
                   <label
                     htmlFor="touch-name"
-                    className="block text-xs sm:text-xs font-semibold uppercase tracking-wider text-neutral-300"
+                    className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-400"
                   >
                     Name <span className="text-purple">*</span>
                   </label>
                   <div className="relative">
-                    <IoPersonOutline className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
+                    <IoPersonOutline className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     <input
                       id="touch-name"
                       type="text"
@@ -716,21 +785,21 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                       onBlur={() => setIsInputFocused(false)}
                       placeholder="Your full name"
                       disabled={isSubmitting}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-[16px] text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[46px]"
+                      className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[38px] sm:h-[42px]"
                     />
                   </div>
                 </div>
 
                 {/* Email Address */}
-                <div className="space-y-1">
+                <div className="space-y-0.5 sm:space-y-1">
                   <label
                     htmlFor="touch-email"
-                    className="block text-xs sm:text-xs font-semibold uppercase tracking-wider text-neutral-300"
+                    className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-400"
                   >
                     Email <span className="text-purple">*</span>
                   </label>
                   <div className="relative">
-                    <IoMailOutline className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
+                    <IoMailOutline className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     <input
                       id="touch-email"
                       type="email"
@@ -741,29 +810,29 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                       onBlur={() => setIsInputFocused(false)}
                       placeholder="your.email@company.com"
                       disabled={isSubmitting}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-[16px] text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[46px]"
+                      className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[38px] sm:h-[42px]"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* 3. Message Details */}
-              <div className="space-y-1 flex-1 flex flex-col">
+              {/* 3. Message Details (Smoothly Flexes to Guarantee Zero Overflow) */}
+              <div className="space-y-0.5 sm:space-y-1 flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between">
                   <label
                     htmlFor="touch-message"
-                    className="block text-xs sm:text-xs font-semibold uppercase tracking-wider text-neutral-300"
+                    className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-400"
                   >
                     Message <span className="text-purple">*</span>
                   </label>
-                  <span className="text-xs text-neutral-400 font-mono">
+                  <span className="text-[10px] sm:text-xs text-neutral-400 font-mono">
                     {message.length}/1000
                   </span>
                 </div>
                 <textarea
                   id="touch-message"
                   required
-                  rows={3}
+                  rows={2}
                   maxLength={1000}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -771,25 +840,29 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   onBlur={() => setIsInputFocused(false)}
                   placeholder="Tell me about your project, goals, or inquiries..."
                   disabled={isSubmitting}
-                  className="w-full p-3.5 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-[16px] text-white placeholder:text-neutral-500 focus:outline-none transition-all resize-none leading-relaxed min-h-[90px] sm:min-h-[110px] max-h-[150px] touch-manipulation flex-1"
+                  className={`w-full p-2.5 sm:p-3 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all resize-none leading-snug touch-manipulation flex-1 ${
+                    isSubmitting
+                      ? "min-h-[42px] max-h-[50px]"
+                      : "min-h-[55px] sm:min-h-[85px] max-h-[75px] sm:max-h-[120px]"
+                  }`}
                 />
               </div>
 
-              {/* 4. Action Footer & Dynamic Cloudflare Challenge Container */}
-              <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 min-h-[52px] transition-all duration-300 ease-out">
-                {/* Dynamic Cloudflare Widget Box with Smooth Transition */}
+              {/* 4. Action Footer: Cloudflare Dynamically Positioned ABOVE Submit Button */}
+              <div className="pt-1 sm:pt-2 flex flex-col items-center gap-1.5 sm:gap-2 shrink-0 transition-all duration-300 ease-out">
+                {/* Dynamic Cloudflare Widget / Badge Box ABOVE Submit Button */}
                 {isSubmitting ? (
-                  <div className="w-full sm:w-auto flex items-center justify-center sm:justify-start min-h-[65px] transition-all duration-300 animate-in fade-in zoom-in-95 order-2 sm:order-1">
+                  <div className="w-full flex items-center justify-center min-h-[65px] transition-all duration-300 animate-in fade-in zoom-in-95">
                     <div
                       ref={turnstileContainerRef}
-                      className="rounded-xl overflow-hidden shadow-lg border border-white/[0.1] bg-black/40 flex items-center justify-center origin-center sm:origin-left transition-transform duration-200"
+                      className="rounded-xl overflow-hidden shadow-lg border border-white/[0.1] bg-black/40 flex items-center justify-center transition-transform duration-200"
                       style={{ minHeight: "65px" }}
                     />
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-xs text-neutral-300 order-2 sm:order-1">
+                  <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm text-neutral-400 py-0.5">
                     <SiCloudflare className="w-4 h-4 text-[#F38020]" />
-                    <span className="text-xs font-medium text-neutral-300">
+                    <span className="font-medium text-neutral-300">
                       Cloudflare Protected
                     </span>
                   </div>
@@ -799,7 +872,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 <button
                   type="submit"
                   disabled={isButtonDisabled}
-                  className={`w-full sm:w-auto px-7 py-3 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center justify-center gap-2.5 touch-manipulation min-h-[48px] shrink-0 order-1 sm:order-2 ${
+                  className={`w-full py-2.5 sm:py-3 px-6 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center justify-center gap-2 touch-manipulation min-h-[42px] sm:min-h-[46px] shrink-0 ${
                     isButtonDisabled
                       ? "bg-white/[0.04] text-neutral-500 border border-white/[0.06] cursor-not-allowed opacity-50"
                       : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-lg shadow-[#7C3AED]/25 cursor-pointer active:scale-[0.98]"
