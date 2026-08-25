@@ -30,21 +30,45 @@ export const FloatingNav = ({
 
   // Auto-scroll to section on direct URL load (e.g. /about, /projects, /testimonials, /contact)
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const section = window.location.pathname.replace(/^\//, "").replace(/^#/, "");
-      if (
-        section &&
-        ["about", "projects", "testimonials", "contact"].includes(section)
-      ) {
-        const timeoutId = setTimeout(() => {
-          const element = document.getElementById(section);
-          if (element) {
-            element.scrollIntoView({ behavior: "smooth" });
-          }
-        }, 300);
-        return () => clearTimeout(timeoutId);
-      }
+    if (typeof window === "undefined") return;
+
+    const section = window.location.pathname.replace(/^\//, "").replace(/^#/, "");
+    if (
+      !section ||
+      !["about", "projects", "testimonials", "experience", "approach", "contact"].includes(section)
+    ) {
+      return;
     }
+
+    // Pre-hydrate target section and preceding sections
+    window.dispatchEvent(
+      new CustomEvent("nav-scroll-start", { detail: { link: `/${section}` } })
+    );
+
+    const performScroll = () => {
+      const element = document.getElementById(section);
+      if (element) {
+        window.dispatchEvent(
+          new CustomEvent("nav-scroll-start", { detail: { link: `/${section}` } })
+        );
+        if (section === "contact") {
+          window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: "smooth",
+          });
+        } else {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+    };
+
+    const timer1 = setTimeout(performScroll, 120);
+    const timer2 = setTimeout(performScroll, 400);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
   }, []);
 
   // Real-time Scroll-Spy to sync URL with visible section (only on home routes)
@@ -66,6 +90,11 @@ export const FloatingNav = ({
 
         const scrollY = window.scrollY;
         if (scrollY < 200) {
+          try {
+            sessionStorage.removeItem("portfolio_active_section");
+          } catch {
+            // Ignore
+          }
           if (
             window.location.pathname !== "/" &&
             !window.location.pathname.startsWith("/blog")
@@ -75,19 +104,22 @@ export const FloatingNav = ({
           return;
         }
 
-        const sectionIds = ["about", "projects", "testimonials", "contact"];
-        const trigger = window.innerHeight * 0.35; // 35% from top of viewport
-
-        const isAtBottom =
+        const contactEl = document.getElementById("contact");
+        const isNearBottom =
           window.innerHeight + window.scrollY >=
-          document.documentElement.scrollHeight - 80;
+          document.documentElement.scrollHeight - 500;
+        const isContactInView =
+          contactEl &&
+          contactEl.getBoundingClientRect().top <= window.innerHeight * 0.75;
 
         let currentSection = "";
 
-        if (isAtBottom) {
+        if (isNearBottom || isContactInView) {
           currentSection = "contact";
         } else {
-          // Track the lowest section whose top has scrolled past the trigger point
+          const sectionIds = ["about", "projects", "testimonials"];
+          const trigger = window.innerHeight * 0.45;
+
           for (const id of sectionIds) {
             const el = document.getElementById(id);
             if (el) {
@@ -100,6 +132,11 @@ export const FloatingNav = ({
         }
 
         if (currentSection) {
+          try {
+            sessionStorage.setItem("portfolio_active_section", currentSection);
+          } catch {
+            // Ignore
+          }
           const targetPath = `/${currentSection}`;
           if (window.location.pathname !== targetPath) {
             window.history.replaceState(null, "", targetPath);
@@ -113,7 +150,7 @@ export const FloatingNav = ({
       clearTimeout(navigatingTimeout);
       navigatingTimeout = setTimeout(() => {
         isNavigating = false;
-      }, 900);
+      }, 1200);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -154,7 +191,7 @@ export const FloatingNav = ({
     const sectionId = link.replace(/^\//, "").replace(/^#/, "");
     const isHomePage =
       pathname === "/" ||
-      ["/about", "/projects", "/testimonials", "/contact"].includes(pathname);
+      ["/about", "/projects", "/testimonials", "/experience", "/approach", "/contact"].includes(pathname);
 
     if (isHomePage) {
       const element = document.getElementById(sectionId);
@@ -163,7 +200,14 @@ export const FloatingNav = ({
         window.dispatchEvent(
           new CustomEvent("nav-scroll-start", { detail: { link } })
         );
-        element.scrollIntoView({ behavior: "smooth" });
+        if (sectionId === "contact") {
+          window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: "smooth",
+          });
+        } else {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
         window.history.replaceState(null, "", link);
       }
     } else {

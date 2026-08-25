@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const { email, avatar, name } = parsed.data;
 
-    // Strict identity check: only gauravpatil9262 is permitted
+    // Strict identity check: only gauravpatil5737 is permitted
     if (!isAuthorizedAdminEmail(email)) {
       return NextResponse.json(
         {

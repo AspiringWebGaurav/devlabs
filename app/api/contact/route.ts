@@ -2,19 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import { sanitizeAndValidateText } from "@/lib/contact/profanity-filter";
-import { dispatchContactEmails } from "@/lib/contact/emailjs-contact";
+import { checkContactRateLimit, recordContactSubmission } from "@/lib/contact/rate-limiter";
+import { getNextSynchronizedLeadNumber } from "@/lib/contact/lead-counter";
+import { dispatchContactFormWorkflow } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
-// In-memory rate limiting map: IP -> lastSubmissionTimestamp
-const ipRateLimitMap = new Map<string, number>();
-const RATE_LIMIT_WINDOW_MS = 10 * 1000; // 10 seconds cooldown per IP
-
 const ContactSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").max(60, "Name must be under 60 characters"),
-  email: z.string().email("Please provide a valid email address").max(100),
-  category: z.string().max(40).optional(),
-  message: z.string().min(10, "Message must be at least 10 characters").max(1000, "Message must be under 1000 characters"),
+  name: z
+    .string()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name must be under 100 characters"),
+  email: z.string().email("Please provide a valid email address").max(120),
+  role: z.string().max(100).optional(),
+  subject: z.string().max(250).optional(),
+  category: z.string().max(250).optional(),
+  message: z
+    .string()
+    .min(10, "Message must be at least 10 characters")
+    .max(2000, "Message must be under 2000 characters"),
   turnstileToken: z.string().optional(),
 });
 
@@ -31,82 +37,150 @@ export async function POST(request: NextRequest) {
     // 1. Zod Schema Validation
     const parsed = ContactSchema.safeParse(rawBody);
     if (!parsed.success) {
-      const issue = parsed.error.issues[0]?.message || "Validation failed on submitted fields.";
+      const issue =
+        parsed.error.issues[0]?.message ||
+        "Validation failed on submitted fields.";
       return NextResponse.json(
         { success: false, error: issue },
         { status: 400 }
       );
     }
 
-    const { name, email, category, message, turnstileToken } = parsed.data;
+    const { name, email, role, subject, category, message, turnstileToken } = parsed.data;
 
     // 2. Extract Client IP
     const forwardedFor = request.headers.get("x-forwarded-for");
     const realIp = request.headers.get("x-real-ip");
-    const clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : realIp || "127.0.0.1";
+    const clientIp = forwardedFor
+      ? forwardedFor.split(",")[0].trim()
+      : realIp || "127.0.0.1";
 
-    // 3. IP Rate Limiting (1 submission per 10s cooldown per IP)
-    const now = Date.now();
-    const lastSub = ipRateLimitMap.get(clientIp);
-    if (lastSub && now - lastSub < RATE_LIMIT_WINDOW_MS) {
-      const secondsLeft = Math.ceil((RATE_LIMIT_WINDOW_MS - (now - lastSub)) / 1000);
+    // 3. Multi-Tier Anti-Abuse Rate Limiting (IP Burst, IP Hourly, Email Hourly & Global Surge)
+    const rateLimitCheck = await checkContactRateLimit(clientIp, email);
+    if (!rateLimitCheck.allowed) {
       return NextResponse.json(
         {
           success: false,
-          error: `Please wait ${secondsLeft}s before sending another message.`,
-          retryAfterSec: secondsLeft,
+          error: rateLimitCheck.reason || "Submission rate limit exceeded. Please try again later.",
+          retryAfter: rateLimitCheck.retryAfterSeconds,
         },
         { status: 429 }
       );
     }
-    // Set timestamp immediately to prevent race-condition double clicks
-    ipRateLimitMap.set(clientIp, now);
 
-    // 4. Cloudflare Turnstile Bot Verification (if site key configured)
-    if (process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY) {
+    // 4. Cloudflare Turnstile Bot Verification (Server-Side)
+    if (turnstileToken) {
       const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIp);
       if (!turnstileResult.success) {
         return NextResponse.json(
           {
             success: false,
-            error: turnstileResult.error || "Security verification failed. Please complete the CAPTCHA.",
+            error:
+              turnstileResult.error ||
+              "Cloudflare security challenge verification failed. Please try again.",
           },
           { status: 403 }
         );
       }
     }
 
-    // 5. Profanity & Spam Filter Sanitization
-    const nameSanitization = sanitizeAndValidateText(name, "Full Name", 2, 60);
+    // 5. Profanity & Content Abuse Filtering
+    const nameSanitization = sanitizeAndValidateText(name, "Full Name", 2, 100);
+    const messageSanitization = sanitizeAndValidateText(message, "Message", 10, 2000);
+
     if (!nameSanitization.isValid) {
       return NextResponse.json(
-        { success: false, error: nameSanitization.error },
-        { status: 400 }
+        {
+          success: false,
+          error: nameSanitization.error || "Your name contains disallowed terms. Please revise.",
+        },
+        { status: 422 }
       );
     }
 
-    const messageSanitization = sanitizeAndValidateText(message, "Message", 10, 1000);
     if (!messageSanitization.isValid) {
       return NextResponse.json(
-        { success: false, error: messageSanitization.error },
-        { status: 400 }
+        {
+          success: false,
+          error: messageSanitization.error || "Your message contains prohibited language. Please revise.",
+        },
+        { status: 422 }
       );
     }
 
-    // 6. Realtime Database REST persistence (Universal cross-instance sync)
-    const messageId = `msg_${now}_${Math.random().toString(36).substring(2, 7)}`;
-    const selectedCategory = category || "General Inquiry";
+    const selectedRole = role?.trim() || "Visitor / Other";
+    const selectedSubject = subject?.trim() || category?.trim() || "General Inquiry";
+    const selectedCategory = category?.trim() || selectedSubject;
 
+    // 6. Generate Synchronized Lead Number
+    const leadNumber = await getNextSynchronizedLeadNumber();
+
+    // 7. Dispatch Dual Brevo Transactional Emails (Lead Alert + Auto-Reply Template #1)
+    let emailResult = {
+      internalEmailSent: false,
+      autoReplySent: false,
+      errors: [] as string[],
+    };
+
+    try {
+      emailResult = await dispatchContactFormWorkflow({
+        name: nameSanitization.sanitizedText,
+        email: email.trim().toLowerCase(),
+        role: selectedRole,
+        subject: selectedSubject,
+        category: selectedCategory,
+        message: messageSanitization.sanitizedText,
+        ip: clientIp,
+        leadNumber,
+      });
+    } catch (err) {
+      console.warn("Brevo contact email dispatch note:", err);
+      emailResult = {
+        internalEmailSent: false,
+        autoReplySent: false,
+        errors: [String(err)],
+      };
+    }
+
+    const emailDelivered =
+      emailResult.internalEmailSent || emailResult.autoReplySent;
+
+    // Reject if both email operations failed completely (guarantees Zero Orphaned DB records)
+    if (!emailDelivered) {
+      const detailError =
+        emailResult.errors[0] ||
+        "Email delivery failed. Please try again or reach out directly.";
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Failed to dispatch message via email gateway. Please try again later.",
+          detail:
+            process.env.NODE_ENV === "development" ? detailError : undefined,
+        },
+        { status: 502 }
+      );
+    }
+
+    // Record verified rate-limit entry only upon successful email dispatch
+    recordContactSubmission(clientIp, email);
+
+    // 8. Persist Verified Message to Firebase Realtime Database (/messages)
+    const now = Date.now();
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const messageRecord = {
       id: messageId,
+      leadNumber,
       name: nameSanitization.sanitizedText,
       email: email.trim().toLowerCase(),
+      role: selectedRole,
+      subject: selectedSubject,
       category: selectedCategory,
       message: messageSanitization.sanitizedText,
-      date: new Date(now).toISOString(),
       createdAt: now,
+      date: new Date(now).toISOString(),
       ip: clientIp,
-      status: "UNREAD",
+      status: "unread",
     };
 
     const FIREBASE_DB_URL = (
@@ -128,25 +202,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 7. Dispatch Dual EmailJS Notifications (Clean direct execution)
-    let emailResult = { adminEmailSent: false, visitorEmailSent: false, errors: [] as string[] };
-    try {
-      emailResult = await dispatchContactEmails({
-        name: nameSanitization.sanitizedText,
-        email: email.trim().toLowerCase(),
-        category: selectedCategory,
-        message: messageSanitization.sanitizedText,
-        ip: clientIp,
-      });
-    } catch (err) {
-      console.warn("Email dispatch note:", err);
-      emailResult = { adminEmailSent: false, visitorEmailSent: false, errors: [String(err)] };
-    }
-
     return NextResponse.json({
       success: true,
       messageId,
-      emailDelivered: emailResult.adminEmailSent || emailResult.visitorEmailSent,
+      leadNumber,
+      emailDelivered,
+      autoReplyDelivered: emailResult.autoReplySent,
       timestamp: messageRecord.date,
     });
   } catch (err: unknown) {
@@ -155,7 +216,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "An unexpected error occurred while processing your message.",
+        error:
+          error.message ||
+          "An unexpected error occurred while processing your message.",
       },
       { status: 500 }
     );

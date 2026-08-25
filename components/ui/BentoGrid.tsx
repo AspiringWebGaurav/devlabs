@@ -59,7 +59,7 @@ export const BentoGridItem = ({
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleCopy = async () => {
-    const text = "gauravpatil5737@gmail.com";
+    const text = "hello@gauravservices.eu.cc";
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);

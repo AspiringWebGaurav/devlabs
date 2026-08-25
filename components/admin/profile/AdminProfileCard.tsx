@@ -16,7 +16,7 @@ export const AdminProfileCard: React.FC<AdminProfileCardProps> = ({
 }) => {
   const [imageError, setImageError] = useState(false);
   const displayName = user?.name || "Gaurav Patil";
-  const displayEmail = user?.email || "gauravpatil9262@gmail.com";
+  const displayEmail = user?.email || "gauravpatil5737@gmail.com";
   const initials = displayName
     .split(" ")
     .map((n) => n[0])

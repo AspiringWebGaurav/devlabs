@@ -244,7 +244,7 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 | **Authentication & 2FA** | Google OAuth 2.0 PKCE, [OTPLib 13](https://github.com/yeojinj/otplib), [QRCode](https://github.com/soldair/node-qrcode) | Multi-factor cryptographic security & session management |
 | **Bot Detection** | [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) | Invisible, privacy-preserving CAPTCHA verification |
 | **Validation Layer** | [Zod 4](https://zod.dev/) | Strict runtime payload and environment validation schemas |
-| **Email Delivery** | [EmailJS REST API](https://www.emailjs.com/) | Dual sequential transactional email dispatching |
+| **Email Delivery** | [Brevo REST API v3](https://www.brevo.com/) | Dual transactional email dispatch (Inbound Lead + Auto-Reply) |
 | **Typography & Icons** | Inter / Outfit / Geist, [React Icons 5](https://react-icons.github.io/react-icons/) | High-density typography and vector iconography |
 
 ---
@@ -272,7 +272,7 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 │   │   ├── admin/auth/callback/    # PKCE code exchange & session issuer
 │   │   ├── admin/auth/session/     # Read-only session validation endpoint
 │   │   ├── admin/auth/login/       # Session minting route
-│   │   └── contact/route.ts        # Turnstile-guarded contact submission & EmailJS
+│   │   └── contact/route.ts        # Turnstile-guarded contact submission & Brevo
 │   └── layout.tsx                  # Root HTML layout, analytics & dark theme provider
 ├── components/
 │   ├── admin/                      # Scoped Swiss Light admin components
@@ -296,7 +296,7 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 │   │   ├── constants.ts            # Single-source constants (ADMIN_SESSION_TTL_HOURS = 5)
 │   │   ├── auth.ts                 # Server-side token signing & verification
 │   │   └── logger.ts               # Structured system logger
-│   └── contact/                    # EmailJS REST dispatcher, profanity sanitizer
+│   └── contact/                    # Brevo REST dispatcher, profanity sanitizer
 └── middleware.ts                   # Edge middleware for admin route protection
 ```
 
@@ -380,7 +380,7 @@ npm run build
 
 * **Zero Hardcoded Secrets**: Secrets and service account keys are stored exclusively in environment variables and are permanently ignored via `.gitignore`.
 * **Rate-Limited Endpoints**: API mutation endpoints are protected by Cloudflare Turnstile bot challenges and server-side request throttling.
-* **Responsible Disclosure**: If you discover a security vulnerability, please submit a confidential report to `gauravpatil9262@gmail.com`.
+* **Responsible Disclosure**: If you discover a security vulnerability, please submit a confidential report to `security@gauravservices.eu.cc`.
 
 ---
 

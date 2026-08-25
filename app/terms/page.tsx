@@ -115,10 +115,10 @@ export default function TermsPage() {
             <p className="text-purple font-medium">
               Email:{" "}
               <a
-                href="mailto:gauravpatil5737@gmail.com"
+                href="mailto:hello@gauravservices.eu.cc"
                 className="hover:underline"
               >
-                gauravpatil5737@gmail.com
+                hello@gauravservices.eu.cc
               </a>
             </p>
           </section>

@@ -18,7 +18,7 @@ export interface AdminSession {
 }
 
 /**
- * Validates whether the given email strictly matches the authorized admin identity (gauravpatil9262).
+ * Validates whether the given email strictly matches the authorized admin identity (gauravpatil5737).
  */
 export function isAuthorizedAdminEmail(email?: string | null): boolean {
   if (!email || typeof email !== "string") return false;

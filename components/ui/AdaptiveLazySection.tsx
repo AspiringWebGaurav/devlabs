@@ -31,10 +31,24 @@ export function AdaptiveLazySection({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Check if directly loaded via deep-link URL (e.g. /projects, /about, /testimonials, /contact)
+    // Check if directly loaded via deep-link URL (e.g. /projects, /about, /testimonials, /contact) or hard refresh while scrolled
+    const knownSections = ["about", "projects", "testimonials", "experience", "approach", "contact"];
+    const savedActiveSection = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("portfolio_active_section") : null;
+
     if (id) {
       const currentPath = window.location.pathname.replace(/^\//, "").replace(/^#/, "");
-      if (currentPath === id || window.location.hash === `#${id}`) {
+      const targetIndex = knownSections.indexOf(currentPath);
+      const savedIndex = savedActiveSection ? knownSections.indexOf(savedActiveSection) : -1;
+      const currentIndex = knownSections.indexOf(id);
+
+      if (
+        currentPath === id ||
+        window.location.hash === `#${id}` ||
+        savedActiveSection === id ||
+        (targetIndex !== -1 && currentIndex !== -1 && currentIndex <= targetIndex) ||
+        (savedIndex !== -1 && currentIndex !== -1 && currentIndex <= savedIndex) ||
+        window.scrollY > 150
+      ) {
         setIsVisible(true);
         setHasRendered(true);
         return;
@@ -46,7 +60,13 @@ export function AdaptiveLazySection({
       const customEvent = e as CustomEvent<{ link?: string }>;
       const link = customEvent.detail?.link || "";
       const targetId = link.replace(/^\//, "").replace(/^#/, "");
-      if (id && targetId === id) {
+      const targetIndex = knownSections.indexOf(targetId);
+      const currentIndex = knownSections.indexOf(id || "");
+
+      if (
+        (id && targetId === id) ||
+        (targetIndex !== -1 && currentIndex !== -1 && currentIndex <= targetIndex)
+      ) {
         setIsVisible(true);
         setHasRendered(true);
       }

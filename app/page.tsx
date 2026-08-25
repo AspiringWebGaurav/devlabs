@@ -63,11 +63,11 @@ export default function Home() {
           <TestimonialsSection />
         </AdaptiveLazySection>
 
-        <AdaptiveLazySection minHeight="450px" placeholder={<ExperienceSectionSkeleton />}>
+        <AdaptiveLazySection id="experience" minHeight="450px" placeholder={<ExperienceSectionSkeleton />}>
           <ExperienceSection />
         </AdaptiveLazySection>
 
-        <AdaptiveLazySection minHeight="600px" placeholder={<ApproachSectionSkeleton />}>
+        <AdaptiveLazySection id="approach" minHeight="600px" placeholder={<ApproachSectionSkeleton />}>
           <ApproachSection />
         </AdaptiveLazySection>
 
