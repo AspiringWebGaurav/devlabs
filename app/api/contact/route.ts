@@ -5,22 +5,21 @@ import { sanitizeAndValidateText } from "@/lib/contact/profanity-filter";
 import { checkContactRateLimit, recordContactSubmission } from "@/lib/contact/rate-limiter";
 import { getNextSynchronizedLeadNumber } from "@/lib/contact/lead-counter";
 import { dispatchContactFormWorkflow } from "@/lib/email";
+import { validateEmail, validateName, validateMessage, MESSAGE_MIN_CHARS, MESSAGE_MAX_CHARS } from "@/lib/contact/validation";
+import { evaluateContentModeration } from "@/lib/security/ai-moderation";
 
 export const dynamic = "force-dynamic";
 
 const ContactSchema = z.object({
-  name: z
-    .string()
-    .min(2, "Name must be at least 2 characters")
-    .max(100, "Name must be under 100 characters"),
-  email: z.string().email("Please provide a valid email address").max(120),
+  name: z.string().min(2, "Name must be at least 2 characters").max(60, "Name must be under 60 characters"),
+  email: z.string().max(120),
   role: z.string().max(100).optional(),
   subject: z.string().max(250).optional(),
   category: z.string().max(250).optional(),
   message: z
     .string()
-    .min(10, "Message must be at least 10 characters")
-    .max(2000, "Message must be under 2000 characters"),
+    .min(MESSAGE_MIN_CHARS, `Message must be at least ${MESSAGE_MIN_CHARS} characters`)
+    .max(MESSAGE_MAX_CHARS, `Message must be under ${MESSAGE_MAX_CHARS} characters`),
   turnstileToken: z.string().optional(),
 });
 
@@ -48,7 +47,32 @@ export async function POST(request: NextRequest) {
 
     const { name, email, role, subject, category, message, turnstileToken } = parsed.data;
 
-    // 2. Extract Client IP
+    // 2. Strict Email Typo & Format Validation
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      return NextResponse.json(
+        { success: false, error: emailValidation.error },
+        { status: 400 }
+      );
+    }
+
+    const nameValidation = validateName(name);
+    if (!nameValidation.isValid) {
+      return NextResponse.json(
+        { success: false, error: nameValidation.error },
+        { status: 400 }
+      );
+    }
+
+    const messageValidation = validateMessage(message);
+    if (!messageValidation.isValid) {
+      return NextResponse.json(
+        { success: false, error: messageValidation.error },
+        { status: 400 }
+      );
+    }
+
+    // 3. Extract Client IP
     const forwardedFor = request.headers.get("x-forwarded-for");
     const realIp = request.headers.get("x-real-ip");
     const clientIp = forwardedFor
@@ -84,7 +108,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. Profanity & Content Abuse Filtering
+    // 5. Multi-Layer Profanity & AI Content Moderation Filtering
     const nameSanitization = sanitizeAndValidateText(name, "Full Name", 2, 100);
     const messageSanitization = sanitizeAndValidateText(message, "Message", 10, 2000);
 
@@ -103,6 +127,18 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: messageSanitization.error || "Your message contains prohibited language. Please revise.",
+        },
+        { status: 422 }
+      );
+    }
+
+    // Deep AI & Public Moderation Verification (OpenAI / Perspective / PurgoMalum)
+    const aiModeration = await evaluateContentModeration(message);
+    if (aiModeration.flagged) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: aiModeration.reason || "Your message was flagged for abusive or toxic language. Please revise.",
         },
         { status: 422 }
       );

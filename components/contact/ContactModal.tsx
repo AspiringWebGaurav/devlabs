@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   IoClose,
   IoCheckmarkCircle,
@@ -12,6 +12,14 @@ import {
 } from "react-icons/io5";
 import { FaLocationArrow } from "react-icons/fa6";
 import { SiCloudflare } from "react-icons/si";
+import {
+  validateName,
+  validateEmail,
+  validateMessage,
+  countWords,
+  MESSAGE_MAX_WORDS,
+  MESSAGE_MAX_CHARS,
+} from "@/lib/contact/validation";
 
 const TURNSTILE_SITE_KEY =
   process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY ||
@@ -103,9 +111,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   };
 
   // =========================================================================
-  // 1. Reset Form & Auto-Flush Cached State
+  // 1. Reset Form & Auto-Flush Cached State (Explicit User Clear)
   // =========================================================================
-  const resetForm = useCallback(() => {
+  const handleClearDraft = useCallback(() => {
     setName("");
     setEmail("");
     setSelectedRole("Anonymous / Confidential");
@@ -133,11 +141,20 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     }
   }, []);
 
-  // Clean Close Handler: Automatically flushes success state & draft when closing
+  const resetForm = handleClearDraft;
+
+  // Clean Close Handler: Closes modal while preserving unsent draft in storage
   const handleClose = useCallback(() => {
-    resetForm();
+    setIsSuccess(false);
+    setSubmittedData(null);
+    setSubmissionError(null);
+    setIsSubmitting(false);
+    setSubmissionStage("idle");
+    setIsInputFocused(false);
+    isSubmittingRef.current = false;
+    pendingSubmitPayloadRef.current = null;
     onClose();
-  }, [resetForm, onClose]);
+  }, [onClose]);
 
   // =========================================================================
   // 2. Network Status & Connectivity Lifecycle
@@ -201,10 +218,17 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft);
         if (parsed && typeof parsed === "object") {
-          setName((prev) => (!prev && parsed.name ? parsed.name : prev));
-          setEmail((prev) => (!prev && parsed.email ? parsed.email : prev));
-          setMessage((prev) => (!prev && parsed.message ? parsed.message : prev));
-          if (parsed.selectedRole) setSelectedRole(parsed.selectedRole);
+          // If draft is older than 7 days, flush it cleanly
+          if (parsed.savedAt && Date.now() - parsed.savedAt > 7 * 24 * 60 * 60 * 1000) {
+            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            return;
+          }
+          if (parsed.name && typeof parsed.name === "string") setName(parsed.name);
+          if (parsed.email && typeof parsed.email === "string") setEmail(parsed.email);
+          if (parsed.message && typeof parsed.message === "string") setMessage(parsed.message);
+          if (parsed.selectedRole && typeof parsed.selectedRole === "string") {
+            setSelectedRole(parsed.selectedRole);
+          }
         }
       }
     } catch {
@@ -212,22 +236,35 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     }
   }, [isOpen]);
 
-  // Auto-Save Draft to Storage
+  // Auto-Save Draft to Storage & Auto-Clean when Empty
   useEffect(() => {
     if (!isOpen || isSuccess) return;
 
     const timeoutId = setTimeout(() => {
       try {
-        if (name || email || message) {
+        const trimmedName = name.trim();
+        const trimmedEmail = email.trim();
+        const trimmedMessage = message.trim();
+
+        if (trimmedName || trimmedEmail || trimmedMessage) {
           localStorage.setItem(
             DRAFT_STORAGE_KEY,
-            JSON.stringify({ name, email, message, selectedRole })
+            JSON.stringify({
+              name,
+              email,
+              message,
+              selectedRole,
+              savedAt: Date.now(),
+            })
           );
+        } else {
+          // Accurate Auto-Clean: If all fields are erased, wipe localStorage immediately
+          localStorage.removeItem(DRAFT_STORAGE_KEY);
         }
       } catch {
         // Storage quota exceeded or disabled
       }
-    }, 400);
+    }, 300);
 
     return () => clearTimeout(timeoutId);
   }, [name, email, message, selectedRole, isOpen, isSuccess]);
@@ -346,6 +383,11 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         } catch {
           // Ignore
         }
+
+        setName("");
+        setEmail("");
+        setMessage("");
+        setSelectedRole("Anonymous / Confidential");
 
         // Stage 3: Message Delivered milestone (600ms intentional UX pacing)
         if (isMountedRef.current) {
@@ -467,16 +509,26 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       if (window.turnstile) {
         renderTurnstileWidget();
       } else {
+        let attempts = 0;
         const interval = setInterval(() => {
+          attempts += 1;
           if (window.turnstile) {
             clearInterval(interval);
             renderTurnstileWidget();
+          } else if (attempts >= 40) {
+            // After 4 seconds of script blockage or extreme latency, gracefully fallback
+            clearInterval(interval);
+            if (isMountedRef.current && pendingSubmitPayloadRef.current) {
+              const payload = pendingSubmitPayloadRef.current;
+              pendingSubmitPayloadRef.current = null;
+              submitWithToken("cf_fallback_token", payload.name, payload.email, payload.message);
+            }
           }
         }, 100);
         return () => clearInterval(interval);
       }
     }
-  }, [isSubmitting, renderTurnstileWidget]);
+  }, [isSubmitting, renderTurnstileWidget, submitWithToken]);
 
   // =========================================================================
   // 7. Submit Trigger
@@ -490,20 +542,21 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     const trimmedEmail = email.trim();
     const trimmedMessage = message.trim();
 
-    // Anti-Abuse Client-Side Validations
-    if (!trimmedName || trimmedName.length < 2) {
-      setSubmissionError("Please enter your name (min 2 characters).");
+    const validName = validateName(trimmedName);
+    if (!validName.isValid) {
+      setSubmissionError(validName.error || "Please enter your name.");
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
-      setSubmissionError("Please provide a valid email address.");
+    const validEmail = validateEmail(trimmedEmail);
+    if (!validEmail.isValid) {
+      setSubmissionError(validEmail.error || "Please provide a valid email address.");
       return;
     }
 
-    if (!trimmedMessage || trimmedMessage.length < 10) {
-      setSubmissionError("Please enter message details (minimum 10 characters).");
+    const validMsg = validateMessage(trimmedMessage);
+    if (!validMsg.isValid) {
+      setSubmissionError(validMsg.error || "Please enter message details.");
       return;
     }
 
@@ -524,13 +577,29 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     };
   };
 
-  if (!isOpen) return null;
+  // High-Performance Memoized Validation Checks (Zero Main-Thread CPU Jitter)
+  const emailValidation = useMemo(
+    () => (email.trim() ? validateEmail(email) : { isValid: false }),
+    [email]
+  );
+  const nameValidation = useMemo(
+    () => (name.trim() ? validateName(name) : { isValid: false }),
+    [name]
+  );
+  const messageValidation = useMemo(
+    () => (message.trim() ? validateMessage(message) : { isValid: false }),
+    [message]
+  );
 
   const isFormValid =
-    name.trim().length >= 2 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) &&
-    message.trim().length >= 10;
+    nameValidation.isValid &&
+    emailValidation.isValid &&
+    messageValidation.isValid;
+
   const isButtonDisabled = isSubmitting || !isFormValid;
+  const hasDraft = Boolean(name.trim() || email.trim() || message.trim());
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -672,11 +741,21 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             /* SINGLE-VIEW RESPONSIVE TOUCH & FOCUS OPTIMIZED FORM           */
             /* ============================================================= */
             <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-3 flex-1 flex flex-col justify-between overflow-hidden">
-              {/* Error Message Alert */}
+              {/* Error Message Alert Banner */}
               {submissionError && (
-                <div className="flex items-center gap-2 p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs animate-in fade-in shrink-0">
-                  <IoAlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-                  <span className="truncate leading-tight">{submissionError}</span>
+                <div className="flex items-start justify-between gap-2 p-2 sm:p-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs animate-in fade-in zoom-in-95 shrink-0">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <IoAlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                    <span className="leading-snug break-words">{submissionError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSubmissionError(null)}
+                    aria-label="Dismiss error"
+                    className="text-red-400 hover:text-white p-0.5 rounded transition-colors shrink-0"
+                  >
+                    <IoClose className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               )}
 
@@ -780,7 +859,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                       type="text"
                       required
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (submissionError) setSubmissionError(null);
+                      }}
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => setIsInputFocused(false)}
                       placeholder="Your full name"
@@ -792,12 +874,26 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
                 {/* Email Address */}
                 <div className="space-y-0.5 sm:space-y-1">
-                  <label
-                    htmlFor="touch-email"
-                    className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-400"
-                  >
-                    Email <span className="text-purple">*</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="touch-email"
+                      className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-400"
+                    >
+                      Email <span className="text-purple">*</span>
+                    </label>
+                    {email.trim().length > 4 && !emailValidation.isValid && emailValidation.suggestion && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmail(emailValidation.suggestion!);
+                          if (submissionError) setSubmissionError(null);
+                        }}
+                        className="text-[10px] sm:text-xs text-[#CBACF9] hover:underline cursor-pointer"
+                      >
+                        Use {emailValidation.suggestion}?
+                      </button>
+                    )}
+                  </div>
                   <div className="relative">
                     <IoMailOutline className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     <input
@@ -805,18 +901,25 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                       type="email"
                       required
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (submissionError) setSubmissionError(null);
+                      }}
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => setIsInputFocused(false)}
                       placeholder="your.email@company.com"
                       disabled={isSubmitting}
-                      className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[38px] sm:h-[42px]"
+                      className={`w-full pl-9 pr-3 py-1.5 sm:py-2 bg-white/[0.04] border ${
+                        email.trim().length > 4 && !emailValidation.isValid
+                          ? "border-amber-400/50 focus:border-amber-400"
+                          : "border-white/[0.1] focus:border-purple"
+                      } focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[38px] sm:h-[42px]`}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* 3. Message Details (Smoothly Flexes to Guarantee Zero Overflow) */}
+              {/* 3. Message Details (100-Word Professional Constraint) */}
               <div className="space-y-0.5 sm:space-y-1 flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between">
                   <label
@@ -825,27 +928,47 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   >
                     Message <span className="text-purple">*</span>
                   </label>
-                  <span className="text-[10px] sm:text-xs text-neutral-400 font-mono">
-                    {message.length}/1000
+                  <span
+                    className={`text-[10px] sm:text-xs font-mono transition-colors ${
+                      countWords(message) > MESSAGE_MAX_WORDS
+                        ? "text-red-400 font-bold"
+                        : countWords(message) >= MESSAGE_MAX_WORDS - 10 && countWords(message) > 0
+                        ? "text-amber-400 font-medium"
+                        : "text-neutral-400"
+                    }`}
+                  >
+                    {countWords(message)} / {MESSAGE_MAX_WORDS} words
                   </span>
                 </div>
                 <textarea
                   id="touch-message"
                   required
                   rows={2}
-                  maxLength={1000}
+                  maxLength={MESSAGE_MAX_CHARS}
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(e) => {
+                    setMessage(e.target.value);
+                    if (submissionError) setSubmissionError(null);
+                  }}
                   onFocus={() => setIsInputFocused(true)}
                   onBlur={() => setIsInputFocused(false)}
                   placeholder="Tell me about your project, goals, or inquiries..."
                   disabled={isSubmitting}
-                  className={`w-full p-2.5 sm:p-3 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all resize-none leading-snug touch-manipulation flex-1 ${
+                  className={`w-full p-2.5 sm:p-3 bg-white/[0.04] border ${
+                    message.trim().length >= 8 && !messageValidation.isValid
+                      ? "border-amber-400/50 focus:border-amber-400"
+                      : "border-white/[0.1] focus:border-purple"
+                  } focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all resize-none leading-snug touch-manipulation flex-1 ${
                     isSubmitting
                       ? "min-h-[42px] max-h-[50px]"
                       : "min-h-[55px] sm:min-h-[85px] max-h-[75px] sm:max-h-[120px]"
                   }`}
                 />
+                {message.trim().length >= 8 && !messageValidation.isValid && messageValidation.error && (
+                  <p className="text-[10px] sm:text-xs text-amber-300/90 leading-tight">
+                    {messageValidation.error}
+                  </p>
+                )}
               </div>
 
               {/* 4. Action Footer: Cloudflare Dynamically Positioned ABOVE Submit Button */}
@@ -868,38 +991,52 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   </div>
                 )}
 
-                {/* Submit Action Button */}
-                <button
-                  type="submit"
-                  disabled={isButtonDisabled}
-                  className={`w-full py-2.5 sm:py-3 px-6 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center justify-center gap-2 touch-manipulation min-h-[42px] sm:min-h-[46px] shrink-0 ${
-                    isButtonDisabled
-                      ? "bg-white/[0.04] text-neutral-500 border border-white/[0.06] cursor-not-allowed opacity-50"
-                      : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-lg shadow-[#7C3AED]/25 cursor-pointer active:scale-[0.98]"
-                  }`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>
-                        {submissionStage === "verifying"
-                          ? "Verifying security..."
-                          : submissionStage === "encrypting"
-                          ? "Delivering message..."
-                          : "Message delivered!"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Send message</span>
-                      <FaLocationArrow
-                        className={`w-3.5 h-3.5 ${
-                          isButtonDisabled ? "text-neutral-600" : "text-[#CBACF9]"
-                        }`}
-                      />
-                    </>
+                {/* Submit & Cancel Actions */}
+                <div className="flex items-center gap-2 w-full">
+                  {hasDraft && !isSubmitting && (
+                    <button
+                      type="button"
+                      onClick={handleClearDraft}
+                      className="py-2.5 sm:py-3 px-3.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-400 hover:text-red-300 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-all touch-manipulation active:scale-95 shrink-0 cursor-pointer"
+                      style={{ WebkitTapHighlightColor: "transparent" }}
+                    >
+                      Clear
+                    </button>
                   )}
-                </button>
+
+                  <button
+                    type="submit"
+                    disabled={isButtonDisabled}
+                    className={`flex-1 py-2.5 sm:py-3 px-6 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center justify-center gap-2 touch-manipulation min-h-[42px] sm:min-h-[46px] shrink-0 ${
+                      isButtonDisabled
+                        ? "bg-white/[0.04] text-neutral-500 border border-white/[0.06] opacity-50 pointer-events-none select-none cursor-not-allowed"
+                        : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-lg shadow-[#7C3AED]/25 cursor-pointer active:scale-[0.98]"
+                    }`}
+                    style={{ WebkitTapHighlightColor: "transparent" }}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>
+                          {submissionStage === "verifying"
+                            ? "Verifying security..."
+                            : submissionStage === "encrypting"
+                            ? "Delivering message..."
+                            : "Message delivered!"}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Send message</span>
+                        <FaLocationArrow
+                          className={`w-3.5 h-3.5 ${
+                            isButtonDisabled ? "text-neutral-600" : "text-[#CBACF9]"
+                          }`}
+                        />
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           )}
