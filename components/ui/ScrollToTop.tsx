@@ -6,6 +6,7 @@ import { FaArrowUp } from "react-icons/fa6";
 
 export const ScrollToTop = () => {
   const [isVisible, setIsVisible] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const toggleVisibility = () => {
@@ -16,8 +17,18 @@ export const ScrollToTop = () => {
       }
     };
 
+    const handleModalState = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isOpen?: boolean }>;
+      setIsModalOpen(!!customEvent.detail?.isOpen);
+    };
+
     window.addEventListener("scroll", toggleVisibility, { passive: true });
-    return () => window.removeEventListener("scroll", toggleVisibility);
+    window.addEventListener("contact-modal-state", handleModalState);
+
+    return () => {
+      window.removeEventListener("scroll", toggleVisibility);
+      window.removeEventListener("contact-modal-state", handleModalState);
+    };
   }, []);
 
   const scrollToTop = () => {
@@ -33,7 +44,7 @@ export const ScrollToTop = () => {
 
   return (
     <AnimatePresence>
-      {isVisible && (
+      {isVisible && !isModalOpen && (
         <motion.button
           initial={{ opacity: 0, scale: 0.6, y: 25 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}

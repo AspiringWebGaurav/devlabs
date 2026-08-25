@@ -64,7 +64,7 @@ Gaurav Portfolio is architected to deliver instantaneous edge rendering, fluid 3
 │   ├──────────────────────────────────────────────────────────────────────────┤   │
 │   │ 3. DataSource Layer (lib/admin/datasource/ — Sole Firebase SDK Boundary) │   │
 │   ├──────────────────────────────────────────────────────────────────────────┤   │
-│   │ 4. Infrastructure (Firestore, RTDB, Cloudflare, EmailJS Relay)           │   │
+│   │ 4. Infrastructure (Firestore, RTDB, Cloudflare, Brevo Gateway)           │   │
 │   └──────────────────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -326,7 +326,7 @@ Copy the template configuration file:
 ```bash
 cp .env.example .env.local
 ```
-Fill in the verified credentials for Google OAuth, Firebase Service Account, Cloudflare Turnstile, and EmailJS.
+Fill in the verified credentials for Google OAuth, Firebase Service Account, Cloudflare Turnstile, and Brevo.
 
 ### 9.4 Start Development Server
 ```bash

@@ -1,5 +1,6 @@
 "use client";
-import React, { JSX, useState, useEffect } from "react";
+
+import React, { JSX, useState, useEffect, useRef, useCallback } from "react";
 import {
   motion,
   AnimatePresence,
@@ -9,6 +10,8 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+
+const SECTIONS = ["about", "projects", "testimonials", "experience", "approach", "contact"] as const;
 
 export const FloatingNav = ({
   navItems,
@@ -27,117 +30,163 @@ export const FloatingNav = ({
 
   // set true for the initial state so that nav bar is visible in the hero section
   const [visible, setVisible] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const isNavigatingRef = useRef(false);
+  const navigationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-scroll to section on direct URL load (e.g. /about, /projects, /testimonials, /contact)
+  // Listen for Contact Modal open/close state to dynamically hide navbar
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const section = window.location.pathname.replace(/^\//, "").replace(/^#/, "");
-    if (
-      !section ||
-      !["about", "projects", "testimonials", "experience", "approach", "contact"].includes(section)
-    ) {
+    const handleModalState = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isOpen?: boolean }>;
+      setIsModalOpen(!!customEvent.detail?.isOpen);
+    };
+
+    window.addEventListener("contact-modal-state", handleModalState);
+    return () => window.removeEventListener("contact-modal-state", handleModalState);
+  }, []);
+
+  // =========================================================================
+  // 1. Layout-Stabilized Auto-Scroll on Direct Load & Hard Refresh
+  // =========================================================================
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Prevent browser native scroll restore from fighting dynamic React layout
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
+    const currentSection = window.location.pathname.replace(/^\//, "").replace(/^#/, "");
+    if (!currentSection || !SECTIONS.includes(currentSection as typeof SECTIONS[number])) {
       return;
     }
 
+    // Lock scroll-spy during initial glide
+    isNavigatingRef.current = true;
+
     // Pre-hydrate target section and preceding sections
     window.dispatchEvent(
-      new CustomEvent("nav-scroll-start", { detail: { link: `/${section}` } })
+      new CustomEvent("nav-scroll-start", { detail: { link: `/${currentSection}` } })
     );
 
-    const performScroll = () => {
-      const element = document.getElementById(section);
-      if (element) {
-        window.dispatchEvent(
-          new CustomEvent("nav-scroll-start", { detail: { link: `/${section}` } })
-        );
-        if (section === "contact") {
+    const scrollToTarget = () => {
+      if (currentSection === "contact") {
+        window.scrollTo({
+          top: document.documentElement.scrollHeight,
+          behavior: "smooth",
+        });
+      } else {
+        const el = document.getElementById(currentSection);
+        if (el) {
+          const navOffset = window.innerWidth < 768 ? 60 : 75;
+          const targetY = el.getBoundingClientRect().top + window.scrollY - navOffset;
           window.scrollTo({
-            top: document.documentElement.scrollHeight,
+            top: Math.max(0, targetY),
             behavior: "smooth",
           });
-        } else {
-          element.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       }
     };
 
-    const timer1 = setTimeout(performScroll, 120);
-    const timer2 = setTimeout(performScroll, 400);
+    // Staggered multi-frame alignment as heavy dynamic chunks (WebGL / Canvas) hydrate
+    const t1 = setTimeout(scrollToTarget, 80);
+    const t2 = setTimeout(scrollToTarget, 280);
+    const t3 = setTimeout(scrollToTarget, 650);
+    const t4 = setTimeout(scrollToTarget, 1100);
+
+    const unlockTimer = setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 1400);
+
+    // Dynamic Height Observer: Re-anchor if below-the-fold layout expands during load
+    let lastHeight = document.documentElement.scrollHeight;
+    let resizeObserver: ResizeObserver | null = null;
+
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => {
+        const newHeight = document.documentElement.scrollHeight;
+        if (Math.abs(newHeight - lastHeight) > 50 && isNavigatingRef.current) {
+          lastHeight = newHeight;
+          scrollToTarget();
+        }
+      });
+      resizeObserver.observe(document.body);
+    }
 
     return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      clearTimeout(unlockTimer);
+      if (resizeObserver) resizeObserver.disconnect();
     };
   }, []);
 
-  // Real-time Scroll-Spy to sync URL with visible section (only on home routes)
+  // =========================================================================
+  // 2. Universal Dominant-Viewport Scroll-Spy (Mobile + Tablet + Desktop)
+  // =========================================================================
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (pathname && pathname.startsWith("/blog")) return;
 
-    let isNavigating = false;
-    let navigatingTimeout: NodeJS.Timeout;
     let ticking = false;
 
     const handleScroll = () => {
-      if (isNavigating || ticking) return;
+      if (isNavigatingRef.current || ticking) return;
       ticking = true;
 
       requestAnimationFrame(() => {
         ticking = false;
-        if (isNavigating) return;
+        if (isNavigatingRef.current) return;
 
         const scrollY = window.scrollY;
-        if (scrollY < 200) {
-          try {
-            sessionStorage.removeItem("portfolio_active_section");
-          } catch {
-            // Ignore
-          }
-          if (
-            window.location.pathname !== "/" &&
-            !window.location.pathname.startsWith("/blog")
-          ) {
+        const viewportHeight = window.innerHeight;
+        const docHeight = document.documentElement.scrollHeight;
+
+        // 1. Hero fold detection
+        if (scrollY < 120) {
+          if (window.location.pathname !== "/" && !window.location.pathname.startsWith("/blog")) {
             window.history.replaceState(null, "", "/");
           }
           return;
         }
 
-        const contactEl = document.getElementById("contact");
-        const isNearBottom =
-          window.innerHeight + window.scrollY >=
-          document.documentElement.scrollHeight - 500;
-        const isContactInView =
-          contactEl &&
-          contactEl.getBoundingClientRect().top <= window.innerHeight * 0.75;
+        // 2. Absolute bottom detection (Footer / Contact view)
+        if (viewportHeight + scrollY >= docHeight - 120) {
+          if (window.location.pathname !== "/contact") {
+            window.history.replaceState(null, "", "/contact");
+          }
+          return;
+        }
 
-        let currentSection = "";
+        // 3. Dominant Section Calculation (Mathematical intersection area in viewport)
+        let maxVisibleHeight = 0;
+        let dominantSection = "";
 
-        if (isNearBottom || isContactInView) {
-          currentSection = "contact";
-        } else {
-          const sectionIds = ["about", "projects", "testimonials"];
-          const trigger = window.innerHeight * 0.45;
+        for (const id of SECTIONS) {
+          const el = document.getElementById(id);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            const visibleTop = Math.max(0, rect.top);
+            const visibleBottom = Math.min(viewportHeight, rect.bottom);
+            const visibleHeight = Math.max(0, visibleBottom - visibleTop);
 
-          for (const id of sectionIds) {
-            const el = document.getElementById(id);
-            if (el) {
-              const rect = el.getBoundingClientRect();
-              if (rect.top <= trigger) {
-                currentSection = id;
-              }
+            if (visibleHeight > maxVisibleHeight) {
+              maxVisibleHeight = visibleHeight;
+              dominantSection = id;
             }
           }
         }
 
-        if (currentSection) {
-          try {
-            sessionStorage.setItem("portfolio_active_section", currentSection);
-          } catch {
-            // Ignore
-          }
-          const targetPath = `/${currentSection}`;
+        if (dominantSection) {
+          // Map intermediate sections to primary navbar routes
+          let targetPath = `/${dominantSection}`;
+          if (dominantSection === "experience") targetPath = "/testimonials";
+          if (dominantSection === "approach") targetPath = "/contact";
+
           if (window.location.pathname !== targetPath) {
             window.history.replaceState(null, "", targetPath);
           }
@@ -145,24 +194,27 @@ export const FloatingNav = ({
       });
     };
 
-    const onNavClickCustom = () => {
-      isNavigating = true;
-      clearTimeout(navigatingTimeout);
-      navigatingTimeout = setTimeout(() => {
-        isNavigating = false;
-      }, 1200);
+    const onNavStartCustom = () => {
+      isNavigatingRef.current = true;
+      if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
+      navigationTimerRef.current = setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 1000);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("nav-scroll-start", onNavClickCustom);
+    window.addEventListener("nav-scroll-start", onNavStartCustom);
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("nav-scroll-start", onNavClickCustom);
-      clearTimeout(navigatingTimeout);
+      window.removeEventListener("nav-scroll-start", onNavStartCustom);
+      if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
     };
   }, [pathname]);
 
+  // =========================================================================
+  // 3. Navbar Visibility & Directional Motion
+  // =========================================================================
   useMotionValueEvent(scrollYProgress, "change", (current) => {
     if (typeof current === "number") {
       const prev = scrollYProgress.getPrevious() ?? 0;
@@ -180,41 +232,59 @@ export const FloatingNav = ({
     }
   });
 
-  const handleNavClick = (
-    e: React.MouseEvent<HTMLAnchorElement>,
-    link: string
-  ) => {
-    if (link === "/blog" || link.startsWith("/blog")) {
-      return;
-    }
+  // =========================================================================
+  // 4. Smooth Nav Click Handler (Touch-Optimized for Mobile)
+  // =========================================================================
+  const handleNavClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>, link: string) => {
+      if (link === "/blog" || link.startsWith("/blog")) {
+        return;
+      }
 
-    const sectionId = link.replace(/^\//, "").replace(/^#/, "");
-    const isHomePage =
-      pathname === "/" ||
-      ["/about", "/projects", "/testimonials", "/experience", "/approach", "/contact"].includes(pathname);
+      const sectionId = link.replace(/^\//, "").replace(/^#/, "");
+      const isHomePage =
+        pathname === "/" ||
+        ["/about", "/projects", "/testimonials", "/experience", "/approach", "/contact"].includes(pathname);
 
-    if (isHomePage) {
-      const element = document.getElementById(sectionId);
-      if (element) {
+      if (isHomePage) {
         e.preventDefault();
+
+        // Lock scroll-spy during animated glide
+        isNavigatingRef.current = true;
+        if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
+        navigationTimerRef.current = setTimeout(() => {
+          isNavigatingRef.current = false;
+        }, 1000);
+
         window.dispatchEvent(
           new CustomEvent("nav-scroll-start", { detail: { link } })
         );
+
         if (sectionId === "contact") {
           window.scrollTo({
             top: document.documentElement.scrollHeight,
             behavior: "smooth",
           });
         } else {
-          element.scrollIntoView({ behavior: "smooth", block: "start" });
+          const el = document.getElementById(sectionId);
+          if (el) {
+            const navOffset = window.innerWidth < 768 ? 60 : 75;
+            const targetY = el.getBoundingClientRect().top + window.scrollY - navOffset;
+            window.scrollTo({
+              top: Math.max(0, targetY),
+              behavior: "smooth",
+            });
+          }
         }
+
         window.history.replaceState(null, "", link);
+      } else {
+        e.preventDefault();
+        router.push(`/#${sectionId}`);
       }
-    } else {
-      e.preventDefault();
-      router.push(`/#${sectionId}`);
-    }
-  };
+    },
+    [pathname, router]
+  );
 
   return (
     <AnimatePresence mode="wait">
@@ -224,23 +294,21 @@ export const FloatingNav = ({
           y: -100,
         }}
         animate={{
-          y: visible ? 0 : -100,
-          opacity: visible ? 1 : 0,
+          y: (visible && !isModalOpen) ? 0 : -100,
+          opacity: (visible && !isModalOpen) ? 1 : 0,
         }}
         transition={{
           duration: 0.2,
         }}
         className={cn(
-          "flex max-w-fit fixed z-[5000] top-10 inset-x-0 mx-auto px-10 py-5 rounded-lg border border-black/.1 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)] items-center justify-center space-x-4",
+          "flex max-w-fit fixed z-[5000] top-6 sm:top-10 inset-x-0 mx-auto px-6 sm:px-10 py-3 sm:py-5 rounded-xl sm:rounded-2xl border border-white/[0.15] shadow-lg items-center justify-center space-x-3 sm:space-x-4",
           "hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.37)] transition-shadow duration-300",
           className
         )}
         style={{
           backdropFilter: "blur(30px) saturate(150%)",
           backgroundColor: "rgba(255, 255, 255, 0.025)",
-          borderRadius: "16px",
-          border: "1px solid rgba(255, 255, 255, 0.15)",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
         }}
       >
         {navItems.map((navItem, idx: number) => (
@@ -249,15 +317,14 @@ export const FloatingNav = ({
             href={navItem.link}
             onClick={(e) => handleNavClick(e, navItem.link)}
             className={cn(
-              "relative dark:text-neutral-50 items-center flex space-x-1 text-neutral-600 dark:hover:text-neutral-300 hover:text-neutral-500"
+              "relative dark:text-neutral-50 items-center flex space-x-1 text-neutral-600 dark:hover:text-neutral-300 hover:text-neutral-500 touch-manipulation py-1 px-1.5"
             )}
           >
             {navItem.icon && <span className="block sm:hidden">{navItem.icon}</span>}
-            <span className="text-sm !cursor-pointer">{navItem.name}</span>
+            <span className="text-xs sm:text-sm !cursor-pointer font-medium">{navItem.name}</span>
           </Link>
         ))}
       </motion.div>
     </AnimatePresence>
   );
 };
-

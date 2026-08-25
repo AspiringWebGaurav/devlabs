@@ -240,9 +240,7 @@ function generateInternalNotificationHtml(
   const safeName = escapeHtml(params.name.trim());
   const safeEmail = escapeHtml(params.email.trim());
   const safeRole = escapeHtml(params.role?.trim() || "Visitor / Other");
-  const safeSubject = escapeHtml(params.subject?.trim() || params.category?.trim() || "General Inquiry");
   const safeMessage = escapeHtml(params.message.trim()).replace(/\n/g, "<br />");
-  const safeIp = escapeHtml(params.ip || "Direct Web");
   const leadTag = params.leadNumber ? `#${params.leadNumber}` : "";
 
   return `<!DOCTYPE html>
@@ -260,9 +258,7 @@ function generateInternalNotificationHtml(
   <p style="margin:0 0 4px 0;"><strong>Sender:</strong> ${safeName}</p>
   <p style="margin:0 0 4px 0;"><strong>Role:</strong> ${safeRole}</p>
   <p style="margin:0 0 4px 0;"><strong>Email:</strong> <a href="mailto:${safeEmail}" style="color:#2563eb;text-decoration:none;">${safeEmail}</a></p>
-  <p style="margin:0 0 4px 0;"><strong>Subject:</strong> ${safeSubject}</p>
-  <p style="margin:0 0 4px 0;"><strong>Received:</strong> ${formattedTime}</p>
-  <p style="margin:0 0 16px 0;"><strong>IP:</strong> ${safeIp}</p>
+  <p style="margin:0 0 16px 0;"><strong>Received:</strong> ${formattedTime}</p>
 
   <p style="margin:16px 0 6px 0;font-weight:700;color:#0f172a;">Message:</p>
   <p style="margin:0 0 24px 0;color:#0f172a;line-height:1.6;">${safeMessage}</p>
@@ -289,8 +285,7 @@ export async function dispatchContactFormWorkflow(
   const trimmedName = params.name.trim();
   const trimmedEmail = params.email.trim().toLowerCase();
   const trimmedRole = params.role?.trim() || "Visitor / Other";
-  const trimmedSubject = params.subject?.trim() || params.category?.trim() || "General Inquiry";
-  const trimmedCategory = params.category?.trim() || trimmedSubject;
+  const trimmedCategory = params.category?.trim() || trimmedRole;
   const trimmedMessage = params.message.trim();
   const firstName = trimmedName.split(" ")[0] || trimmedName;
   const leadNo = params.leadNumber;
@@ -308,10 +303,8 @@ export async function dispatchContactFormWorkflow(
       name: trimmedName,
       email: trimmedEmail,
       role: trimmedRole,
-      subject: trimmedSubject,
       category: trimmedCategory,
       message: trimmedMessage,
-      ip: params.ip,
       leadNumber: leadNo,
     },
     formattedTime
@@ -325,9 +318,7 @@ Lead Number: ${leadNo ? `#${leadNo}` : "Direct"}
 Sender: ${trimmedName}
 Role: ${trimmedRole}
 Email: ${trimmedEmail}
-Subject: ${trimmedSubject}
 Received: ${formattedTime}
-IP: ${params.ip || "Direct Web"}
 
 Message:
 ${trimmedMessage}
@@ -336,8 +327,8 @@ ${trimmedMessage}
 To reply directly, hit "Reply" in your email client to message ${trimmedEmail}.`;
 
   const emailSubject = leadNo
-    ? `New Contact Inquiry (Lead #${leadNo}): ${trimmedName} - ${trimmedSubject}`
-    : `New Contact Inquiry: ${trimmedName} - ${trimmedSubject}`;
+    ? `New Contact Inquiry (Lead #${leadNo}): ${trimmedName} [${trimmedRole}]`
+    : `New Contact Inquiry: ${trimmedName} [${trimmedRole}]`;
 
   // =========================================================================
   // Parallel Dual Dispatch (Lead Alert + Auto-Reply concurrently)
@@ -367,7 +358,7 @@ To reply directly, hit "Reply" in your email client to message ${trimmedEmail}.`
         name: trimmedName,
         NAME: trimmedName,
         FNAME: firstName,
-        category: trimmedCategory,
+        category: trimmedRole,
         message: trimmedMessage,
         date: formattedTime,
       },

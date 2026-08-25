@@ -54,7 +54,9 @@ export default function AdminTermsPage() {
             These terms establish the mandatory security protocols, session lifetimes, operational invariants, and data integrity standards required for all administrative access across the Gaurav Portfolio platform.
           </p>
           <div className="flex flex-wrap items-center gap-4 pt-3 text-xs font-admin-mono text-[#94A3B8] border-t border-[#F1F5F9]">
-            <span>Last Updated: August 2026</span>
+            <span>Original Effective: January 1, 2026</span>
+            <span>·</span>
+            <span>Last Updated: August 25, 2026</span>
             <span>·</span>
             <span>Version: 1.0.0 (Phase 0 Standard)</span>
             <span>·</span>
