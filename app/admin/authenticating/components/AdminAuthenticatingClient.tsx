@@ -8,7 +8,7 @@ export const AdminAuthenticatingClient: React.FC = () => {
   const redirectedRef = useRef(false);
 
   useEffect(() => {
-    // Dynamic smooth progress ticker (~2.2s duration)
+    // Deliberate, smooth progress ticker (~2.8s duration)
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
@@ -17,27 +17,34 @@ export const AdminAuthenticatingClient: React.FC = () => {
             redirectedRef.current = true;
             setTimeout(() => {
               window.location.replace("/admin");
-            }, 350);
+            }, 500);
           }
           return 100;
         }
 
-        let inc = 2;
-        if (prev < 25) inc = Math.random() > 0.3 ? 3 : 2;
-        else if (prev < 65) inc = Math.random() > 0.4 ? 3 : 2;
-        else if (prev < 90) inc = Math.random() > 0.3 ? 3 : 2;
-        else inc = 2;
+        let inc = 1;
+        if (prev < 25) {
+          inc = 1;
+        } else if (prev < 65) {
+          inc = Math.random() > 0.45 ? 2 : 1;
+        } else if (prev < 88) {
+          inc = 1;
+        } else if (prev < 96) {
+          inc = Math.random() > 0.5 ? 2 : 1;
+        } else {
+          inc = 1;
+        }
 
         const next = Math.min(prev + inc, 100);
         if (next === 100 && !redirectedRef.current) {
           redirectedRef.current = true;
           setTimeout(() => {
             window.location.replace("/admin");
-          }, 350);
+          }, 500);
         }
         return next;
       });
-    }, 30);
+    }, 36);
 
     return () => clearInterval(interval);
   }, []);

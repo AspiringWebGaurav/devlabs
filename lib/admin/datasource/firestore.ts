@@ -146,6 +146,32 @@ class FirestoreDataSource {
       throw err;
     }
   }
+
+  /**
+   * Executes a callback inside an atomic Firestore transaction.
+   */
+  public async runTransaction<T>(
+    updateFunction: (
+      transaction: import("firebase-admin/firestore").Transaction,
+      db: Firestore
+    ) => Promise<T>
+  ): Promise<T> {
+    const startTime = Date.now();
+    const db = this.getDb();
+    if (!db) throw new Error("Firestore Admin App not configured");
+
+    try {
+      const result = await db.runTransaction(async (transaction) => {
+        return await updateFunction(transaction, db);
+      });
+      adminLogger.latency("Firestore:runTransaction", Date.now() - startTime);
+      return result;
+    } catch (err) {
+      adminLogger.error("Firestore:runTransaction", err, "Transaction failed to commit");
+      throw err;
+    }
+  }
 }
 
 export const firestoreDataSource = new FirestoreDataSource();
+

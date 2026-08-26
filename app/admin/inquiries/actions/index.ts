@@ -13,7 +13,11 @@ export async function updateInquiryStatusAction(formData: { id: string; status: 
     return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
   }
 
-  // Future mutation mediated via Repository/DataSource
+  const result = await inquiriesRepository.updateInquiryStatus(parsed.data.id, parsed.data.status);
+  if (!result.success) {
+    return { success: false, error: result.error || "Failed to update inquiry status" };
+  }
+
   revalidatePath("/admin/inquiries");
   return { success: true };
 }

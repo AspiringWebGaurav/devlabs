@@ -55,6 +55,10 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
 
+    // Proactively clear any stale session or challenge cookies to enforce fresh login lifecycle
+    response.cookies.delete("admin_session");
+    response.cookies.delete("admin_otp_challenge");
+
     return response;
   } catch (err: unknown) {
     const error = err as Error;

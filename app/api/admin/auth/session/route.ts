@@ -5,12 +5,12 @@ import { ADMIN_COOKIE_NAME } from "@/lib/admin/constants";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const isAuth = isAuthorizedAdminSession(request);
+  const isAuth = await isAuthorizedAdminSession(request);
   if (!isAuth) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
-  const session = getAdminSession(request);
+  const session = await getAdminSession(request);
   return NextResponse.json({
     authenticated: true,
     user: session

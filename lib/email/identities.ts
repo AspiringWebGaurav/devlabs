@@ -29,7 +29,7 @@ export const EMAIL_IDENTITIES: Record<EmailIdentityType, EmailIdentity> = {
   SECURITY: {
     type: "SECURITY",
     email: "security@gauravservices.eu.cc",
-    name: "Gaurav Security",
+    name: "Device Auth",
     defaultReplyTo: "security@gauravservices.eu.cc",
     purpose:
       "OTP emails, email verification, 2FA, login/security verification, password reset, security recovery & alerts.",
@@ -45,7 +45,7 @@ export const EMAIL_IDENTITIES: Record<EmailIdentityType, EmailIdentity> = {
   NO_REPLY: {
     type: "NO_REPLY",
     email: "no-reply@gauravservices.eu.cc",
-    name: "Gaurav Portfolio Notifications",
+    name: "Gaurav Services",
     defaultReplyTo: "no-reply@gauravservices.eu.cc",
     purpose:
       "Strictly non-reply automated system notifications where direct reply is not applicable.",

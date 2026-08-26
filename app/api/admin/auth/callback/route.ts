@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthorizedAdminEmail, createAdminSessionPayload } from "@/lib/admin/auth";
-import { ADMIN_COOKIE_NAME, ADMIN_SESSION_MAX_AGE_SECONDS } from "@/lib/admin/constants";
+import { isAuthorizedAdminEmail } from "@/lib/admin/auth";
 
 export const dynamic = "force-dynamic";
+
 
 /**
  * Handles Google OAuth 2.0 PKCE Callback, verifies email authorization,
@@ -84,25 +84,39 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    // Authorized Superadmin: Create 7-day session cookie and redirect to dashboard
-    const session = createAdminSessionPayload(email, avatar, name);
-    const serialized = encodeURIComponent(JSON.stringify(session));
+    // Authorized Identity: Extract deployment-authoritative client IP
+    const { extractClientIp } = await import("@/lib/admin/services/ip-security.service");
+    const { otpService } = await import("@/lib/admin/services/otp.service");
+    const { ADMIN_COOKIE_NAME, ADMIN_OTP_COOKIE_NAME, OTP_TTL_SECONDS } = await import("@/lib/admin/constants");
 
-    const response = NextResponse.redirect(
-      new URL("/admin/authenticating", baseUrl)
-    );
+    const clientIp = extractClientIp(request.headers);
+    const userAgent = request.headers.get("user-agent") || undefined;
+
+    // Create and dispatch 6-digit OTP challenge
+    const { challengeId } = await otpService.createOtpChallenge({
+      email,
+      name: name || "Gaurav Patil",
+      avatar,
+      clientIp,
+      userAgent,
+    });
+
+    // Set secure httpOnly OTP challenge cookie and redirect to /admin/otp
+    const response = NextResponse.redirect(new URL("/admin/otp", baseUrl));
     const isSecure = process.env.NODE_ENV === "production";
 
     response.cookies.set({
-      name: ADMIN_COOKIE_NAME,
-      value: serialized,
-      httpOnly: false,
+      name: ADMIN_OTP_COOKIE_NAME,
+      value: challengeId,
+      httpOnly: true,
       secure: isSecure,
       sameSite: "lax",
-      maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
+      maxAge: OTP_TTL_SECONDS,
       path: "/",
     });
 
+    // CRITICAL: Delete any prior session cookie so user MUST complete OTP verification
+    response.cookies.delete(ADMIN_COOKIE_NAME);
     response.cookies.delete("oauth_code_verifier");
     return response;
   } catch (err: unknown) {
@@ -118,3 +132,4 @@ export async function GET(request: NextRequest) {
     return response;
   }
 }
+

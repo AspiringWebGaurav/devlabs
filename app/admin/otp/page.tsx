@@ -2,9 +2,9 @@
 
 import React, { Suspense } from "react";
 import Link from "next/link";
-import { AdminLoginForm, AdminFooter } from "@/components/admin";
+import { AdminOtpForm, AdminFooter } from "@/components/admin";
 
-export default function AdminLoginPage() {
+export default function AdminOtpPage() {
   return (
     <div className="h-screen max-h-screen w-full flex flex-col justify-between bg-[#FFFFFF] text-black relative overflow-hidden select-none">
       {/* 1. Edge-to-Edge Top Navigation Bar with Exact Shiro Proportions */}
@@ -51,14 +51,14 @@ export default function AdminLoginPage() {
           </div>
         </div>
 
-        {/* Center Sign-In Card */}
+        {/* Center OTP Card */}
         <div className="flex-1 min-h-0 flex flex-col justify-center items-center px-4 py-2 sm:py-4 relative z-10 overflow-hidden">
           <Suspense
             fallback={
               <div className="w-full max-w-md h-80 bg-white border border-[#E2E8F0] rounded-sm animate-pulse shadow-2xs" />
             }
           >
-            <AdminLoginForm />
+            <AdminOtpForm />
           </Suspense>
         </div>
       </main>

@@ -11,6 +11,7 @@ import {
   FaXmark,
 } from "react-icons/fa6";
 import { GoogleAuthButton, AuthButtonState } from "./GoogleAuthButton";
+import { clearClientAdminSession } from "@/lib/admin/auth";
 
 export const AdminLoginForm: React.FC = () => {
   const searchParams = useSearchParams();
@@ -93,6 +94,8 @@ export const AdminLoginForm: React.FC = () => {
 
   // Handle Direct In-Tab Google OAuth (Zero Popups Forever)
   const handleGoogleSignInClick = () => {
+    // Proactively purge any existing client session cookie before initiating OAuth
+    clearClientAdminSession();
     setAuthState("connecting");
     setErrorMsg(null);
     setUnauthorizedAccess(false);

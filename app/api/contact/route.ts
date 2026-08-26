@@ -7,6 +7,7 @@ import { getNextSynchronizedLeadNumber } from "@/lib/contact/lead-counter";
 import { dispatchContactFormWorkflow } from "@/lib/email";
 import { validateEmail, validateName, validateMessage, MESSAGE_MIN_CHARS, MESSAGE_MAX_CHARS } from "@/lib/contact/validation";
 import { evaluateContentModeration } from "@/lib/security/ai-moderation";
+import { inquiriesRepository } from "@/lib/admin/repositories";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
       ? forwardedFor.split(",")[0].trim()
       : realIp || "127.0.0.1";
 
-    // 3. Multi-Tier Anti-Abuse Rate Limiting (IP Burst, IP Hourly, Email Hourly & Global Surge)
+    // 4. Multi-Tier Anti-Abuse Rate Limiting
     const rateLimitCheck = await checkContactRateLimit(clientIp, email);
     if (!rateLimitCheck.allowed) {
       return NextResponse.json(
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Cloudflare Turnstile Bot Verification (Server-Side)
+    // 5. Cloudflare Turnstile Bot Verification (Server-Side)
     if (turnstileToken) {
       const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIp);
       if (!turnstileResult.success) {
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. Multi-Layer Profanity & AI Content Moderation Filtering
+    // 6. Sanitization & AI Content Moderation
     const nameSanitization = sanitizeAndValidateText(name, "Full Name", 2, 100);
     const messageSanitization = sanitizeAndValidateText(message, "Message", 10, 2000);
 
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Deep AI & Public Moderation Verification (OpenAI / Perspective / PurgoMalum)
+    // Deep AI Moderation Verification (OpenAI / Perspective if configured)
     const aiModeration = await evaluateContentModeration(message);
     if (aiModeration.flagged) {
       return NextResponse.json(
@@ -148,10 +149,10 @@ export async function POST(request: NextRequest) {
     const selectedSubject = subject?.trim() || category?.trim() || "General Inquiry";
     const selectedCategory = category?.trim() || selectedSubject;
 
-    // 6. Generate Synchronized Lead Number
+    // 7. Generate Synchronized Lead Number
     const leadNumber = await getNextSynchronizedLeadNumber();
 
-    // 7. Dispatch Dual Brevo Transactional Emails (Lead Alert + Auto-Reply Template #1)
+    // 8. Dispatch Dual Brevo Transactional Emails (Lead Alert + Auto-Reply Template #1)
     let emailResult = {
       internalEmailSent: false,
       autoReplySent: false,
@@ -201,42 +202,25 @@ export async function POST(request: NextRequest) {
     // Record verified rate-limit entry only upon successful email dispatch
     recordContactSubmission(clientIp, email);
 
-    // 8. Persist Verified Message to Firebase Realtime Database (/messages)
+    // 9. Persist Verified Inquiry via Repository Layer (4-Tier Compliance & Zero Stale Data)
     const now = Date.now();
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const messageRecord = {
+    const isoDate = new Date(now).toISOString();
+    const messageId = `msg_${now}_${Math.random().toString(36).substring(2, 7)}`;
+
+    // Write to Firestore inquiries collection (used by /admin/inquiries)
+    await inquiriesRepository.createInquiry({
       id: messageId,
-      leadNumber,
       name: nameSanitization.sanitizedText,
       email: email.trim().toLowerCase(),
-      role: selectedRole,
       subject: selectedSubject,
-      category: selectedCategory,
       message: messageSanitization.sanitizedText,
-      createdAt: now,
-      date: new Date(now).toISOString(),
-      ip: clientIp,
+      createdAt: isoDate,
       status: "unread",
-    };
+    }).catch((inqErr) => {
+      console.warn("Firestore inquiries repository note:", inqErr);
+    });
 
-    const FIREBASE_DB_URL = (
-      process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
-      process.env.FIREBASE_DATABASE_URL ||
-      ""
-    ).replace(/\/$/, "");
 
-    if (FIREBASE_DB_URL) {
-      try {
-        await fetch(`${FIREBASE_DB_URL}/messages/${messageId}.json`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(messageRecord),
-          cache: "no-store",
-        });
-      } catch (rtdbErr) {
-        console.warn("RTDB message persistence note:", rtdbErr);
-      }
-    }
 
     return NextResponse.json({
       success: true,
@@ -244,7 +228,7 @@ export async function POST(request: NextRequest) {
       leadNumber,
       emailDelivered,
       autoReplyDelivered: emailResult.autoReplySent,
-      timestamp: messageRecord.date,
+      timestamp: isoDate,
     });
   } catch (err: unknown) {
     const error = err as Error;

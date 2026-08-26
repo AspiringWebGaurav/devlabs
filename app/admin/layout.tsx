@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin/constants";
-import type { AdminSession } from "@/lib/admin/auth";
+import { type AdminSession, verifyAdminSession } from "@/lib/admin/auth";
 import { AdminSessionProvider } from "@/components/admin/context";
 import { AdminThemeEnforcer } from "@/components/admin/layout";
 
@@ -34,19 +34,7 @@ export default async function AdminLayout({
 }>) {
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
-  let initialSession: AdminSession | null = null;
-
-  if (sessionCookie) {
-    try {
-      initialSession = JSON.parse(decodeURIComponent(sessionCookie));
-    } catch {
-      try {
-        initialSession = JSON.parse(sessionCookie);
-      } catch {
-        initialSession = null;
-      }
-    }
-  }
+  const initialSession: AdminSession | null = sessionCookie ? await verifyAdminSession(sessionCookie) : null;
 
   return (
     <>

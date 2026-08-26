@@ -20,10 +20,10 @@ export async function getNextSynchronizedLeadNumber(): Promise<number> {
     ""
   ).replace(/\/$/, "");
 
-  // 1. Try Upstash Redis Atomic Increment with 2.5s timeout
+  // 1. Try Upstash Redis Atomic Increment with 1.0s timeout
   if (redisUrl && redisToken) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
 
     try {
       const res = await fetch(`${redisUrl}/incr/counter:leads:global`, {
@@ -55,10 +55,10 @@ export async function getNextSynchronizedLeadNumber(): Promise<number> {
     }
   }
 
-  // 2. Try Firebase Realtime Database Read & Increment with 2.5s timeout
+  // 2. Try Firebase Realtime Database Read & Increment with 1.0s timeout
   if (firebaseDbUrl) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
 
     try {
       const readRes = await fetch(`${firebaseDbUrl}/stats/leadCount.json`, {

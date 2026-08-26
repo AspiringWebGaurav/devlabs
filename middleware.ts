@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ADMIN_COOKIE_NAME, PRIMARY_ADMIN_EMAIL } from "@/lib/admin/constants";
+import { ADMIN_COOKIE_NAME } from "@/lib/admin/constants";
+import { verifyAdminSession } from "@/lib/admin/auth";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", pathname);
@@ -10,43 +11,42 @@ export function middleware(request: NextRequest) {
   // 1. Dynamic Admin Gatekeeper Routing (/admin/*)
   if (pathname.startsWith("/admin")) {
     const sessionCookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-    let isAuthenticated = false;
-
-    if (sessionCookie) {
-      try {
-        let parsed: { email?: string; role?: string; expiresAt?: number; id?: string } | null = null;
-        try {
-          parsed = JSON.parse(decodeURIComponent(sessionCookie));
-        } catch {
-          try {
-            parsed = JSON.parse(sessionCookie);
-          } catch {
-            parsed = null;
-          }
-        }
-
-        const now = Date.now();
-        const isNotExpired = !parsed?.expiresAt || now < parsed.expiresAt;
-        const email = (parsed?.email || "").trim().toLowerCase();
-        const isAuthorized =
-          email === PRIMARY_ADMIN_EMAIL.toLowerCase() ||
-          parsed?.role === "superadmin" ||
-          (typeof parsed?.id === "string" && parsed.id.startsWith("usr_"));
-
-        if (isNotExpired && isAuthorized) {
-          isAuthenticated = true;
-        }
-      } catch {
-        isAuthenticated = false;
-      }
-    }
+    const verifiedSession = sessionCookie ? await verifyAdminSession(sessionCookie) : null;
+    const isAuthenticated = verifiedSession !== null;
 
     const isPublicAdminRoute =
       pathname === "/admin/login" ||
       pathname === "/admin/terms" ||
       pathname === "/admin/privacy";
 
-    // Case A: Unauthenticated user trying to access protected /admin routes -> redirect to /admin/login
+    const isOtpRoute = pathname === "/admin/otp";
+    const otpChallengeCookie = request.cookies.get("admin_otp_challenge")?.value;
+
+    // Case A: OTP Challenge in progress (/admin/otp): Must strictly stay on OTP page until verified
+    if (isOtpRoute) {
+      if (otpChallengeCookie) {
+        // Active challenge: Allow through and purge any stale session cookie
+        const response = NextResponse.next({
+          request: {
+            headers: requestHeaders,
+          },
+        });
+        if (sessionCookie) {
+          response.cookies.delete(ADMIN_COOKIE_NAME);
+        }
+        return response;
+      } else {
+        // No challenge active -> redirect to login
+        return NextResponse.redirect(new URL("/admin/login", request.url));
+      }
+    }
+
+    // Case B: Authenticated admin visiting /admin/login -> redirect to /admin dashboard
+    if (isAuthenticated && pathname === "/admin/login") {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+
+    // Case C: Unauthenticated user trying to access protected /admin routes -> redirect to /admin/login
     if (!isAuthenticated && !isPublicAdminRoute) {
       const loginUrl = new URL("/admin/login", request.url);
       const response = NextResponse.redirect(loginUrl);
@@ -56,17 +56,13 @@ export function middleware(request: NextRequest) {
       return response;
     }
 
-    // Case B: Already authenticated admin visiting /admin/login -> redirect to /admin dashboard
-    if (isAuthenticated && pathname === "/admin/login") {
-      return NextResponse.redirect(new URL("/admin", request.url));
-    }
-
     return NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
   }
+
 
   // 2. Clean Runtime Section Rewriting (/about, /projects, /testimonials, /contact -> /)
   const isSectionRoute = ["/about", "/projects", "/testimonials", "/contact"].includes(pathname);

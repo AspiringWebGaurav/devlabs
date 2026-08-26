@@ -1,46 +1,21 @@
 import { NextRequest } from "next/server";
-import { ADMIN_COOKIE_NAME, PRIMARY_ADMIN_EMAIL } from "./constants";
-import { AdminSession, isAuthorizedAdminEmail } from "./auth";
+import { ADMIN_COOKIE_NAME } from "./constants";
+import { AdminSession, verifyAdminSession } from "./auth";
 
 /**
- * Validates whether the incoming NextRequest has an active, valid, non-expired Admin session cookie.
+ * Validates whether the incoming NextRequest has an active, valid, cryptographically signed Admin session cookie.
  */
-export function isAuthorizedAdminSession(request: NextRequest): boolean {
-  const session = getAdminSession(request);
-  if (!session) return false;
-
-  const now = Date.now();
-  const isNotExpired = !session.expiresAt || now < session.expiresAt;
-  if (!isNotExpired) return false;
-
-  return (
-    isAuthorizedAdminEmail(session.email) ||
-    session.email?.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase() ||
-    session.role === "superadmin" ||
-    (typeof session.id === "string" && session.id.startsWith("usr_"))
-  );
+export async function isAuthorizedAdminSession(request: NextRequest): Promise<boolean> {
+  const session = await getAdminSession(request);
+  return session !== null;
 }
 
 /**
- * Extracts and decodes the AdminSession from incoming request cookies.
+ * Extracts and cryptographically verifies the AdminSession from incoming request cookies.
+ * Returns null if the session is absent, forged, unsigned, expired, or unauthorized.
  */
-export function getAdminSession(request: NextRequest): AdminSession | null {
+export async function getAdminSession(request: NextRequest): Promise<AdminSession | null> {
   const sessionCookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
   if (!sessionCookie) return null;
-
-  try {
-    let session: AdminSession | null = null;
-    try {
-      session = JSON.parse(decodeURIComponent(sessionCookie));
-    } catch {
-      try {
-        session = JSON.parse(sessionCookie);
-      } catch {
-        session = null;
-      }
-    }
-    return session;
-  } catch {
-    return null;
-  }
+  return await verifyAdminSession(sessionCookie);
 }

@@ -9,6 +9,7 @@ import {
   Auth,
 } from "firebase/auth";
 import { getDatabase, Database } from "firebase/database";
+import { getStorage, FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "dummy-api-key",
@@ -43,6 +44,14 @@ export const getFirebaseRtdb = (): Database => {
     _rtdb = getDatabase(getClientApp());
   }
   return _rtdb;
+};
+
+let _storage: FirebaseStorage | null = null;
+export const getFirebaseStorage = (): FirebaseStorage => {
+  if (!_storage) {
+    _storage = getStorage(getClientApp());
+  }
+  return _storage;
 };
 
 export const getGoogleProvider = (emailHint?: string): GoogleAuthProvider => {

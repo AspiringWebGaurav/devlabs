@@ -1,52 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { isAuthorizedAdminEmail, createAdminSessionPayload } from "@/lib/admin/auth";
-import { ADMIN_COOKIE_NAME, PRIMARY_ADMIN_EMAIL, ADMIN_SESSION_MAX_AGE_SECONDS } from "@/lib/admin/constants";
+import { PRIMARY_ADMIN_EMAIL } from "@/lib/admin/constants";
 
 export const dynamic = "force-dynamic";
 
-const LoginSchema = z.object({
-  email: z.string().email("A valid email is required."),
-  avatar: z.string().url().optional(),
-  name: z.string().optional(),
-});
-
+/**
+ * Legacy Login Endpoint Guard
+ *
+ * Security Mandate: Direct unauthenticated session minting is strictly disabled.
+ * The production-authoritative authentication flow requires:
+ * 1. Google OAuth 2.0 PKCE (/api/admin/auth/google -> /api/admin/auth/callback)
+ * 2. Two-Factor OTP Verification (/api/admin/auth/otp/verify)
+ */
 export async function POST(request: NextRequest) {
-  try {
+  // Allow strictly in local development when verified with the internal secret header
+  const internalSecret = request.headers.get("x-admin-internal-secret");
+  const configuredSecret = process.env.ADMIN_SESSION_SECRET;
+
+  if (
+    process.env.NODE_ENV === "development" &&
+    configuredSecret &&
+    internalSecret === configuredSecret
+  ) {
+    const { isAuthorizedAdminEmail, createAdminSessionPayload, signAdminSession } = await import(
+      "@/lib/admin/auth"
+    );
+    const { ADMIN_COOKIE_NAME, ADMIN_SESSION_MAX_AGE_SECONDS } = await import(
+      "@/lib/admin/constants"
+    );
+
     const body = await request.json().catch(() => null);
-    if (!body) {
-      return NextResponse.json(
-        { success: false, error: "Invalid JSON payload in request." },
-        { status: 400 }
-      );
-    }
+    const email = body?.email;
 
-    const parsed = LoginSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: parsed.error.issues[0]?.message || "Validation failed." },
-        { status: 400 }
-      );
-    }
-
-    const { email, avatar, name } = parsed.data;
-
-    // Strict identity check: only gauravpatil5737 is permitted
     if (!isAuthorizedAdminEmail(email)) {
       return NextResponse.json(
         {
           success: false,
-          isUnauthorizedAccount: true,
-          unauthorizedEmail: email,
           error: `Access Denied: The account "${email}" is not authorized. Access is strictly restricted to primary superadmin (${PRIMARY_ADMIN_EMAIL}).`,
         },
         { status: 403 }
       );
     }
 
-    // Create session payload with dynamic name and avatar
-    const session = createAdminSessionPayload(email, avatar, name);
-    const serialized = encodeURIComponent(JSON.stringify(session));
+    const session = createAdminSessionPayload(email, body?.avatar, body?.name);
+    const signedToken = await signAdminSession(session);
 
     const response = NextResponse.json({
       success: true,
@@ -59,23 +55,25 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const isSecure = process.env.NODE_ENV === "production";
     response.cookies.set({
       name: ADMIN_COOKIE_NAME,
-      value: serialized,
-      httpOnly: false, // Accessible to client session utilities
-      secure: isSecure,
+      value: signedToken,
+      httpOnly: true,
+      secure: false,
       sameSite: "lax",
       maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
       path: "/",
     });
 
     return response;
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal authentication error.";
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    );
   }
+
+  return NextResponse.json(
+    {
+      success: false,
+      error:
+        "Direct session minting is disabled. Administrative sign-in requires Google OAuth 2.0 PKCE and two-factor OTP verification.",
+    },
+    { status: 403 }
+  );
 }

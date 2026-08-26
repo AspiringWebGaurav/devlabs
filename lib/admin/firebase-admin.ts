@@ -1,6 +1,7 @@
 import { App, getApps, initializeApp, cert } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { getDatabase, Database } from "firebase-admin/database";
+import { getStorage, Storage } from "firebase-admin/storage";
 
 let _adminApp: App | null = null;
 
@@ -26,6 +27,10 @@ export function getAdminApp(): App | null {
           privateKey,
         }),
         databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || process.env.FIREBASE_DATABASE_URL,
+        storageBucket:
+          process.env.FIREBASE_ADMIN_STORAGE_BUCKET ||
+          process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+          "gaurav-portfolio-improved.firebasestorage.app",
       });
       return _adminApp;
     } catch (err) {
@@ -37,12 +42,33 @@ export function getAdminApp(): App | null {
   return null;
 }
 
+let _adminFirestore: Firestore | null = null;
+
 export function getAdminFirestore(): Firestore | null {
+  if (_adminFirestore) return _adminFirestore;
   const app = getAdminApp();
-  return app ? getFirestore(app) : null;
+  if (!app) return null;
+  const db = getFirestore(app);
+  try {
+    db.settings({ ignoreUndefinedProperties: true });
+  } catch {
+    // ignore if already configured
+  }
+  _adminFirestore = db;
+  return _adminFirestore;
 }
 
 export function getAdminDb(): Database | null {
   const app = getAdminApp();
   return app ? getDatabase(app) : null;
+}
+
+let _adminStorage: Storage | null = null;
+
+export function getAdminStorage(): Storage | null {
+  if (_adminStorage) return _adminStorage;
+  const app = getAdminApp();
+  if (!app) return null;
+  _adminStorage = getStorage(app);
+  return _adminStorage;
 }

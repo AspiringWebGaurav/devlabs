@@ -80,18 +80,40 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * Resolves the application URL dynamically.
+ * Resolves the application URL dynamically based on runtime request headers or environment variables.
+ * Supports localhost, preview/staging URLs, and production domains with zero hardcoding.
  */
-export function resolveAppUrl(): string {
+export function resolveAppUrl(requestHeaders?: Headers | null): string {
+  // 1. Authoritative runtime request headers (highest priority for 100% dynamic URL matching)
+  if (requestHeaders) {
+    const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host");
+    if (host) {
+      const proto =
+        requestHeaders.get("x-forwarded-proto") ||
+        (host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https");
+      return `${proto}://${host}`.replace(/\/$/, "");
+    }
+  }
+
+  // 2. Explicit public app URL override
   if (process.env.NEXT_PUBLIC_APP_URL) {
     return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  }
+
+  // 3. Vercel deployment URL (auto-populated by Vercel platform)
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/\/$/, "")}`;
   }
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`;
   }
+
+  // 4. Local development fallback
   if (process.env.NODE_ENV === "development") {
     return "http://localhost:3000";
   }
+
+  // 5. Canonical production domain fallback
   return "https://gauravpatil.online";
 }
 
@@ -382,3 +404,148 @@ To reply directly, hit "Reply" in your email client to message ${trimmedEmail}.`
     errors,
   };
 }
+
+export interface OtpEmailParams {
+  email: string;
+  name?: string;
+  otp: string;
+  clientIp?: string | null;
+  userAgent?: string | null;
+  expiresMinutes?: number;
+}
+
+/**
+ * Dispatches a 6-digit OTP code to the Superadmin inbox via security@gauravservices.eu.cc
+ * Styled in minimal, spam-free Wasmer Pro aesthetic.
+ */
+export async function dispatchOtpEmail(
+  params: OtpEmailParams
+): Promise<SendEmailResult> {
+  const safeOtp = escapeHtml(params.otp);
+  const expiresMin = params.expiresMinutes || 5;
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Verification Code</title>
+</head>
+<body style="margin:0;padding:32px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#111827;line-height:1.6;background-color:#ffffff;">
+  <p style="margin:0 0 16px 0;">Hi Gaurav,</p>
+  <p style="margin:0 0 20px 0;">Here is your verification code to complete sign-in to the Admin Panel:</p>
+
+  <p style="margin:24px 0;font-family:-apple-system,BlinkMacSystemFont,'SFMono-Regular',Consolas,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:6px;color:#111827;">${safeOtp}</p>
+
+  <p style="margin:0 0 8px 0;font-size:14px;color:#6b7280;">This code is valid for ${expiresMin} minutes. If you did not request this code, you can safely ignore this email.</p>
+
+  <p style="margin:24px 0 0 0;font-size:14px;color:#374151;">Gaurav Services</p>
+
+  <div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
+    <span>Gaurav Services</span> &nbsp;&bull;&nbsp;
+    <a href="https://gauravservices.eu.cc/admin/terms" style="color:#6b7280;text-decoration:none;">Terms</a> &nbsp;|&nbsp;
+    <a href="https://gauravservices.eu.cc/admin/privacy" style="color:#6b7280;text-decoration:none;">Privacy</a>
+  </div>
+</body>
+</html>`;
+
+  const textContent = `Hi Gaurav,
+
+Here is your verification code to complete sign-in to the Admin Panel:
+
+${params.otp}
+
+This code is valid for ${expiresMin} minutes. If you did not request this code, you can safely ignore this email.
+
+Gaurav Services
+
+Terms: https://gauravservices.eu.cc/admin/terms | Privacy: https://gauravservices.eu.cc/admin/privacy`;
+
+  return sendTransactionalEmail({
+    purpose: "SECURITY_OTP",
+    identity: EMAIL_IDENTITIES.NO_REPLY,
+    to: [{ email: params.email, name: params.name || "Gaurav Patil" }],
+    subject: `Your verification code is ${params.otp}`,
+    htmlContent,
+    textContent,
+    tags: ["admin_auth", "otp_verification"],
+  });
+}
+
+export interface NewIpAlertParams {
+  email: string;
+  name?: string;
+  clientIp: string;
+  verifyUrl: string;
+  userAgent?: string | null;
+  expiresMinutes?: number;
+}
+
+/**
+ * Dispatches an untrusted IP authorization alert with 1-click approval link via security@gauravservices.eu.cc
+ * Styled in minimal, spam-free Wasmer Pro aesthetic.
+ */
+export async function dispatchNewIpSecurityAlert(
+  params: NewIpAlertParams
+): Promise<SendEmailResult> {
+  const safeIp = escapeHtml(params.clientIp);
+  const safeUrl = escapeHtml(params.verifyUrl);
+  const expiresMin = params.expiresMinutes || 15;
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authorize New IP Address</title>
+</head>
+<body style="margin:0;padding:32px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#111827;line-height:1.6;background-color:#ffffff;">
+  <p style="margin:0 0 16px 0;">Hi Gaurav,</p>
+  <p style="margin:0 0 16px 0;">A sign-in attempt was detected from an unrecognized IP address (<strong>${safeIp}</strong>).</p>
+  <p style="margin:0 0 24px 0;">Click below to authorize this IP address to access your Admin Panel:</p>
+
+  <div style="margin:24px 0;">
+    <a href="${safeUrl}" style="background-color:#0f172a;color:#ffffff;padding:12px 24px;font-size:14px;font-weight:600;text-decoration:none;border-radius:4px;display:inline-block;">
+      Authorize IP address &rarr;
+    </a>
+  </div>
+
+  <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">
+    Or open this link: <a href="${safeUrl}" style="color:#2563eb;word-break:break-all;">${safeUrl}</a>
+  </p>
+  <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">This link is valid for ${expiresMin} minutes. If you did not make this request, no action is needed.</p>
+
+  <p style="margin:24px 0 0 0;font-size:14px;color:#374151;">Gaurav Services</p>
+
+  <div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
+    <span>Gaurav Services</span> &nbsp;&bull;&nbsp;
+    <a href="https://gauravservices.eu.cc/admin/terms" style="color:#6b7280;text-decoration:none;">Terms</a> &nbsp;|&nbsp;
+    <a href="https://gauravservices.eu.cc/admin/privacy" style="color:#6b7280;text-decoration:none;">Privacy</a>
+  </div>
+</body>
+</html>`;
+
+  const textContent = `Hi Gaurav,
+
+A sign-in attempt was detected from an unrecognized IP address (${params.clientIp}).
+
+Click below to authorize this IP address to access your Admin Panel:
+${params.verifyUrl}
+
+This link is valid for ${expiresMin} minutes. If you did not make this request, no action is needed.
+
+Gaurav Services
+
+Terms: https://gauravservices.eu.cc/admin/terms | Privacy: https://gauravservices.eu.cc/admin/privacy`;
+
+  return sendTransactionalEmail({
+    purpose: "SECURITY_ALERT",
+    identity: EMAIL_IDENTITIES.SECURITY,
+    to: [{ email: params.email, name: params.name || "Gaurav Patil" }],
+    subject: "Authorize sign-in from a new IP address",
+    htmlContent,
+    textContent,
+    tags: ["admin_auth", "security_alert", "ip_verification"],
+  });
+}
+

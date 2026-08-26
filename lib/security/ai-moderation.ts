@@ -175,10 +175,12 @@ export async function evaluateContentModeration(text: string): Promise<AIModerat
     }
   }
 
-  // Stage 4: Public API Web Check (PurgoMalum)
-  const purgoResult = await checkPurgoMalum(text);
-  if (purgoResult && purgoResult.flagged) {
-    return purgoResult;
+  // Stage 4: Public API Web Check (PurgoMalum - Opt-in only to avoid latency & data leakage)
+  if (process.env.ENABLE_PURGOMALUM === "true") {
+    const purgoResult = await checkPurgoMalum(text);
+    if (purgoResult && purgoResult.flagged) {
+      return purgoResult;
+    }
   }
 
   return { flagged: false, source: "in_engine" };

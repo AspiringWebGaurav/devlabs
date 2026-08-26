@@ -152,18 +152,18 @@ export async function checkContactRateLimit(
   }
 
   // =========================================================================
-  // 5. Upstash Redis Global Sync (Fast 3s timeout for edge resilience)
+  // 5. Upstash Redis Global Sync (Fast 2s timeout for edge resilience)
   // =========================================================================
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (redisUrl && redisToken) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     try {
       const redisKey = `ratelimit:contact:ip:${normalizedIp.replace(/[^a-zA-Z0-9_]/g, "_")}`;
-      const res = await fetch(`${redisUrl}/incr/${redisKey}`, {
+      const res = await fetch(`${redisUrl}/get/${redisKey}`, {
         headers: { Authorization: `Bearer ${redisToken}` },
         signal: controller.signal,
       });
@@ -171,16 +171,12 @@ export async function checkContactRateLimit(
       clearTimeout(timeoutId);
 
       if (res.ok) {
-        const data = (await res.json()) as { result: number };
-        if (data.result === 1) {
-          // Set 1-hour expiry on new key
-          fetch(`${redisUrl}/expire/${redisKey}/3600`, {
-            headers: { Authorization: `Bearer ${redisToken}` },
-          }).catch(() => {});
-        } else if (data.result > MAX_IP_HOURLY) {
+        const data = (await res.json()) as { result: string | number | null };
+        const currentVal = Number(data.result) || 0;
+        if (currentVal >= MAX_IP_HOURLY) {
           return {
             allowed: false,
-            reason: `Hourly limit exceeded. Please try again later.`,
+            reason: `Hourly limit reached for this network. Please try again later.`,
             retryAfterSeconds: 3600,
           };
         }
@@ -236,5 +232,23 @@ export function recordContactSubmission(clientIp: string, email: string) {
   } else {
     currentEmailEntry.count++;
     currentEmailEntry.lastTimestamp = now;
+  }
+
+  // 5. Atomic Upstash Redis Increment with 1-hour expiry
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (redisUrl && redisToken) {
+    const redisKey = `ratelimit:contact:ip:${normalizedIp.replace(/[^a-zA-Z0-9_]/g, "_")}`;
+    fetch(`${redisUrl}/pipeline`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${redisToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        ["INCR", redisKey],
+        ["EXPIRE", redisKey, 3600],
+      ]),
+    }).catch(() => {});
   }
 }
