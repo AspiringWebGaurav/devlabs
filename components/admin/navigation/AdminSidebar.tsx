@@ -6,15 +6,19 @@ import { usePathname } from "next/navigation";
 import { FaDatabase, FaRightFromBracket } from "react-icons/fa6";
 import { useAdminSession } from "@/components/admin/context";
 import { AdminProfileCard } from "@/components/admin/profile";
+import { SignOutOverlay } from "@/components/admin/auth/SignOutOverlay";
 
 export const AdminSidebar: React.FC = () => {
   const pathname = usePathname();
   const { user, signOut } = useAdminSession();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const handleInitiateSignOut = async () => {
+  const handleInitiateSignOut = () => {
     if (isSigningOut) return;
     setIsSigningOut(true);
+  };
+
+  const handleExecuteSignOut = async () => {
     await signOut();
   };
 
@@ -99,6 +103,12 @@ export const AdminSidebar: React.FC = () => {
           )}
         </button>
       </div>
+
+      {/* Dynamic Smooth Balanced Sign-Out Overlay */}
+      <SignOutOverlay
+        isOpen={isSigningOut}
+        onComplete={handleExecuteSignOut}
+      />
     </aside>
   );
 };

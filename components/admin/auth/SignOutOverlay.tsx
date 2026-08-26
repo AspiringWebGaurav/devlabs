@@ -12,7 +12,7 @@ export const SignOutOverlay: React.FC<SignOutOverlayProps> = ({
   isOpen,
   onComplete,
 }) => {
-  const [progress, setProgress] = useState(4);
+  const [progress, setProgress] = useState(8);
   const completedRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
 
@@ -22,12 +22,12 @@ export const SignOutOverlay: React.FC<SignOutOverlayProps> = ({
 
   useEffect(() => {
     if (!isOpen) {
-      setProgress(4);
+      setProgress(8);
       completedRef.current = false;
       return;
     }
 
-    // Dynamic, deliberate progress ticker (~1.8s duration)
+    // Dynamic, balanced progress ticker ("neither slow nor fast": ~1.25s total)
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
@@ -35,35 +35,24 @@ export const SignOutOverlay: React.FC<SignOutOverlayProps> = ({
           return 100;
         }
 
-        let inc = 2;
-        if (prev < 30) {
-          inc = Math.random() > 0.3 ? 3 : 2;
-        } else if (prev < 70) {
-          inc = Math.random() > 0.4 ? 3 : 2;
-        } else if (prev < 90) {
-          inc = Math.random() > 0.3 ? 3 : 2;
-        } else {
-          inc = 2;
-        }
-
-        const next = Math.min(prev + inc, 100);
-
-        // When 100% is reached, trigger sign out after a brief visual confirmation
-        if (next >= 100 && !completedRef.current) {
-          completedRef.current = true;
-          setTimeout(() => {
-            if (onCompleteRef.current) {
-              onCompleteRef.current();
-            }
-          }, 350);
-        }
-
-        return next;
+        const inc = Math.random() > 0.4 ? 3 : 2;
+        return Math.min(prev + inc, 100);
       });
-    }, 30);
+    }, 28);
 
     return () => clearInterval(interval);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && progress === 100 && !completedRef.current) {
+      completedRef.current = true;
+      // Brief visual confirmation of Session Detached (250ms), then execute clean sign-out
+      const timer = setTimeout(() => {
+        onCompleteRef.current?.();
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, progress]);
 
   if (!isOpen) return null;
 

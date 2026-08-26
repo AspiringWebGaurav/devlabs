@@ -484,7 +484,7 @@ export const AdminOtpForm: React.FC = () => {
     if (isSuccess) {
       const fallbackTimer = setTimeout(() => {
         handleAuthComplete();
-      }, 1800);
+      }, 4200);
       return () => clearTimeout(fallbackTimer);
     }
   }, [isSuccess, handleAuthComplete]);

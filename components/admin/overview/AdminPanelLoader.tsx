@@ -12,7 +12,7 @@ export const AdminPanelLoader: React.FC<AdminPanelLoaderProps> = ({
   onComplete,
   fullScreen = true,
 }) => {
-  const [progress, setProgress] = useState(15);
+  const [progress, setProgress] = useState(4);
   const onCompleteRef = useRef(onComplete);
   const hasTriggeredRef = useRef(false);
 
@@ -21,7 +21,7 @@ export const AdminPanelLoader: React.FC<AdminPanelLoaderProps> = ({
   }, [onComplete]);
 
   useEffect(() => {
-    // Deliberate, smooth dynamic progress ticker
+    // Deliberate, smooth, authentic security progression (~2.7s duration: "slow" and authoritative)
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
@@ -29,20 +29,20 @@ export const AdminPanelLoader: React.FC<AdminPanelLoaderProps> = ({
           return 100;
         }
 
-        let inc = 2;
-        if (prev < 30) {
-          inc = Math.random() > 0.3 ? 4 : 2;
-        } else if (prev < 70) {
-          inc = Math.random() > 0.4 ? 5 : 3;
-        } else if (prev < 92) {
-          inc = Math.random() > 0.3 ? 4 : 2;
+        let inc = 1;
+        if (prev < 25) {
+          inc = Math.random() > 0.45 ? 2 : 1;
+        } else if (prev < 60) {
+          inc = Math.random() > 0.5 ? 2 : 1;
+        } else if (prev < 88) {
+          inc = Math.random() > 0.4 ? 2 : 1;
         } else {
-          inc = 2;
+          inc = 1;
         }
 
         return Math.min(prev + inc, 100);
       });
-    }, 24);
+    }, 32);
 
     return () => clearInterval(interval);
   }, []);
@@ -50,10 +50,10 @@ export const AdminPanelLoader: React.FC<AdminPanelLoaderProps> = ({
   useEffect(() => {
     if (progress === 100 && !hasTriggeredRef.current) {
       hasTriggeredRef.current = true;
-      // Small pause at 100% to show Ready, then fire navigation
+      // Visual confirmation hold at 100% (Ready), then transition to dashboard
       const timer = setTimeout(() => {
         onCompleteRef.current?.();
-      }, 300);
+      }, 420);
       return () => clearTimeout(timer);
     }
   }, [progress]);
