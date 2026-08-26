@@ -1,7 +1,7 @@
 # Gaurav Portfolio &mdash; Enterprise Architecture & Core Documentation
 
 [![Production](https://img.shields.io/badge/Production-gauravpatil.online-6366f1?style=flat-square&logo=vercel)](https://gauravpatil.online)
-[![Next.js](https://img.shields.io/badge/Next.js-15.5.23-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15.5.24-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.2.8-blue?style=flat-square&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4.19-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
@@ -12,6 +12,8 @@
 
 An enterprise-grade, high-performance developer portfolio platform and unified administrative command console engineered with **Next.js 15 (App Router)**, **React 19**, **Three.js WebGL**, **Tailwind CSS**, and **Firebase Admin SDK**. Designed with dual-subsystem UI/UX isolation, a rigorous 4-Tier Data Access Architecture, and an immutable 11-Article Database Constitution.
 
+> 📬 **Direct Inquiries & Approach**: Want to get in touch or discuss an engagement? Reach out directly via [`hello@gauravservices.eu.cc`](mailto:hello@gauravservices.eu.cc) or submit the live contact form at [gauravpatil.online/contact](https://gauravpatil.online/contact).
+
 ---
 
 ## 📑 Table of Contents
@@ -19,16 +21,17 @@ An enterprise-grade, high-performance developer portfolio platform and unified a
 - [1. Executive Architectural Blueprint](#1-executive-architectural-blueprint)
 - [2. Dual-Subsystem UI/UX Isolation](#2-dual-subsystem-uiux-isolation)
 - [3. 4-Tier Data Access Layer (DAL)](#3-4-tier-data-access-layer-dal)
-- [4. Single-Source Session Security & Governance](#4-single-source-session-security--governance)
-- [5. Database Constitution (11 Non-Negotiable Articles)](#5-database-constitution-11-non-negotiable-articles)
-- [6. Performance Engineering & Zero-CLS Standard](#6-performance-engineering--zero-cls-standard)
-- [7. Complete Technology Stack Matrix](#7-complete-technology-stack-matrix)
-- [8. Repository Directory & Colocation Map](#8-repository-directory--colocation-map)
-- [9. Local Development & Installation](#9-local-development--installation)
-- [10. Environment Variable Protocol](#10-environment-variable-protocol)
-- [11. Pre-Push Verification & Git Standard](#11-pre-push-verification--git-standard)
-- [12. Security Governance & Responsible Disclosure](#12-security-governance--responsible-disclosure)
-- [13. Open Source License](#13-open-source-license)
+- [4. Single-Source Session Security, 2FA & 3-Tier Loaders](#4-single-source-session-security-2fa--3-tier-loaders)
+- [5. Communications, Custom Domain Emails & Contact Gateway](#5-communications-custom-domain-emails--contact-gateway)
+- [6. Database Constitution (11 Non-Negotiable Articles)](#6-database-constitution-11-non-negotiable-articles)
+- [7. Performance Engineering & Zero-CLS Standard](#7-performance-engineering--zero-cls-standard)
+- [8. Complete Technology Stack Matrix](#8-complete-technology-stack-matrix)
+- [9. Repository Directory & Colocation Map](#9-repository-directory--colocation-map)
+- [10. Local Development & Installation](#10-local-development--installation)
+- [11. Environment Variable Protocol](#11-environment-variable-protocol)
+- [12. Pre-Push Verification & Git Standard](#12-pre-push-verification--git-standard)
+- [13. Security Governance & Responsible Disclosure](#13-security-governance--responsible-disclosure)
+- [14. Open Source License](#14-open-source-license)
 
 ---
 
@@ -145,19 +148,72 @@ lib/admin/
 
 ---
 
-## 4. Single-Source Session Security & Governance
+## 4. Single-Source Session Security, 2FA & 3-Tier Loaders
 
-Administrative security is governed by a single-source configuration with zero client-side privilege escalation:
+Administrative security is governed by a single-source configuration with zero client-side privilege escalation and zero trust:
 
-* **Google OAuth 2.0 PKCE Handshake**: Compliant with RFC 7636. Authentication occurs via direct in-tab browser redirects without intrusive popup windows.
+### 4.1 In-Tab Google OAuth 2.0 PKCE & Two-Factor Authentication (2FA)
+* **Google OAuth 2.0 PKCE Handshake**: Compliant with RFC 7636. Authentication occurs via direct in-tab browser redirects without intrusive secondary popup windows.
+* **Salted HMAC-SHA256 One-Time Passcodes (OTP)**: Following OAuth completion, the system transitions to `/admin/otp` and dispatches a 6-digit code. Passcodes are hashed with unique cryptographic salts (`AdminOtpChallengeRecord`) and verified in constant time.
+* **Authoritative 3-Attempt Budget & 5-Minute Ceiling**: A unified global budget of 3 attempts protects against brute-force attacks across both primary OTP and fallback passcodes. Resends generate a fresh HMAC with a 60-second cooldown but **never reset the attempt counter** and **never extend the immutable 5-minute expiration ceiling**.
+* **Zero-Lockout Security IP Authorization**: Sign-ins from unrecognized IP locations generate an automated security approval link dispatched via `security@gauravservices.eu.cc` with a 15-minute token TTL. An on-screen fallback passcode pathway (`/api/admin/auth/otp/fallback`) ensures guaranteed access if email authorization links are delayed or inaccessible.
+
+### 4.2 Web Crypto Session Signing & Clean Detach
 * **Single-Source Session Security**: Configured via `ADMIN_SESSION_TTL_HOURS = 5` in `lib/admin/constants.ts`. Derived seconds (`18,000s`) and milliseconds (`18,000,000ms`) are computed automatically to prevent configuration drift.
-* **Auto-Expiring Cookie Architecture**: Cryptographically signed `admin_session` cookie issued with `SameSite=Lax`, `Path=/`, and `HttpOnly` in production.
+* **Auto-Expiring Cookie Architecture**: Cryptographically signed `admin_session` cookie issued via Edge-compatible Web Crypto API (`HMAC-SHA256`) with `SameSite=Lax`, `Path=/`, and `HttpOnly` in production.
 * **Server-Hydrated Read-Only Context**: `AdminSessionContext` hydrates user identity from server cookies during initial layout render, completely eliminating redundant client-side `/api/admin/auth/session` network waterfalls.
-* **Interactive Sign-In & Sign-Out Overlays**: Full-screen Swiss authorization overlays provide immediate visual feedback during login and 5-step clean state detachment on logout.
+* **5-Step Clean Detach**: Signing out executes an awaited server invalidation (`DELETE /api/admin/auth/session`), clears client cookie stores, disposes Firebase SDK instances, purges browser session storage, and executes a clean redirect to `/admin/login?signedOut=true`.
+
+### 4.3 Mandatory 3-Tier Loader Architecture
+The administration lifecycle enforces 3 purpose-built, calibrated loading systems that never conflate or bleed:
+1. **Tier 1: Signing In Loader (`AdminPanelLoader.tsx`) &mdash; Cadence: "Slow" (~2.7s – 3.0s Deliberate)**:
+   - Full-screen Swiss security card exclusively for OAuth, OTP verification, and IP approval.
+   - Paced via 32ms ticker with small increments across 4 authoritative stages (*Verifying Authentication &rarr; Connecting Data Layer &rarr; Initializing Canvas &rarr; Workspace Ready*), holding at `100% Ready` for 420ms before navigating.
+   - **Solid Holding Invariant**: Never fades to `opacity-0` while on `/admin/otp`, holding a solid neutral background to eliminate blank screen bleed. Protected by a 4.2s fallback safety timer in `AdminOtpForm.tsx`.
+2. **Tier 2: Signing Out Loader (`SignOutOverlay.tsx`) &mdash; Cadence: "Neither Slow Nor Fast" (~1.25s Balanced)**:
+   - Full-screen session detachment modal triggered from `AdminSidebar.tsx`.
+   - Paced via 28ms ticker reaching 100% in ~1.0s, holding 250ms on `"Session Detached"` with green checkmark.
+   - Strictly awaits server session deletion (`DELETE /api/admin/auth/session`) before redirecting, eliminating race conditions.
+3. **Tier 3: Dashboard Tab Switching Loader (`AdminDashboardTabLoader.tsx`) &mdash; Cadence: "Pure Dynamic Optimised"**:
+   - In-canvas concentric dual-ring GPU-accelerated SVG spinner (clockwise `#7C3AED` primary arc + counter-rotating inner arc with center micro-core).
+   - Dynamic telemetry cycler (*Synchronizing telemetry... &rarr; Mounting bindings... &rarr; Rendering analytics...*) and active pulsing radar ping chip.
+   - Wrapped within `AdminPageContainer` via `app/admin/loading.tsx`: pinned headers and sidebars remain visible and interactive with zero layout shift (`CLS = 0`). Modal bleed is strictly prohibited.
 
 ---
 
-## 5. Database Constitution (11 Non-Negotiable Articles)
+## 5. Communications, Custom Domain Emails & Contact Gateway
+
+The platform features an enterprise-grade communications infrastructure supporting direct web submissions and an authenticated custom domain email gateway (`gauravservices.eu.cc`) routed through Brevo REST API v3:
+
+### 5.1 Direct Web Inquiries (`gauravpatil.online/contact`)
+Visitors and prospective clients can reach out directly using the production web contact form:
+* **Direct Form Submission URL**: [https://gauravpatil.online/contact](https://gauravpatil.online/contact) *(anchor syncs seamlessly to the interactive `#contact` modal)*.
+* **Security & Anti-Abuse**: Protected by invisible Cloudflare Turnstile token validation and client-side request throttling.
+* **Atomic Processing Pipeline**: Submissions execute server-side Zod payload schema validation, automated profanity scrubbing, atomic Firebase Firestore lead ingestion (`inquiries/`), and immediate dispatch of two distinct transactional emails in `<1.2s`.
+* **Lead Tracking**: Visitors receive an immediate confirmation with an official inquiry tracking reference (e.g. `#104`).
+
+### 5.2 Official Custom Domain Email Directory (`gauravservices.eu.cc`)
+For direct email correspondence, security disclosures, or support requests, the project operates four dedicated, role-segregated custom domain mailboxes:
+
+| Mailbox / Address | Display Identity | Purpose & Scope | Turnaround & SLA |
+| :--- | :--- | :--- | :--- |
+| [`hello@gauravservices.eu.cc`](mailto:hello@gauravservices.eu.cc) | **Gaurav Patil** | **Client & Visitor Inquiries**: Project proposals, consulting requests, collaboration inquiries, architectural audits, and public contact form routing. | Instant auto-acknowledgement; personal response typically within 24 hours. |
+| [`security@gauravservices.eu.cc`](mailto:security@gauravservices.eu.cc) | **Device Auth & Security** | **Security Operations**: Multi-factor authentication notices, recognized device IP verification alerts, login telemetry, and confidential vulnerability reports (Responsible Disclosure). | 15-minute 1-click IP verification links; urgent security disclosures triaged immediately. |
+| [`help@gauravservices.eu.cc`](mailto:help@gauravservices.eu.cc) | **Gaurav Support** | **Technical Support**: Troubleshooting assistance, platform issue reports, client dispute resolution, and operational support workflows. | Prioritized ticket triage; initial response within 12–24 business hours. |
+| [`no-reply@gauravservices.eu.cc`](mailto:no-reply@gauravservices.eu.cc) | **Gaurav Services** | **System Notifications (Do Not Reply)**: Ephemeral 2FA One-Time Passcodes (OTP), fallback authorization codes, automated error alerts, and non-monitored system broadcasts. | Instantaneous automated dispatch; inbound replies are unmonitored. |
+
+> 🛡️ **Privacy & Anti-Abuse Guarantee**: All custom domain emails are authenticated with industry-standard SPF, DKIM, and DMARC protocols. Inbound submissions are never enrolled in marketing lists, promotional sequences, or third-party newsletters.
+
+### 5.3 Dynamic Environment Link Resolution in Email Footers
+Transactional email footers (`Terms | Privacy`) evaluate runtime request headers and environment variables via `resolveAppUrl()` to dynamically generate links matching the exact active environment:
+* **Local Development**: [`http://localhost:3000/admin/terms`](http://localhost:3000/admin/terms) & [`http://localhost:3000/admin/privacy`](http://localhost:3000/admin/privacy)
+* **Staging / Preview**: [`https://devlabs.eu.cc/admin/terms`](https://devlabs.eu.cc/admin/terms) & [`https://devlabs.eu.cc/admin/privacy`](https://devlabs.eu.cc/admin/privacy)
+* **Canonical Production**: [`https://gauravpatil.online/admin/terms`](https://gauravpatil.online/admin/terms) & [`https://gauravpatil.online/admin/privacy`](https://gauravpatil.online/admin/privacy)
+* Eliminates hardcoded external domain redirects and ensures seamless local/staging testing.
+
+---
+
+## 6. Database Constitution (11 Non-Negotiable Articles)
 
 The database is treated as a financial ledger: every mutation must leave the system in a provably consistent state.
 
@@ -222,16 +278,17 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 
 ---
 
-## 6. Performance Engineering & Zero-CLS Standard
+## 7. Performance Engineering & Zero-CLS Standard
 
 * **Zero Cumulative Layout Shift (`CLS = 0`)**: Dynamic 3D WebGL modules, remote images, and administrative cards specify exact aspect ratios and skeleton containers to eliminate content reflow during streaming.
+* **Calibrated 3-Tier Loaders**: Strict isolation of auth initialization (~2.8s deliberate), session termination (~1.25s balanced), and tab switching (in-canvas pure dynamic GPU-accelerated concentric dual spinner) guarantees zero layout shift (`CLS = 0`) across all user interactions.
 * **Anti-Jitter Geometry**: Interactive hover states use GPU-accelerated opacity and background color transitions (`transition-colors`, `transition-opacity`, `duration-150`) without altering margins, padding, or container dimensions.
 * **Distraction-Free Static Typography**: Static headers, metadata labels, and policy cards avoid continuous pulse or blink animations (`animate-pulse`).
 * **Turbopack Optimized Compiles**: Standalone production build pipeline compiles in `<12s` with zero compiler warnings.
 
 ---
 
-## 7. Complete Technology Stack Matrix
+## 8. Complete Technology Stack Matrix
 
 | Architectural Layer | Technologies & Libraries | Purpose / Implementation |
 | :--- | :--- | :--- |
@@ -241,15 +298,15 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 | **Motion & Animation** | [Motion (Framer Motion 12)](https://motion.dev/) | Smooth layout transitions, bento grids, modal animations |
 | **3D WebGL Graphics** | [Three.js](https://threejs.org/), [@react-three/fiber](https://docs.pmnd.rs/react-three-fiber), [three-globe](https://github.com/vasturiano/three-globe) | Interactive globe visualization with custom coordinates |
 | **Backend & Database** | [Firebase 11](https://firebase.google.com/), [Firebase Admin SDK 14](https://firebase.google.com/docs/admin/setup) | Firestore NoSQL, Realtime Database, Cloud Storage |
-| **Authentication & 2FA** | Google OAuth 2.0 PKCE, [OTPLib 13](https://github.com/yeojinj/otplib), [QRCode](https://github.com/soldair/node-qrcode) | Multi-factor cryptographic security & session management |
+| **Authentication & 2FA** | Google OAuth 2.0 PKCE, Salted HMAC-SHA256 OTP, Web Crypto API | Multi-factor cryptographic security & session management |
 | **Bot Detection** | [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) | Invisible, privacy-preserving CAPTCHA verification |
 | **Validation Layer** | [Zod 4](https://zod.dev/) | Strict runtime payload and environment validation schemas |
-| **Email Delivery** | [Brevo REST API v3](https://www.brevo.com/) | Dual transactional email dispatch (Inbound Lead + Auto-Reply) |
+| **Email Gateway** | [Brevo REST API v3](https://www.brevo.com/) via `@/lib/email` | Multi-sender identity pipeline (`hello@`, `security@`, `no-reply@`) |
 | **Typography & Icons** | Inter / Outfit / Geist, [React Icons 5](https://react-icons.github.io/react-icons/) | High-density typography and vector iconography |
 
 ---
 
-## 8. Repository Directory & Colocation Map
+## 9. Repository Directory & Colocation Map
 
 ```text
 ├── app/
@@ -259,27 +316,35 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 │   │   └── terms/page.tsx          # Public Terms of Service
 │   ├── admin/                      # Scoped Minimalist Light Admin Subsystem
 │   │   ├── layout.tsx              # Admin layout, font scope & session provider
-│   │   ├── loading.tsx             # Universal AdminPanelLoader hydration screen
+│   │   ├── loading.tsx             # Universal AdminDashboardTabLoader workspace screen
 │   │   ├── error.tsx               # Root admin error boundary
 │   │   ├── page.tsx                # Portfolio Services Management Workspace
 │   │   ├── login/page.tsx          # Google OAuth 2.0 PKCE Gateway
+│   │   ├── otp/page.tsx            # Mandatory 2FA OTP Challenge Verification
+│   │   ├── authenticating/page.tsx # Transient OAuth Handshake Transition Screen
 │   │   ├── profile/page.tsx        # Superadmin Identity & Security Workspace
 │   │   ├── inquiries/page.tsx      # Inbound Lead Processing & Communications
 │   │   ├── privacy/page.tsx        # Administrative Privacy Policy
 │   │   └── terms/page.tsx          # Administrative Terms of Service
 │   ├── api/                        # Serverless API routes
 │   │   ├── admin/auth/google/      # OAuth authorization handshake initiator
-│   │   ├── admin/auth/callback/    # PKCE code exchange & session issuer
-│   │   ├── admin/auth/session/     # Read-only session validation endpoint
-│   │   ├── admin/auth/login/       # Session minting route
+│   │   ├── admin/auth/callback/    # PKCE code exchange & OTP challenge issuer
+│   │   ├── admin/auth/otp/         # 2FA OTP Subsystem
+│   │   │   ├── verify/route.ts     # Atomic transactional OTP verification
+│   │   │   ├── resend/route.ts     # Rate-limited OTP re-dispatch (60s cooldown)
+│   │   │   ├── fallback/route.ts   # On-screen passcode fallback pathway
+│   │   │   └── status/route.ts     # Non-sensitive challenge status query
+│   │   ├── admin/auth/verify-ip/   # 1-click email security IP approval endpoint
+│   │   ├── admin/auth/session/     # Read-only session validation & deletion
+│   │   ├── admin/auth/login/       # Hardened credential route (403 disabled)
 │   │   └── contact/route.ts        # Turnstile-guarded contact submission & Brevo
 │   └── layout.tsx                  # Root HTML layout, analytics & dark theme provider
 ├── components/
 │   ├── admin/                      # Scoped Swiss Light admin components
-│   │   ├── auth/                   # AdminLoginForm, GoogleAuthButton, SignInOverlay, SignOutOverlay
+│   │   ├── auth/                   # AdminLoginForm, AdminOtpForm, SignOutOverlay, AdminPanelLoader
 │   │   ├── context/                # AdminSessionContext & useAdminSession hook
 │   │   ├── error/                  # AdminErrorBoundary widget-level isolation
-│   │   ├── layout/                 # AdminPageContainer, AdminThemeEnforcer
+│   │   ├── layout/                 # AdminPageContainer, AdminDashboardTabLoader, AdminThemeEnforcer
 │   │   ├── navigation/             # AdminHeader, AdminSidebar, AdminFooter
 │   │   ├── overview/               # OverviewCanvas, AdminPanelLoader
 │   │   ├── profile/                # AdminProfileCard, AdminProfileModal
@@ -288,28 +353,31 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 │   └── ui/                         # Aceternity UI & custom motion primitives
 ├── lib/
 │   ├── admin/                      # Core Admin Infrastructure
-│   │   ├── datasource/             # Firestore & RTDB SDK isolation layer
-│   │   ├── repositories/           # BaseRepository, services.repository, inquiries.repository
-│   │   ├── services/               # Cross-cutting administrative services
+│   │   ├── datasource/             # Firestore & RTDB SDK isolation layer (sole SDK boundary)
+│   │   ├── repositories/           # BaseRepository, services, inquiries, auth-challenges
+│   │   ├── services/               # otp.service, ip-security.service, inquiries.service
 │   │   ├── schemas/                # Shared Zod validation schemas
 │   │   ├── utils/                  # Date, string, and error utilities
 │   │   ├── constants.ts            # Single-source constants (ADMIN_SESSION_TTL_HOURS = 5)
-│   │   ├── auth.ts                 # Server-side token signing & verification
+│   │   ├── auth.ts                 # Web Crypto HMAC-SHA256 token signing & verification
 │   │   └── logger.ts               # Structured system logger
-│   └── contact/                    # Brevo REST dispatcher, profanity sanitizer
+│   └── email/                      # Centralized Transactional Email Engine
+│       ├── identities.ts           # Central sender identities (hello@, security@, no-reply@)
+│       ├── templates.ts            # High-deliverability transactional email templates
+│       └── brevo.ts                # Brevo REST API dispatcher & resolveAppUrl()
 └── middleware.ts                   # Edge middleware for admin route protection
 ```
 
 ---
 
-## 9. Local Development & Installation
+## 10. Local Development & Installation
 
-### 9.1 Prerequisites
+### 10.1 Prerequisites
 * **Node.js**: `v20.x` or `v22.x` (LTS recommended)
 * **Package Manager**: `npm` (v10+)
 * **Git**: `2.40+`
 
-### 9.2 Clone & Install Dependencies
+### 10.2 Clone & Install Dependencies
 ```bash
 # Clone the repository
 git clone https://github.com/AspiringWebGaurav/devlabs.git
@@ -321,14 +389,14 @@ cd devlabs
 npm install
 ```
 
-### 9.3 Configure Environment Variables
+### 10.3 Configure Environment Variables
 Copy the template configuration file:
 ```bash
 cp .env.example .env.local
 ```
-Fill in the verified credentials for Google OAuth, Firebase Service Account, Cloudflare Turnstile, and Brevo.
+Fill in the verified credentials for Google OAuth, Firebase Service Account, Cloudflare Turnstile, Brevo API, and Session Secret.
 
-### 9.4 Start Development Server
+### 10.4 Start Development Server
 ```bash
 npm run dev
 ```
@@ -336,7 +404,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. The adminis
 
 ---
 
-## 10. Environment Variable Protocol
+## 11. Environment Variable Protocol
 
 To prevent production deployment drift across Vercel environments:
 1. All baseline/legacy variables are permanently active in Vercel production.
@@ -355,11 +423,13 @@ NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://your-project-rtdb.firebaseio.com
 
 # ADDED
 ADMIN_SESSION_TTL_HOURS=5
+SESSION_SECRET="your_secure_hmac_secret_here"
+BREVO_API_KEY=your_brevo_api_key_here
 ```
 
 ---
 
-## 11. Pre-Push Verification & Git Standard
+## 12. Pre-Push Verification & Git Standard
 
 Pushes to remote `origin/main` require 100% verification across all quality gates:
 
@@ -370,21 +440,25 @@ npx tsc --noEmit
 # 2. Verify ESLint Code Quality (0 warnings)
 npm run lint
 
-# 3. Verify Local Production Build (0 errors, 0 warnings)
+# 3. Verify Security Penetration & Session Integrity (14/14 scenarios)
+npx tsx --env-file=.env.local scratch/security_final_check.ts
+
+# 4. Verify Local Production Build (0 errors, 0 warnings)
 npm run build
 ```
 
 ---
 
-## 12. Security Governance & Responsible Disclosure
+## 13. Security Governance & Responsible Disclosure
 
 * **Zero Hardcoded Secrets**: Secrets and service account keys are stored exclusively in environment variables and are permanently ignored via `.gitignore`.
 * **Rate-Limited Endpoints**: API mutation endpoints are protected by Cloudflare Turnstile bot challenges and server-side request throttling.
-* **Responsible Disclosure**: If you discover a security vulnerability, please submit a confidential report to `security@gauravservices.eu.cc`.
+* **Central Email Integrity**: Automated security alerts and OTP challenges are dispatched exclusively from authenticated senders ([`security@gauravservices.eu.cc`](mailto:security@gauravservices.eu.cc), [`no-reply@gauravservices.eu.cc`](mailto:no-reply@gauravservices.eu.cc)).
+* **Responsible Disclosure**: If you discover a security vulnerability, please submit a confidential report to [`security@gauravservices.eu.cc`](mailto:security@gauravservices.eu.cc).
 
 ---
 
-## 13. Open Source License
+## 14. Open Source License
 
 This project is licensed under the terms of the [MIT License](LICENSE) with comprehensive usage conditions, copyright grants, trademark reservations, and architectural liability disclaimers.
 
