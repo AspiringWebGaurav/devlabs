@@ -472,13 +472,28 @@ export const AdminOtpForm: React.FC = () => {
     };
   }, [stage, router, scheduleTimeout]);
 
+  const hasNavigatedRef = useRef(false);
+  const handleAuthComplete = useCallback(() => {
+    if (!hasNavigatedRef.current) {
+      hasNavigatedRef.current = true;
+      window.location.replace("/admin");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isSuccess) {
+      const fallbackTimer = setTimeout(() => {
+        handleAuthComplete();
+      }, 1800);
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [isSuccess, handleAuthComplete]);
+
   if (isSuccess) {
     return (
       <AdminPanelLoader
         fullScreen={true}
-        onComplete={() => {
-          window.location.replace("/admin");
-        }}
+        onComplete={handleAuthComplete}
       />
     );
   }

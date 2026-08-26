@@ -22,19 +22,19 @@ export async function middleware(request: NextRequest) {
     const isOtpRoute = pathname === "/admin/otp";
     const otpChallengeCookie = request.cookies.get("admin_otp_challenge")?.value;
 
+    // Case 0: Authenticated admin visiting /admin/otp -> redirect to /admin dashboard
+    if (isAuthenticated && isOtpRoute) {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+
     // Case A: OTP Challenge in progress (/admin/otp): Must strictly stay on OTP page until verified
     if (isOtpRoute) {
       if (otpChallengeCookie) {
-        // Active challenge: Allow through and purge any stale session cookie
-        const response = NextResponse.next({
+        return NextResponse.next({
           request: {
             headers: requestHeaders,
           },
         });
-        if (sessionCookie) {
-          response.cookies.delete(ADMIN_COOKIE_NAME);
-        }
-        return response;
       } else {
         // No challenge active -> redirect to login
         return NextResponse.redirect(new URL("/admin/login", request.url));

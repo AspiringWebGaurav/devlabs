@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { FaShieldHalved, FaCircleCheck } from "react-icons/fa6";
 
 interface AdminPanelLoaderProps {
@@ -12,8 +12,13 @@ export const AdminPanelLoader: React.FC<AdminPanelLoaderProps> = ({
   onComplete,
   fullScreen = true,
 }) => {
-  const [progress, setProgress] = useState(4);
-  const [isFinishing, setIsFinishing] = useState(false);
+  const [progress, setProgress] = useState(15);
+  const onCompleteRef = useRef(onComplete);
+  const hasTriggeredRef = useRef(false);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     // Deliberate, smooth dynamic progress ticker
@@ -24,47 +29,41 @@ export const AdminPanelLoader: React.FC<AdminPanelLoaderProps> = ({
           return 100;
         }
 
-        let inc = 1;
-        if (prev < 25) {
-          inc = Math.random() > 0.3 ? 2 : 1;
-        } else if (prev < 65) {
-          inc = Math.random() > 0.4 ? 2 : 1;
-        } else if (prev < 90) {
-          inc = Math.random() > 0.3 ? 2 : 1;
+        let inc = 2;
+        if (prev < 30) {
+          inc = Math.random() > 0.3 ? 4 : 2;
+        } else if (prev < 70) {
+          inc = Math.random() > 0.4 ? 5 : 3;
+        } else if (prev < 92) {
+          inc = Math.random() > 0.3 ? 4 : 2;
         } else {
-          inc = Math.random() > 0.5 ? 2 : 1;
+          inc = 2;
         }
 
         return Math.min(prev + inc, 100);
       });
-    }, 32);
+    }, 24);
 
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (progress === 100 && !isFinishing) {
-      setIsFinishing(true);
-      // Hold briefly at 100% before smooth reveal
+    if (progress === 100 && !hasTriggeredRef.current) {
+      hasTriggeredRef.current = true;
+      // Small pause at 100% to show Ready, then fire navigation
       const timer = setTimeout(() => {
-        if (onComplete) {
-          onComplete();
-        }
-      }, 420);
+        onCompleteRef.current?.();
+      }, 300);
       return () => clearTimeout(timer);
     }
-  }, [progress, isFinishing, onComplete]);
+  }, [progress]);
 
   const containerClasses = fullScreen
-    ? "fixed inset-0 z-50 bg-[#FAFAFA] flex flex-col items-center justify-center p-4 select-none animate-in fade-in duration-200"
+    ? "fixed inset-0 z-50 bg-[#FAFAFA] flex flex-col items-center justify-center p-4 select-none animate-in fade-in duration-150"
     : "min-h-screen w-full bg-[#FAFAFA] flex flex-col items-center justify-center p-4 select-none";
 
   return (
-    <div
-      className={`${containerClasses} ${
-        isFinishing ? "opacity-0 transition-opacity duration-300" : "opacity-100"
-      }`}
-    >
+    <div className={`${containerClasses} opacity-100`}>
       <div className="w-full max-w-sm bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-7 rounded-none sm:rounded-[2px] shadow-2xs space-y-4 animate-in zoom-in-95 duration-200">
         {/* Brand Header & Live Percentage */}
         <div className="flex items-center justify-between pb-3 border-b border-[#F1F5F9]">

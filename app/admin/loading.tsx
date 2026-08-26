@@ -1,6 +1,10 @@
 import React from "react";
-import { AdminPanelLoader } from "@/components/admin/overview/AdminPanelLoader";
+import { AdminPageContainer, AdminDashboardTabLoader } from "@/components/admin/layout";
 
 export default function AdminLoading() {
-  return <AdminPanelLoader fullScreen={true} />;
+  return (
+    <AdminPageContainer breadcrumb="WORKSPACE">
+      <AdminDashboardTabLoader />
+    </AdminPageContainer>
+  );
 }
