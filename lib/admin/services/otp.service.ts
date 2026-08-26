@@ -65,6 +65,7 @@ export class OtpService {
     avatar?: string;
     clientIp: string | null;
     userAgent?: string;
+    requestHeaders?: Headers | null;
   }): Promise<{ challengeId: string; expiresAt: number }> {
     const rawOtp = this.generateOtpCode();
     const salt = this.generateSalt();
@@ -107,6 +108,7 @@ export class OtpService {
       clientIp: params.clientIp,
       userAgent: params.userAgent,
       expiresMinutes: 5,
+      requestHeaders: params.requestHeaders,
     });
 
     return { challengeId, expiresAt };
@@ -270,7 +272,8 @@ export class OtpService {
   public async resendOtp(
     challengeId: string,
     clientIp: string | null,
-    userAgent?: string
+    userAgent?: string,
+    requestHeaders?: Headers | null
   ): Promise<{ success: boolean; error?: string; message?: string; cooldownSeconds?: number }> {
     if (!challengeId || typeof challengeId !== "string") {
       return { success: false, error: "Invalid challenge identifier." };
@@ -319,17 +322,20 @@ export class OtpService {
           const remainingSec = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000);
           return {
             success: false,
-            error: `Please wait ${remainingSec} seconds before requesting another code.`,
+            error: `Please wait ${remainingSec} seconds before requesting a new code.`,
             cooldownSeconds: remainingSec,
           };
         }
       }
 
-      // Mutate challenge in-place (attemptsCount and expiresAt are strictly preserved!)
+      const currentResendCount = challenge.resendCount || 0;
+      const previousResentAt = challenge.lastResentAt;
+
+      // Update challenge record with new HMAC (strictly keeping existing attemptsCount)
       transaction.update(challengeRef, {
         otpHash: newOtpHmac,
         otpSalt: newSalt,
-        resendCount: (challenge.resendCount || 0) + 1,
+        resendCount: currentResendCount + 1,
         lastResentAt: now,
         clientIp: clientIp || challenge.clientIp,
         userAgent: userAgent || challenge.userAgent,
@@ -339,9 +345,9 @@ export class OtpService {
         success: true,
         email: challenge.email,
         name: challenge.name,
-        previousResentAt: challenge.lastResentAt,
         clientIp: clientIp || challenge.clientIp,
         userAgent: userAgent || challenge.userAgent,
+        previousResentAt,
       };
     });
 
@@ -361,6 +367,7 @@ export class OtpService {
         clientIp: txResult.clientIp,
         userAgent: txResult.userAgent,
         expiresMinutes: 5,
+        requestHeaders,
       });
 
       if (!emailResult.success) {
@@ -398,7 +405,8 @@ export class OtpService {
   public async requestFallbackPasscode(
     challengeId: string,
     clientIp: string | null,
-    userAgent?: string
+    userAgent?: string,
+    requestHeaders?: Headers | null
   ): Promise<{
     success: boolean;
     error?: string;
@@ -500,6 +508,7 @@ export class OtpService {
         clientIp: txResult.clientIp,
         userAgent: txResult.userAgent,
         expiresMinutes: 5,
+        requestHeaders,
       });
 
       if (!emailResult.success) {

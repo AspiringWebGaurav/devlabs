@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
         verifyUrl,
         userAgent,
         expiresMinutes: 15,
+        requestHeaders: request.headers,
       });
 
       return NextResponse.json({

@@ -56,9 +56,9 @@ export default function AdminTermsPage() {
           <div className="flex flex-wrap items-center gap-4 pt-3 text-xs font-admin-mono text-[#94A3B8] border-t border-[#F1F5F9]">
             <span>Original Effective: January 1, 2026</span>
             <span>·</span>
-            <span>Last Updated: August 25, 2026</span>
+            <span>Last Updated: August 26, 2026</span>
             <span>·</span>
-            <span>Version: 1.0.0 (Phase 0 Standard)</span>
+            <span>Version: 1.1.0 (Enterprise Multi-Tier Standard)</span>
             <span>·</span>
             <span className="text-[#10B981] font-semibold">Security State: Enforced</span>
           </div>
@@ -77,7 +77,15 @@ export default function AdminTermsPage() {
               <div className="space-y-3 text-xs font-admin-mono border-t border-[#F1F5F9] pt-3">
                 <div className="flex items-center justify-between text-[#64748B]">
                   <span>Auth Protocol</span>
-                  <span className="font-semibold text-black">OAuth 2.0 PKCE</span>
+                  <span className="font-semibold text-black">OAuth 2.0 PKCE + 2FA</span>
+                </div>
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>OTP Security</span>
+                  <span className="font-semibold text-black">HMAC-SHA256 (3-Attempt)</span>
+                </div>
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>IP Security</span>
+                  <span className="font-semibold text-black">Zero-Lockout Trust</span>
                 </div>
                 <div className="flex items-center justify-between text-[#64748B]">
                   <span>Session TTL</span>
@@ -90,6 +98,10 @@ export default function AdminTermsPage() {
                 <div className="flex items-center justify-between text-[#64748B]">
                   <span>Storage Policy</span>
                   <span className="font-semibold text-black">Zero Orphan</span>
+                </div>
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>Loaders</span>
+                  <span className="font-semibold text-[#7C3AED]">3-Tier Calibrated</span>
                 </div>
                 <div className="flex items-center justify-between text-[#64748B]">
                   <span>Layout Stability</span>
@@ -215,6 +227,46 @@ export default function AdminTermsPage() {
               </div>
               <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
                 To ensure high performance and cost efficiency, all queries are executed server-first using cursor-based pagination (<code>.startAfter()</code> / <code>.limit()</code>) with explicit field selection (<code>.select()</code>). Snapshot subscriptions must maintain single instances and cleanly unbind upon unmount (<code>unsubscribe()</code>). Unnecessary reads and repeated listeners are strictly prevented.
+              </p>
+            </div>
+
+            {/* Clause 6 */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                  <FaKey className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div>
+                  <span className="font-admin-mono text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider block">
+                    Article 06
+                  </span>
+                  <h2 className="text-lg font-bold font-admin-sans text-black">
+                    Two-Factor OTP Verification &amp; Zero-Lockout Security IP Architecture
+                  </h2>
+                </div>
+              </div>
+              <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
+                Superadmin authentication enforces mandatory secondary verification. One-Time Passcodes (OTP) are cryptographically hashed using HMAC-SHA256 with unique salts and constrained by a strict global 3-attempt budget. Sign-in attempts from unrecognized IP locations generate an automated security authorization link dispatched via <code>security@gauravservices.eu.cc</code> with a 15-minute expiration window. An on-screen passcode fallback pathway ensures guaranteed access even if email verification links are inaccessible, maintaining complete security without risk of lockout.
+              </p>
+            </div>
+
+            {/* Clause 7 */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                  <FaShieldHalved className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div>
+                  <span className="font-admin-mono text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider block">
+                    Article 07
+                  </span>
+                  <h2 className="text-lg font-bold font-admin-sans text-black">
+                    Mandatory 3-Tier Loader Architecture &amp; Anti-Jitter Standard
+                  </h2>
+                </div>
+              </div>
+              <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
+                The administrative lifecycle strictly isolates three distinct loading paradigms to guarantee zero layout shift (<code>CLS = 0</code>): <strong>Tier 1 (Signing In)</strong> maintains a solid full-screen card with deliberate ~2.8s pacing and zero premature fading; <strong>Tier 2 (Signing Out)</strong> presents a balanced ~1.25s detachment card with guaranteed server session cookie invalidation; <strong>Tier 3 (Dashboard Tab Switching)</strong> renders a dedicated GPU-accelerated concentric dual-ring SVG spinner and live telemetry cycler confined strictly within the workspace canvas while keeping headers and navigation pinned.
               </p>
             </div>
           </div>

@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
       const result = await otpService.requestFallbackPasscode(
         challengeId,
         clientIp,
-        userAgent
+        userAgent,
+        request.headers
       );
 
       if (!result.success) {

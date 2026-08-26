@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const clientIp = extractClientIp(request.headers);
     const userAgent = request.headers.get("user-agent") || undefined;
 
-    const result = await otpService.resendOtp(challengeId, clientIp, userAgent);
+    const result = await otpService.resendOtp(challengeId, clientIp, userAgent, request.headers);
 
     if (!result.success) {
       const isCooldown = typeof result.cooldownSeconds === "number" && result.cooldownSeconds > 0;

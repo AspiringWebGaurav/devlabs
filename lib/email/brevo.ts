@@ -412,17 +412,21 @@ export interface OtpEmailParams {
   clientIp?: string | null;
   userAgent?: string | null;
   expiresMinutes?: number;
+  requestHeaders?: Headers | null;
 }
 
 /**
  * Dispatches a 6-digit OTP code to the Superadmin inbox via security@gauravservices.eu.cc
- * Styled in minimal, spam-free Wasmer Pro aesthetic.
+ * Styled in minimal, spam-free Wasmer Pro aesthetic with dynamic admin panel URLs.
  */
 export async function dispatchOtpEmail(
   params: OtpEmailParams
 ): Promise<SendEmailResult> {
   const safeOtp = escapeHtml(params.otp);
   const expiresMin = params.expiresMinutes || 5;
+  const baseUrl = resolveAppUrl(params.requestHeaders);
+  const termsUrl = `${baseUrl}/admin/terms`;
+  const privacyUrl = `${baseUrl}/admin/privacy`;
 
   const htmlContent = `<!DOCTYPE html>
 <html lang="en">
@@ -443,8 +447,8 @@ export async function dispatchOtpEmail(
 
   <div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
     <span>Gaurav Services</span> &nbsp;&bull;&nbsp;
-    <a href="https://gauravservices.eu.cc/admin/terms" style="color:#6b7280;text-decoration:none;">Terms</a> &nbsp;|&nbsp;
-    <a href="https://gauravservices.eu.cc/admin/privacy" style="color:#6b7280;text-decoration:none;">Privacy</a>
+    <a href="${termsUrl}" style="color:#6b7280;text-decoration:none;">Terms</a> &nbsp;|&nbsp;
+    <a href="${privacyUrl}" style="color:#6b7280;text-decoration:none;">Privacy</a>
   </div>
 </body>
 </html>`;
@@ -459,7 +463,7 @@ This code is valid for ${expiresMin} minutes. If you did not request this code, 
 
 Gaurav Services
 
-Terms: https://gauravservices.eu.cc/admin/terms | Privacy: https://gauravservices.eu.cc/admin/privacy`;
+Terms: ${termsUrl} | Privacy: ${privacyUrl}`;
 
   return sendTransactionalEmail({
     purpose: "SECURITY_OTP",
@@ -479,11 +483,12 @@ export interface NewIpAlertParams {
   verifyUrl: string;
   userAgent?: string | null;
   expiresMinutes?: number;
+  requestHeaders?: Headers | null;
 }
 
 /**
  * Dispatches an untrusted IP authorization alert with 1-click approval link via security@gauravservices.eu.cc
- * Styled in minimal, spam-free Wasmer Pro aesthetic.
+ * Styled in minimal, spam-free Wasmer Pro aesthetic with dynamic admin panel URLs.
  */
 export async function dispatchNewIpSecurityAlert(
   params: NewIpAlertParams
@@ -491,6 +496,9 @@ export async function dispatchNewIpSecurityAlert(
   const safeIp = escapeHtml(params.clientIp);
   const safeUrl = escapeHtml(params.verifyUrl);
   const expiresMin = params.expiresMinutes || 15;
+  const baseUrl = resolveAppUrl(params.requestHeaders);
+  const termsUrl = `${baseUrl}/admin/terms`;
+  const privacyUrl = `${baseUrl}/admin/privacy`;
 
   const htmlContent = `<!DOCTYPE html>
 <html lang="en">
@@ -519,8 +527,8 @@ export async function dispatchNewIpSecurityAlert(
 
   <div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
     <span>Gaurav Services</span> &nbsp;&bull;&nbsp;
-    <a href="https://gauravservices.eu.cc/admin/terms" style="color:#6b7280;text-decoration:none;">Terms</a> &nbsp;|&nbsp;
-    <a href="https://gauravservices.eu.cc/admin/privacy" style="color:#6b7280;text-decoration:none;">Privacy</a>
+    <a href="${termsUrl}" style="color:#6b7280;text-decoration:none;">Terms</a> &nbsp;|&nbsp;
+    <a href="${privacyUrl}" style="color:#6b7280;text-decoration:none;">Privacy</a>
   </div>
 </body>
 </html>`;
@@ -536,7 +544,7 @@ This link is valid for ${expiresMin} minutes. If you did not make this request, 
 
 Gaurav Services
 
-Terms: https://gauravservices.eu.cc/admin/terms | Privacy: https://gauravservices.eu.cc/admin/privacy`;
+Terms: ${termsUrl} | Privacy: ${privacyUrl}`;
 
   return sendTransactionalEmail({
     purpose: "SECURITY_ALERT",

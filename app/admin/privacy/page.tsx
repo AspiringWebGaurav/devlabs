@@ -56,9 +56,9 @@ export default function AdminPrivacyPage() {
           <div className="flex flex-wrap items-center gap-4 pt-3 text-xs font-admin-mono text-[#94A3B8] border-t border-[#F1F5F9]">
             <span>Original Effective: January 1, 2026</span>
             <span>·</span>
-            <span>Last Updated: August 25, 2026</span>
+            <span>Last Updated: August 26, 2026</span>
             <span>·</span>
-            <span>Version: 1.0.0 (Phase 0 Standard)</span>
+            <span>Version: 1.1.0 (Enterprise Multi-Tier Standard)</span>
             <span>·</span>
             <span className="text-[#10B981] font-semibold">Compliance: Strict</span>
           </div>
@@ -78,6 +78,14 @@ export default function AdminPrivacyPage() {
                 <div className="flex items-center justify-between text-[#64748B]">
                   <span>OAuth Scopes</span>
                   <span className="font-semibold text-black">openid, email, profile</span>
+                </div>
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>2FA Storage</span>
+                  <span className="font-semibold text-black">HMAC Hashed (Salted)</span>
+                </div>
+                <div className="flex items-center justify-between text-[#64748B]">
+                  <span>IP Telemetry</span>
+                  <span className="font-semibold text-black">Ephemeral (15m TTL)</span>
                 </div>
                 <div className="flex items-center justify-between text-[#64748B]">
                   <span>Session Cookie</span>
@@ -215,6 +223,46 @@ export default function AdminPrivacyPage() {
               </div>
               <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
                 All administrative views and API routes are configured with <code>no-store</code> cache directives (<code>export const dynamic = &quot;force-dynamic&quot;</code>). Authenticated data is never stored in public intermediary caches or Next.js Data Cache layers, guaranteeing that private inquiries and session states are never leaked to unauthorized visitors.
+              </p>
+            </div>
+
+            {/* Section 6 */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                  <FaLock className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div>
+                  <span className="font-admin-mono text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider block">
+                    Section 06
+                  </span>
+                  <h2 className="text-lg font-bold font-admin-sans text-black">
+                    Two-Factor OTP &amp; Security IP Telemetry Governance
+                  </h2>
+                </div>
+              </div>
+              <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
+                One-Time Passcodes (OTP) generated during 2FA are stored exclusively in salted HMAC-SHA256 hashed representations; plaintext codes are never written to database logs. Device IP addresses and client user-agents collected during authentication are utilized strictly for real-time risk evaluation and security link generation via <code>security@gauravservices.eu.cc</code>. Unverified IP challenge documents are governed by an immutable 15-minute TTL and automatically purged upon consumption or expiration.
+              </p>
+            </div>
+
+            {/* Section 7 */}
+            <div className="bg-[#FFFFFF] border border-[#E2E8F0] p-6 sm:p-8 rounded-none sm:rounded-sm shadow-2xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                  <FaUserCheck className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div>
+                  <span className="font-admin-mono text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider block">
+                    Section 07
+                  </span>
+                  <h2 className="text-lg font-bold font-admin-sans text-black">
+                    Complete 5-Step Session Detach &amp; Zero Residual Storage
+                  </h2>
+                </div>
+              </div>
+              <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
+                Initiating sign-out executes an atomic 5-step detachment sequence that invalidates the cryptographic <code>admin_session</code> cookie on the server via <code>DELETE /api/admin/auth/session</code>, clears client cookie stores, terminates Firebase authentication instances, and purges temporary browser session storage. Following detachment, no tokens, identities, or privileged state remain in client memory or browser caches.
               </p>
             </div>
           </div>

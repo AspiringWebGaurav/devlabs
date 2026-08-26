@@ -106,7 +106,7 @@ function PrivacyContentInner() {
           <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400 font-mono">
             <span>Original Effective: January 1, 2026</span>
             <span>•</span>
-            <span className="text-purple font-semibold">Last Updated: August 25, 2026</span>
+            <span className="text-purple font-semibold">Last Updated: August 26, 2026</span>
             <span>•</span>
             <span className="text-emerald-400 font-semibold">Standard: Privacy-First</span>
           </div>
@@ -278,10 +278,23 @@ function PrivacyContentInner() {
             </ul>
           </section>
 
-          {/* Section 6: Contact */}
+          {/* Section 6: Administrative Subsystem Privacy Governance */}
+          {filterMode === "all" && (
+            <section id="admin-privacy" className="space-y-3">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
+                <FaShieldHalved className="w-4 h-4 text-purple" />
+                <span>6. Administrative Subsystem Privacy Governance</span>
+              </h2>
+              <p>
+                The administrative panel (<code className="text-purple font-mono">/admin/*</code>) maintains a strictly isolated data governance architecture. Administrative authentication is restricted to authorized Superadmins via Google OAuth 2.0 PKCE. 2FA One-Time Passcodes are stored in salted HMAC-SHA256 hashed representations, and security IP verification challenges operate under an immutable 15-minute TTL. Sign-out triggers a complete 5-step detachment that clears all cookies, tokens, and browser session storage. Detailed administrative privacy protocols are documented in the <Link href="/admin/privacy" className="text-purple hover:underline font-semibold">Administrator Privacy Policy</Link>.
+              </p>
+            </section>
+          )}
+
+          {/* Section 7: Contact */}
           <section id="contact-requests" className="space-y-3">
             <h2 className="text-xl font-semibold text-white">
-              6. Contact &amp; Data Requests
+              7. Contact &amp; Data Requests
             </h2>
             <p>
               For any privacy inquiries, data deletion requests, or security disclosures, reach out directly to:

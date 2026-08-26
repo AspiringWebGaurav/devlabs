@@ -107,7 +107,7 @@ function TermsContentInner() {
           <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400 font-mono">
             <span>Original Effective: January 1, 2026</span>
             <span>•</span>
-            <span className="text-purple font-semibold">Last Updated: August 25, 2026</span>
+            <span className="text-purple font-semibold">Last Updated: August 26, 2026</span>
             <span>•</span>
             <span className="text-emerald-400 font-semibold">Jurisdiction: Standard Global</span>
           </div>
@@ -240,25 +240,38 @@ function TermsContentInner() {
               )}
             </div>
             <p>
-              All transactional emails, contact receipts, and security alerts are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravservices.eu.cc</span> via Brevo API. We maintain a zero-spam guarantee: your submitted email will never be enrolled in promotional sequences without express consent.
+              All transactional emails, contact receipts, and security alerts are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravservices.eu.cc</span> via Brevo API. Official sender identities include <code className="text-purple font-mono">hello@gauravservices.eu.cc</code> (inquiries and auto-replies), <code className="text-purple font-mono">security@gauravservices.eu.cc</code> (authentication alerts), and <code className="text-purple font-mono">no-reply@gauravservices.eu.cc</code> (system OTPs). We maintain a strict zero-spam guarantee: submitted contact emails are never enrolled in marketing sequences.
             </p>
           </section>
 
-          {/* Section 6: Limitation of Liability */}
+          {/* Section 6: Administrative Subsystem Governance */}
+          {filterMode === "all" && (
+            <section id="admin-governance" className="space-y-3">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
+                <FaShieldHalved className="w-4 h-4 text-purple" />
+                <span>6. Administrative Subsystem Isolation &amp; 2FA Governance</span>
+              </h2>
+              <p>
+                The administrative panel (<code className="text-purple font-mono">/admin/*</code>) is an isolated workspace strictly restricted to authorized Superadmins. Administrative access requires Google OAuth 2.0 PKCE, salted HMAC-SHA256 Two-Factor Authentication (OTP), and zero-lockout IP security verification. Administrative access and data operations are governed separately under the <Link href="/admin/terms" className="text-purple hover:underline font-semibold">Administrator Terms of Service</Link>.
+              </p>
+            </section>
+          )}
+
+          {/* Section 7: Limitation of Liability */}
           <section id="liability" className="space-y-3">
             <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
-              <FaShieldHalved className="w-4 h-4 text-purple" />
-              <span>6. Limitation of Liability &amp; Disclaimers</span>
+              <FaScaleBalanced className="w-4 h-4 text-purple" />
+              <span>7. Limitation of Liability &amp; Disclaimers</span>
             </h2>
             <p>
               This website and its demonstrative artifacts are provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis. In no event shall Gaurav Patil be liable for indirect, incidental, or consequential damages resulting from the use of this website.
             </p>
           </section>
 
-          {/* Section 7: Legal Contact */}
+          {/* Section 8: Legal Contact */}
           <section id="legal-contact" className="space-y-3">
             <h2 className="text-xl font-semibold text-white">
-              7. Inquiries &amp; Legal Notices
+              8. Inquiries &amp; Legal Notices
             </h2>
             <p>
               For legal inquiries, contract proposals, or engagement agreements:

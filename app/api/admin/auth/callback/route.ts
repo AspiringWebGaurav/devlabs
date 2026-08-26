@@ -99,6 +99,7 @@ export async function GET(request: NextRequest) {
       avatar,
       clientIp,
       userAgent,
+      requestHeaders: request.headers,
     });
 
     // Set secure httpOnly OTP challenge cookie and redirect to /admin/otp
