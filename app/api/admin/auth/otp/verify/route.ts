@@ -7,6 +7,7 @@ import {
 import { createAdminSessionPayload, signAdminSession } from "@/lib/admin/auth";
 import { otpService } from "@/lib/admin/services/otp.service";
 import { ipSecurityService, normalizeIpAddress } from "@/lib/admin/services/ip-security.service";
+import { authChallengesRepository } from "@/lib/admin/repositories/auth-challenges.repository";
 import { dispatchNewIpSecurityAlert } from "@/lib/email/brevo";
 
 export const dynamic = "force-dynamic";
@@ -122,16 +123,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Case 4: IP is Authorized & OTP Validated -> Finalize Challenge & Elevate to Full Admin Session
-    await otpService.getChallenge(challenge.id).then(async (latest) => {
-      if (latest && !latest.isConsumed) {
-        const { authChallengesRepository } = await import("@/lib/admin/repositories/auth-challenges.repository");
-        await authChallengesRepository.updateChallenge(challenge.id, {
-          ipVerified: true,
-          isConsumed: true,
-          consumedAt: Date.now(),
-        }).catch(() => {});
-      }
-    });
+    authChallengesRepository.updateChallenge(challenge.id, {
+      ipVerified: true,
+      isConsumed: true,
+      consumedAt: Date.now(),
+    }).catch(() => {});
 
     const session = createAdminSessionPayload(email, challenge.avatar, challenge.name);
     const signedToken = await signAdminSession(session);
@@ -139,7 +135,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       verified: true,
-      redirect: "/admin/authenticating",
+      redirect: "/admin",
     });
 
     const isSecure = process.env.NODE_ENV === "production";

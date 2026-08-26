@@ -12,6 +12,7 @@ import {
   FaCircleNotch,
   FaKey,
 } from "react-icons/fa6";
+import { AdminPanelLoader } from "../overview/AdminPanelLoader";
 
 export type AuthUiStage = "PRIMARY_OTP" | "AWAITING_IP" | "FALLBACK_PASSCODE";
 
@@ -231,10 +232,6 @@ export const AdminOtpForm: React.FC = () => {
       isSuccessRef.current = true;
       setIsSuccess(true);
       setErrorMsg(null);
-      setSuccessMsg("Verification successful. Initializing secure workspace...");
-      scheduleTimeout(() => {
-        window.location.href = data.redirect || "/admin/authenticating";
-      }, 500);
     } catch {
       setErrorMsg("Network error connecting to verification service. Please try again.");
       triggerShake();
@@ -305,10 +302,6 @@ export const AdminOtpForm: React.FC = () => {
       isSuccessRef.current = true;
       setIsSuccess(true);
       setErrorMsg(null);
-      setSuccessMsg("Passcode verified! Initializing secure workspace...");
-      scheduleTimeout(() => {
-        window.location.href = data.redirect || "/admin/authenticating";
-      }, 500);
     } catch {
       setErrorMsg("Network error connecting to authorization service. Please try again.");
       triggerShake();
@@ -451,10 +444,9 @@ export const AdminOtpForm: React.FC = () => {
 
         if (data.status === "VERIFIED") {
           stopPolling("VERIFIED");
-          setSuccessMsg("IP address authorized! Loading workspace...");
-          scheduleTimeout(() => {
-            window.location.href = data.redirect || "/admin/authenticating";
-          }, 800);
+          isSuccessRef.current = true;
+          setIsSuccess(true);
+          setErrorMsg(null);
         } else if (data.status === "EXPIRED") {
           stopPolling("EXPIRED");
           setErrorMsg("Verification challenge expired. Redirecting to sign in...");
@@ -479,6 +471,17 @@ export const AdminOtpForm: React.FC = () => {
       stopPolling("UNMOUNT");
     };
   }, [stage, router, scheduleTimeout]);
+
+  if (isSuccess) {
+    return (
+      <AdminPanelLoader
+        fullScreen={true}
+        onComplete={() => {
+          window.location.replace("/admin");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-[420px]">

@@ -107,22 +107,42 @@ export function constantTimeCompare(a: string, b: string): boolean {
 }
 
 export class IpSecurityService {
+  private trustedIpCache = new Map<string, { trusted: boolean; expiresAt: number }>();
+  private trustedCountCache = new Map<string, { count: number; expiresAt: number }>();
+
   /**
    * Checks if an IP is already trusted for the given admin email.
-   * Single-document point lookup using deterministic key.
+   * Single-document point lookup using deterministic key with memory caching.
    */
   public async isIpTrusted(email: string, normalizedIp: string): Promise<boolean> {
     const docId = generateDeterministicIpKey(email, normalizedIp);
+    const cached = this.trustedIpCache.get(docId);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.trusted;
+    }
+
     const result = await authChallengesRepository.getTrustedIp(docId);
-    return Boolean(result.success && result.data && result.data.ip === normalizedIp);
+    const isTrusted = Boolean(result.success && result.data && result.data.ip === normalizedIp);
+    if (isTrusted) {
+      this.trustedIpCache.set(docId, { trusted: true, expiresAt: Date.now() + 10 * 60 * 1000 });
+    }
+    return isTrusted;
   }
 
   /**
    * Checks how many trusted IPs exist for this admin email.
    */
   public async getTrustedIpCount(email: string): Promise<number> {
-    const result = await authChallengesRepository.countTrustedIpsForEmail(email);
-    return result.success && typeof result.data === "number" ? result.data : 0;
+    const normEmail = email.trim().toLowerCase();
+    const cached = this.trustedCountCache.get(normEmail);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.count;
+    }
+
+    const result = await authChallengesRepository.countTrustedIpsForEmail(normEmail);
+    const count = result.success && typeof result.data === "number" ? result.data : 0;
+    this.trustedCountCache.set(normEmail, { count, expiresAt: Date.now() + 5 * 60 * 1000 });
+    return count;
   }
 
   /**
@@ -136,6 +156,7 @@ export class IpSecurityService {
   ): Promise<void> {
     const now = Date.now();
     const docId = generateDeterministicIpKey(email, normalizedIp);
+    this.trustedIpCache.set(docId, { trusted: true, expiresAt: now + 10 * 60 * 1000 });
     const record: AdminTrustedIpRecord = {
       id: docId,
       email: email.trim().toLowerCase(),

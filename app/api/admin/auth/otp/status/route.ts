@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
       const response = NextResponse.json({
         status: "VERIFIED",
-        redirect: "/admin/authenticating",
+        redirect: "/admin",
       });
 
       const isSecure = process.env.NODE_ENV === "production";

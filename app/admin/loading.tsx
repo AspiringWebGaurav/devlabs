@@ -1,11 +1,6 @@
 import React from "react";
-import { AdminPageContainer } from "@/components/admin/layout";
-import { AdminOverviewSkeleton } from "@/components/admin/skeletons";
+import { AdminPanelLoader } from "@/components/admin/overview/AdminPanelLoader";
 
 export default function AdminLoading() {
-  return (
-    <AdminPageContainer breadcrumb="PORTFOLIO SERVICES">
-      <AdminOverviewSkeleton />
-    </AdminPageContainer>
-  );
+  return <AdminPanelLoader fullScreen={true} />;
 }

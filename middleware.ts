@@ -41,8 +41,19 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // Case B: Authenticated admin visiting /admin/login -> redirect to /admin dashboard
+    // Case B: Authenticated admin visiting /admin/login -> redirect to /admin dashboard (unless explicitly signed out)
     if (isAuthenticated && pathname === "/admin/login") {
+      const isExplicitSignOut = request.nextUrl.searchParams.get("signedOut") === "true";
+      if (isExplicitSignOut) {
+        // User explicitly signed out: purge session cookie and allow login page to render
+        const response = NextResponse.next({
+          request: {
+            headers: requestHeaders,
+          },
+        });
+        response.cookies.delete(ADMIN_COOKIE_NAME);
+        return response;
+      }
       return NextResponse.redirect(new URL("/admin", request.url));
     }
 

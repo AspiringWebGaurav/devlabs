@@ -201,4 +201,5 @@ export async function getClientAdminSession(): Promise<AdminSession | null> {
 export function clearClientAdminSession(): void {
   if (typeof document === "undefined") return;
   document.cookie = `${ADMIN_COOKIE_NAME}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+  document.cookie = `${ADMIN_COOKIE_NAME}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure`;
 }
