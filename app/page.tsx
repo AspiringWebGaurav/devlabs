@@ -1,10 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { HeroSection } from "@/components/portfolio";
+import { HeroSection } from "@/components/portfolio/HeroSection";
 import { FloatingNav } from "@/components/ui/FloatingNav";
 import { navItems } from "@/data";
-import { AdaptiveLazySection } from "@/components/ui/AdaptiveLazySection";
 import ScrollToTop from "@/components/ui/ScrollToTop";
 
 import {
@@ -18,27 +17,27 @@ import {
 
 // Dynamically chunk and defer below-the-fold modules with dedicated skeletons
 const GridSection = dynamic(
-  () => import("@/components/portfolio").then((m) => m.GridSection),
+  () => import("@/components/portfolio/GridSection").then((m) => m.GridSection),
   { ssr: false, loading: () => <GridSectionSkeleton /> }
 );
 const ProjectsSection = dynamic(
-  () => import("@/components/portfolio").then((m) => m.ProjectsSection),
+  () => import("@/components/portfolio/ProjectsSection").then((m) => m.ProjectsSection),
   { ssr: false, loading: () => <ProjectsSectionSkeleton /> }
 );
 const TestimonialsSection = dynamic(
-  () => import("@/components/portfolio").then((m) => m.TestimonialsSection),
+  () => import("@/components/portfolio/TestimonialsSection").then((m) => m.TestimonialsSection),
   { ssr: false, loading: () => <TestimonialsSectionSkeleton /> }
 );
 const ExperienceSection = dynamic(
-  () => import("@/components/portfolio").then((m) => m.ExperienceSection),
+  () => import("@/components/portfolio/ExperienceSection").then((m) => m.ExperienceSection),
   { ssr: false, loading: () => <ExperienceSectionSkeleton /> }
 );
 const ApproachSection = dynamic(
-  () => import("@/components/portfolio").then((m) => m.ApproachSection),
+  () => import("@/components/portfolio/ApproachSection").then((m) => m.ApproachSection),
   { ssr: false, loading: () => <ApproachSectionSkeleton /> }
 );
 const FooterSection = dynamic(
-  () => import("@/components/portfolio").then((m) => m.FooterSection),
+  () => import("@/components/portfolio/FooterSection").then((m) => m.FooterSection),
   { ssr: false, loading: () => <FooterSectionSkeleton /> }
 );
 
@@ -50,30 +49,30 @@ export default function Home() {
         {/* Critical first fold: hydrates synchronously */}
         <HeroSection />
 
-        {/* Screen-Adaptive lazy-loaded sections with dedicated skeleton fallbacks */}
-        <AdaptiveLazySection id="about" minHeight="600px" placeholder={<GridSectionSkeleton />}>
+        {/* Below-the-fold modules with instant frame-0 high-contrast skeleton fallbacks */}
+        <div id="about" className="w-full">
           <GridSection />
-        </AdaptiveLazySection>
+        </div>
 
-        <AdaptiveLazySection id="projects" minHeight="700px" placeholder={<ProjectsSectionSkeleton />}>
+        <div id="projects" className="w-full">
           <ProjectsSection />
-        </AdaptiveLazySection>
+        </div>
 
-        <AdaptiveLazySection id="testimonials" minHeight="500px" placeholder={<TestimonialsSectionSkeleton />}>
+        <div id="testimonials" className="w-full">
           <TestimonialsSection />
-        </AdaptiveLazySection>
+        </div>
 
-        <AdaptiveLazySection id="experience" minHeight="450px" placeholder={<ExperienceSectionSkeleton />}>
+        <div id="experience" className="w-full">
           <ExperienceSection />
-        </AdaptiveLazySection>
+        </div>
 
-        <AdaptiveLazySection id="approach" minHeight="600px" placeholder={<ApproachSectionSkeleton />}>
+        <div id="approach" className="w-full">
           <ApproachSection />
-        </AdaptiveLazySection>
+        </div>
 
-        <AdaptiveLazySection id="contact" minHeight="400px" placeholder={<FooterSectionSkeleton />}>
+        <div id="contact" className="w-full">
           <FooterSection />
-        </AdaptiveLazySection>
+        </div>
 
         <ScrollToTop />
       </div>

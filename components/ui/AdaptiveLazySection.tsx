@@ -11,10 +11,14 @@ interface AdaptiveLazySectionProps {
   placeholder?: React.ReactNode;
 }
 
+const KNOWN_SECTIONS = ["about", "projects", "testimonials", "experience", "approach", "contact"];
+
 /**
  * Screen-Adaptive Lazy Section Controller
- * - On Mobile (< 768px): Uses a conservative 200px viewport margin to conserve cellular data and CPU.
- * - On Desktop (>= 768px): Uses an anticipatory 500px viewport margin to pre-warm 3D visual shaders.
+ * - Renders skeleton placeholders with 100% immediate visibility (Zero blank space on fast scroll).
+ * - On Mobile (< 768px): Uses an anticipatory 800px viewport margin to pre-fetch chunks before fast touch flings.
+ * - On Desktop (>= 768px): Uses a 1000px viewport margin for instant WebGL and shader compilation.
+ * - Progressive Idle Pre-Warming: Uses requestIdleCallback to quietly hydrate downstream sections in sequence.
  * - Direct deep-links & navigation events trigger immediate hydration with zero layout shift (CLS = 0).
  */
 export function AdaptiveLazySection({
@@ -25,21 +29,22 @@ export function AdaptiveLazySection({
   placeholder,
 }: AdaptiveLazySectionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
   const [hasRendered, setHasRendered] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     // Check if directly loaded via deep-link URL (e.g. /projects, /about, /testimonials, /contact) or hard refresh while scrolled
-    const knownSections = ["about", "projects", "testimonials", "experience", "approach", "contact"];
-    const savedActiveSection = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("portfolio_active_section") : null;
+    const savedActiveSection =
+      typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem("portfolio_active_section")
+        : null;
 
     if (id) {
       const currentPath = window.location.pathname.replace(/^\//, "").replace(/^#/, "");
-      const targetIndex = knownSections.indexOf(currentPath);
-      const savedIndex = savedActiveSection ? knownSections.indexOf(savedActiveSection) : -1;
-      const currentIndex = knownSections.indexOf(id);
+      const targetIndex = KNOWN_SECTIONS.indexOf(currentPath);
+      const savedIndex = savedActiveSection ? KNOWN_SECTIONS.indexOf(savedActiveSection) : -1;
+      const currentIndex = KNOWN_SECTIONS.indexOf(id);
 
       if (
         currentPath === id ||
@@ -49,7 +54,6 @@ export function AdaptiveLazySection({
         (savedIndex !== -1 && currentIndex !== -1 && currentIndex <= savedIndex) ||
         window.scrollY > 150
       ) {
-        setIsVisible(true);
         setHasRendered(true);
         return;
       }
@@ -60,30 +64,53 @@ export function AdaptiveLazySection({
       const customEvent = e as CustomEvent<{ link?: string }>;
       const link = customEvent.detail?.link || "";
       const targetId = link.replace(/^\//, "").replace(/^#/, "");
-      const targetIndex = knownSections.indexOf(targetId);
-      const currentIndex = knownSections.indexOf(id || "");
+      const targetIndex = KNOWN_SECTIONS.indexOf(targetId);
+      const currentIndex = KNOWN_SECTIONS.indexOf(id || "");
 
       if (
         (id && targetId === id) ||
         (targetIndex !== -1 && currentIndex !== -1 && currentIndex <= targetIndex)
       ) {
-        setIsVisible(true);
         setHasRendered(true);
       }
     };
 
     window.addEventListener("nav-scroll-start", handleNavStart);
 
-    // Adaptive viewport detection
+    // Progressive idle pre-warmer: hydrate sequentially during browser idle moments
+    let idleTimer: NodeJS.Timeout | null = null;
+    let idleCallbackId: number | null = null;
+
+    const sectionIndex = id ? KNOWN_SECTIONS.indexOf(id) : 0;
+    const staggeredDelay = 600 + Math.max(0, sectionIndex) * 350;
+
+    if (typeof window !== "undefined") {
+      if ("requestIdleCallback" in window) {
+        idleCallbackId = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(
+          () => {
+            idleTimer = setTimeout(() => {
+              setHasRendered(true);
+            }, staggeredDelay);
+          },
+          { timeout: 3500 }
+        );
+      } else {
+        idleTimer = setTimeout(() => {
+          setHasRendered(true);
+        }, staggeredDelay);
+      }
+    }
+
+    // Generous anticipatory Intersection Observer
     const isMobile = window.innerWidth < 768;
-    const rootMargin = isMobile ? "200px 0px" : "500px 0px";
+    const rootMargin = isMobile ? "800px 0px" : "1000px 0px";
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setIsVisible(true);
           setHasRendered(true);
           observer.disconnect();
+          if (idleTimer) clearTimeout(idleTimer);
         }
       },
       { rootMargin }
@@ -97,6 +124,10 @@ export function AdaptiveLazySection({
     return () => {
       observer.disconnect();
       window.removeEventListener("nav-scroll-start", handleNavStart);
+      if (idleTimer) clearTimeout(idleTimer);
+      if (idleCallbackId !== null && "cancelIdleCallback" in window) {
+        (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(idleCallbackId);
+      }
     };
   }, [id]);
 
@@ -105,13 +136,10 @@ export function AdaptiveLazySection({
       ref={containerRef}
       id={id}
       style={{ minHeight: !hasRendered ? minHeight : undefined }}
-      className={cn("w-full transition-opacity duration-500 ease-out", className, {
-        "opacity-100": isVisible,
-        "opacity-0": !isVisible && !hasRendered,
-      })}
+      className={cn("w-full relative opacity-100", className)}
     >
       {hasRendered ? (
-        children
+        <div className="w-full animate-in fade-in duration-300 ease-out">{children}</div>
       ) : (
         placeholder || (
           <div
