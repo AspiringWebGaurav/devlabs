@@ -15,7 +15,7 @@ export const TestimonialsSectionSkeleton = () => {
           {[1, 2].map((cardIdx) => (
             <div
               key={cardIdx}
-              className="w-[85vw] max-w-[420px] md:w-[60vw] h-[280px] md:h-[320px] rounded-2xl border border-white/20 p-6 md:p-12 flex flex-col justify-between shrink-0 skeleton-shimmer bg-[#0B0F33]/90 shadow-2xl"
+              className="w-[90vw] max-w-full md:w-[60vw] h-[280px] md:h-[320px] rounded-2xl border border-white/20 p-6 md:p-12 flex flex-col justify-between shrink-0 skeleton-shimmer bg-[#0B0F33]/90 shadow-2xl"
             >
               <div className="space-y-3">
                 <div className="w-full h-4 bg-white/25 rounded-md" />

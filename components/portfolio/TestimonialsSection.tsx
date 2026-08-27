@@ -14,13 +14,23 @@ export const TestimonialsSection = ({
   testimonials = SEED_TESTIMONIALS,
   clients = SEED_CLIENTS,
 }: TestimonialsSectionProps) => {
-  const formattedTestimonials = testimonials.map((t) => ({
+  const activeTestimonials =
+    testimonials && testimonials.length > 0
+      ? testimonials
+      : SEED_TESTIMONIALS;
+
+  const formattedTestimonials = activeTestimonials.map((t) => ({
     quote: t.quote,
     name: t.name,
     title: t.role || t.company,
   }));
 
-  const sortedClients = [...clients].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const activeClients =
+    clients && clients.length > 0
+      ? clients
+      : SEED_CLIENTS;
+
+  const sortedClients = [...activeClients].sort((a, b) => (a.order || 0) - (b.order || 0));
 
   return (
     <section className="py-20">
@@ -30,7 +40,7 @@ export const TestimonialsSection = ({
       </h1>
 
       <div className="flex flex-col items-center max-lg:mt-10">
-        <div className="h-[50vh] md:h-[30rem] rounded-md flex flex-col antialiased items-center justify-center relative overflow-hidden">
+        <div className="h-[50vh] md:h-[30rem] w-full rounded-md flex flex-col antialiased items-center justify-center relative overflow-hidden">
           <InfiniteMovingCards
             items={formattedTestimonials}
             direction="right"
