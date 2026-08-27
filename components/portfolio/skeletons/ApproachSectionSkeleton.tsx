@@ -13,7 +13,7 @@ export const ApproachSectionSkeleton = () => {
         {[1, 2, 3].map((phase) => (
           <div
             key={phase}
-            className="border border-white/20 max-w-sm w-full p-8 relative lg:h-[35rem] h-[28rem] rounded-3xl flex flex-col justify-center items-center text-center skeleton-shimmer bg-[#0B0F33]/90 shadow-2xl"
+            className="border border-white/20 max-w-sm w-full p-8 relative lg:h-[35rem] min-h-[18rem] rounded-3xl flex flex-col justify-center items-center text-center skeleton-shimmer bg-[#0B0F33]/90 shadow-2xl"
           >
             <div className="w-28 h-12 rounded-full bg-purple/25 border border-purple/40 mb-6" />
             <div className="w-48 h-6 bg-white/25 rounded-md mb-4" />

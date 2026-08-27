@@ -17,7 +17,7 @@ export const FooterSectionSkeleton = () => {
           {[1, 2, 3].map((icon) => (
             <div
               key={icon}
-              className="w-10 h-10 rounded-lg bg-purple/20 border border-purple/35"
+              className="w-11 h-11 rounded-lg bg-purple/20 border border-purple/35"
             />
           ))}
         </div>

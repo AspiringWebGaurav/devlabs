@@ -63,7 +63,11 @@ export const ScrollToTop = () => {
           whileHover={{ scale: 1.12, y: -2 }}
           whileTap={{ scale: 0.9 }}
           onClick={scrollToTop}
-          className="fixed bottom-5 right-5 sm:bottom-8 sm:right-8 z-50 group flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-white/20 bg-[#000319]/80 backdrop-blur-xl text-purple shadow-[0_0_25px_rgba(203,172,249,0.3)] hover:shadow-[0_0_35px_rgba(203,172,249,0.65)] hover:border-purple/60 transition-colors duration-300 cursor-pointer overflow-hidden"
+          className="fixed z-50 group flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-white/20 bg-[#000319]/80 backdrop-blur-xl text-purple shadow-[0_0_25px_rgba(203,172,249,0.3)] hover:shadow-[0_0_35px_rgba(203,172,249,0.65)] hover:border-purple/60 transition-colors duration-300 cursor-pointer overflow-hidden touch-manipulation"
+          style={{
+            bottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))",
+            right: "calc(1.25rem + env(safe-area-inset-right, 0px))",
+          }}
           aria-label="Back to top"
         >
           <span className="absolute inset-0 rounded-full bg-gradient-to-t from-purple/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />

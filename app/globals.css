@@ -69,6 +69,9 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    width: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   * {
     @apply border-border;
@@ -80,11 +83,20 @@
   }
   body {
     @apply bg-background text-foreground;
+    width: 100%;
+    overflow-x: hidden;
   }
   body:has([data-admin="true"]),
   [data-admin="true"] {
     background-color: #FAFAFA !important;
     color: #000000 !important;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
   }
   button {
     @apply active:outline-none;
@@ -93,7 +105,7 @@
 
 @layer utilities {
   .heading {
-    @apply font-bold text-4xl md:text-5xl text-center;
+    @apply font-bold text-3xl sm:text-4xl md:text-5xl text-center leading-tight tracking-tight;
   }
 
   .black-gradient {
@@ -152,6 +164,13 @@
     rgba(255, 255, 255, 0) 100%
   );
   animation: skeletonShimmer 1.8s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer::after {
+    animation: none !important;
+    display: none !important;
+  }
 }
 
 @keyframes scroll {

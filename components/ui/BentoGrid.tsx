@@ -168,7 +168,7 @@ export const BentoGridItem = ({
 
           {/* Tech stack list */}
           {isType("tech_stack", 3) && (
-            <div className="flex gap-1 lg:gap-5 w-fit absolute -right-3 lg:-right-2">
+            <div className="flex gap-1 lg:gap-5 w-fit absolute -right-2 sm:-right-2 lg:-right-2 scale-90 sm:scale-95 lg:scale-100 origin-right">
               <div className="flex flex-col gap-3 md:gap-3 lg:gap-8">
                 {((techStackLeft && techStackLeft.length > 0) ? techStackLeft : ["ReactJS", "Express", "Typescript"]).map((item, i) => (
                   <span

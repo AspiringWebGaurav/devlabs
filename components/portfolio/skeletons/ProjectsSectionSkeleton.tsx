@@ -9,18 +9,18 @@ export const ProjectsSectionSkeleton = () => {
         <div className="w-48 h-5 bg-purple/30 rounded-md" />
       </div>
 
-      <div className="flex flex-wrap items-center justify-center p-4 gap-x-24 gap-y-8 mt-10">
+      <div className="flex flex-wrap items-center justify-center p-2 sm:p-4 gap-x-24 gap-y-8 mt-6 sm:mt-10">
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="sm:h-[41rem] h-[32rem] lg:min-h-[32.5rem] flex items-center justify-center sm:w-[570px] w-[80vw]"
+            className="sm:h-[41rem] h-[30rem] lg:min-h-[32.5rem] flex items-center justify-center sm:w-[570px] w-[90vw] max-w-[570px]"
           >
             <div
               className="w-full h-full rounded-2xl border border-white/20 p-6 flex flex-col justify-between skeleton-shimmer bg-[#0B0F33]/90 shadow-2xl"
             >
               {/* Image box placeholder */}
               <div
-                className="w-full sm:h-[40vh] h-[30vh] rounded-2xl border border-white/10 mb-6 flex items-center justify-center bg-[#13162D]"
+                className="w-full sm:h-[40vh] h-[28vh] rounded-2xl border border-white/10 mb-6 flex items-center justify-center bg-[#13162D]"
               >
                 <div className="w-16 h-16 rounded-full bg-purple/20 border border-purple/30" />
               </div>

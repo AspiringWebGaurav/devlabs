@@ -867,7 +867,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                       onBlur={() => setIsInputFocused(false)}
                       placeholder="Your full name"
                       disabled={isSubmitting}
-                      className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[38px] sm:h-[42px]"
+                      className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-white/[0.04] border border-white/[0.1] focus:border-purple focus:bg-white/[0.07] rounded-xl text-base sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[42px]"
                     />
                   </div>
                 </div>
@@ -913,7 +913,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         email.trim().length > 4 && !emailValidation.isValid
                           ? "border-amber-400/50 focus:border-amber-400"
                           : "border-white/[0.1] focus:border-purple"
-                      } focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[38px] sm:h-[42px]`}
+                      } focus:bg-white/[0.07] rounded-xl text-base sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all touch-manipulation h-[42px]`}
                     />
                   </div>
                 </div>
@@ -958,7 +958,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     message.trim().length >= 8 && !messageValidation.isValid
                       ? "border-amber-400/50 focus:border-amber-400"
                       : "border-white/[0.1] focus:border-purple"
-                  } focus:bg-white/[0.07] rounded-xl text-[15px] sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all resize-none leading-snug touch-manipulation flex-1 ${
+                  } focus:bg-white/[0.07] rounded-xl text-base sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none transition-all resize-none leading-snug touch-manipulation flex-1 ${
                     isSubmitting
                       ? "min-h-[42px] max-h-[50px]"
                       : "min-h-[55px] sm:min-h-[85px] max-h-[75px] sm:max-h-[120px]"

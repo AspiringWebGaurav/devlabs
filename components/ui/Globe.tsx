@@ -287,6 +287,8 @@ export function World(props: WorldProps) {
   return (
     <Canvas
       dpr={[1, 2]}
+      style={{ touchAction: "pan-y" }}
+      className="pointer-events-none md:pointer-events-auto"
       camera={{
         fov: 50,
         aspect: aspect,
@@ -320,6 +322,10 @@ export function World(props: WorldProps) {
         autoRotate={true}
         minPolarAngle={Math.PI / 3.5}
         maxPolarAngle={Math.PI - Math.PI / 3}
+        touches={{
+          ONE: 0, // Single-finger drag passes through to vertical page scrolling
+          TWO: 1, // Two-finger gesture allows 3D globe orbit
+        }}
       />
     </Canvas>
   );

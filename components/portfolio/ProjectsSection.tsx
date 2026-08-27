@@ -18,14 +18,14 @@ export const ProjectsSection = ({ projects = SEED_PROJECTS }: ProjectsSectionPro
         A small selection of{" "}
         <span className="text-purple">recent projects</span>
       </h1>
-      <div className="flex flex-wrap items-center justify-center p-4 gap-x-24 gap-y-8 mt-10">
+      <div className="flex flex-wrap items-center justify-center p-2 sm:p-4 gap-x-24 gap-y-8 mt-6 sm:mt-10">
         {sortedProjects.map(({ id, title, description, coverImage, iconLists, liveUrl }) => (
           <div
-            className="sm:h-[41rem] h-[32rem] lg:min-h-[32.5rem] flex items-center justify-center sm:w-[570px] w-[80vw]"
+            className="sm:h-[41rem] h-[30rem] lg:min-h-[32.5rem] flex items-center justify-center sm:w-[570px] w-[90vw] max-w-[570px]"
             key={id}
           >
             <PinContainer title={liveUrl} href={liveUrl}>
-              <div className="relative flex items-center justify-center sm:w-[570px] w-[80vw] overflow-hidden sm:h-[40vh] h-[30vh] mb-10">
+              <div className="relative flex items-center justify-center sm:w-[570px] w-[90vw] max-w-[570px] overflow-hidden sm:h-[40vh] h-[28vh] mb-8 sm:mb-10">
                 <div
                   className="relative w-full h-full overflow-hidden lg:rounded-3xl"
                   style={{ backgroundColor: "#13162D" }}
@@ -69,7 +69,7 @@ export const ProjectsSection = ({ projects = SEED_PROJECTS }: ProjectsSectionPro
                     href={liveUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-xs sm:text-sm text-purple hover:text-white transition-colors duration-200 font-medium group/link"
+                    className="flex items-center gap-2 text-xs sm:text-sm text-purple hover:text-white transition-colors duration-200 font-medium group/link py-2.5 px-3 min-h-[44px] touch-manipulation"
                   >
                     Check Live Site
                     <FaLocationArrow className="w-3 h-3 text-purple group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform duration-200" />

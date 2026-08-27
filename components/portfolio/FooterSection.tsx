@@ -105,14 +105,14 @@ export const FooterSection = ({
         </div>
 
         {/* Right: Social Media Links */}
-        <div className="flex items-center justify-center md:justify-end gap-3">
+        <div className="flex items-center justify-center md:justify-end gap-3.5">
           {sortedSocial.map((info) => (
             <a
               key={info.id}
               href={info.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-10 h-10 cursor-pointer flex justify-center items-center backdrop-filter backdrop-blur-lg saturate-180 bg-opacity-75 bg-black-200 rounded-lg border border-black-300 hover:border-purple/50 transition-colors duration-200 group"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] cursor-pointer flex justify-center items-center backdrop-filter backdrop-blur-lg saturate-180 bg-opacity-75 bg-black-200 rounded-lg border border-black-300 hover:border-purple/50 active:scale-95 transition-all duration-200 group touch-manipulation"
               aria-label={`Link to ${info.platform}`}
             >
               {renderSocialIcon(info)}

@@ -106,7 +106,7 @@ function PrivacyContentInner() {
           <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400 font-mono">
             <span>Original Effective: January 1, 2026</span>
             <span>•</span>
-            <span className="text-purple font-semibold">Last Updated: August 26, 2026</span>
+            <span className="text-purple font-semibold">Last Updated: August 27, 2026</span>
             <span>•</span>
             <span className="text-emerald-400 font-semibold">Standard: Privacy-First</span>
           </div>

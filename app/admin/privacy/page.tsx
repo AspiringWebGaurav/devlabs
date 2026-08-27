@@ -56,7 +56,7 @@ export default function AdminPrivacyPage() {
           <div className="flex flex-wrap items-center gap-4 pt-3 text-xs font-admin-mono text-[#94A3B8] border-t border-[#F1F5F9]">
             <span>Original Effective: January 1, 2026</span>
             <span>·</span>
-            <span>Last Updated: August 26, 2026</span>
+            <span>Last Updated: August 27, 2026</span>
             <span>·</span>
             <span>Version: 1.1.0 (Enterprise Multi-Tier Standard)</span>
             <span>·</span>

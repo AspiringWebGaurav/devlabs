@@ -16,7 +16,7 @@ export const ExperienceSection = ({ experience = SEED_EXPERIENCE }: ExperienceSe
         My <span className="text-purple">work experience</span>
       </h1>
 
-      <div className="w-full mt-12 grid lg:grid-cols-4 grid-cols-1 gap-10">
+      <div className="w-full mt-8 sm:mt-12 grid lg:grid-cols-4 sm:grid-cols-2 grid-cols-1 gap-6 sm:gap-10">
         {sortedExperience.map((card, idx) => (
           <Button
             key={card.id}
@@ -30,7 +30,7 @@ export const ExperienceSection = ({ experience = SEED_EXPERIENCE }: ExperienceSe
             }}
             className="flex-1 text-black dark:text-white border-neutral-200 dark:border-slate-800"
           >
-            <div className="flex lg:flex-row flex-col lg:items-center p-3 py-6 md:p-5 lg:p-10 gap-2">
+            <div className="flex lg:flex-row flex-col lg:items-center p-4 py-6 sm:p-5 lg:p-10 gap-3 sm:gap-2">
               <img
                 src={card.thumbnailUrl}
                 alt={card.title}

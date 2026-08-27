@@ -32,9 +32,9 @@ export const HeroSection = ({ data = SEED_HERO }: HeroSectionProps) => {
   };
 
   return (
-    <div className="pb-12 pt-28 md:pb-16 md:pt-36 relative">
+    <div className="pb-10 pt-24 sm:pb-12 sm:pt-28 md:pb-16 md:pt-36 relative overflow-hidden">
       {/* Spotlights */}
-      <div>
+      <div className="pointer-events-none select-none">
         <Spotlight
           className="-top-40 -left-10 md:-left-32 md:-top-20 h-screen"
           fill="white"
@@ -49,7 +49,7 @@ export const HeroSection = ({ data = SEED_HERO }: HeroSectionProps) => {
       {/* Grid Pattern Background */}
       <div
         className="h-screen w-full dark:bg-black-100 bg-white dark:bg-grid-white/[0.03] bg-grid-black-100/[0.2]
-       absolute top-0 left-0 flex items-center justify-center"
+       absolute top-0 left-0 flex items-center justify-center pointer-events-none"
       >
         <div
           className="absolute pointer-events-none inset-0 flex items-center justify-center dark:bg-black-100
@@ -57,18 +57,18 @@ export const HeroSection = ({ data = SEED_HERO }: HeroSectionProps) => {
         />
       </div>
 
-      <div className="flex justify-center relative my-20 z-10">
-        <div className="max-w-[89vw] md:max-w-2xl lg:max-w-[60vw] flex flex-col items-center justify-center">
-          <p className="uppercase tracking-widest text-xs text-center text-blue-100 max-w-80">
+      <div className="flex justify-center relative my-8 sm:my-14 md:my-20 z-10">
+        <div className="max-w-[92vw] sm:max-w-[89vw] md:max-w-2xl lg:max-w-[60vw] flex flex-col items-center justify-center">
+          <p className="uppercase tracking-widest text-[10px] sm:text-xs text-center text-blue-100 max-w-80">
             {data.eyebrow || SEED_HERO.eyebrow}
           </p>
 
           <TextGenerateEffect
             words={data.headingWords || SEED_HERO.headingWords}
-            className="text-center text-[40px] md:text-5xl lg:text-6xl"
+            className="text-center text-[28px] xs:text-[34px] sm:text-[40px] md:text-5xl lg:text-6xl leading-tight tracking-tight"
           />
 
-          <p className="text-center md:tracking-wider mb-4 text-sm md:text-lg lg:text-2xl text-white-200">
+          <p className="text-center md:tracking-wider mb-4 text-xs sm:text-sm md:text-lg lg:text-2xl text-white-200 leading-relaxed max-w-xl">
             {data.description || SEED_HERO.description}
           </p>
 

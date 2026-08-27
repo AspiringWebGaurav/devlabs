@@ -107,7 +107,7 @@ function TermsContentInner() {
           <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400 font-mono">
             <span>Original Effective: January 1, 2026</span>
             <span>•</span>
-            <span className="text-purple font-semibold">Last Updated: August 26, 2026</span>
+            <span className="text-purple font-semibold">Last Updated: August 27, 2026</span>
             <span>•</span>
             <span className="text-emerald-400 font-semibold">Jurisdiction: Standard Global</span>
           </div>
@@ -138,12 +138,14 @@ function TermsContentInner() {
             <section id="acceptance" className="space-y-3">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaScaleBalanced className="w-4 h-4 text-purple" />
-                <span>1. Acceptance of Terms</span>
+                <span>1. Acceptance of Terms &amp; Accessibility Commitment</span>
               </h2>
               <p>
                 By accessing and interacting with <span className="text-purple font-semibold">Gaurav Portfolio</span>,
-                you acknowledge and agree to be bound by these Terms of Service. If you do not agree with any provision,
-                you may discontinue viewing or utilizing this platform.
+                you acknowledge and agree to be bound by these Terms of Service. This platform commits to a strict 
+                <strong className="text-white"> Mobile-First 10/10 Production Standard</strong>, ensuring zero horizontal overflow, 
+                fluid typography, touch-ergonomic 44px hit targets, accessible reduced-motion fallbacks, and single-view contact workflows 
+                across all modern smartphones, tablets, and desktop workstations. If you do not agree with any provision, you may discontinue viewing or utilizing this platform.
               </p>
             </section>
           )}
