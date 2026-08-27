@@ -55,7 +55,48 @@ export default function AdminLoginPage() {
         <div className="flex-1 min-h-0 flex flex-col justify-center items-center px-4 py-2 sm:py-4 relative z-10 overflow-hidden">
           <Suspense
             fallback={
-              <div className="w-full max-w-md h-80 bg-white border border-[#E2E8F0] rounded-sm animate-pulse shadow-2xs" />
+              <div className="w-full max-w-md">
+                <div className="w-full bg-[#FFFFFF] border border-[#E2E8F0] rounded-none sm:rounded-[2px] shadow-2xs overflow-hidden">
+                  <div className="p-6 sm:p-8 space-y-1.5 border-b border-[#F1F5F9]">
+                    <h1 className="text-2xl font-bold font-admin-sans text-black tracking-[-0.035em]">
+                      Sign in to Admin.
+                    </h1>
+                    <p className="text-xs text-[#475569] font-admin-sans leading-relaxed">
+                      Access is strictly restricted to authorized Superadmin identities.
+                    </p>
+                  </div>
+                  <div className="p-6 sm:p-8 space-y-4">
+                    <div className="w-full h-11 bg-[#000000] text-white rounded-none sm:rounded-[2px] flex items-center justify-center gap-3 font-admin-mono text-xs font-semibold shadow-2xs">
+                      <svg
+                        className="w-3.5 h-3.5 animate-spin text-[#7C3AED]"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      <span className="tracking-wide">Preparing Gateway...</span>
+                    </div>
+                    <p className="text-[11px] font-admin-sans text-[#94A3B8] text-center pt-1 leading-relaxed">
+                      By signing in you agree to the{" "}
+                      <span className="text-[#64748B] underline decoration-[#CBD5E1]">Admin Terms</span>{" "}
+                      and{" "}
+                      <span className="text-[#64748B] underline decoration-[#CBD5E1]">Privacy Policy</span>.
+                    </p>
+                  </div>
+                </div>
+              </div>
             }
           >
             <AdminLoginForm />
