@@ -32,7 +32,7 @@ export const HeroSection = ({ data = SEED_HERO }: HeroSectionProps) => {
   };
 
   return (
-    <div className="pb-10 pt-24 sm:pb-12 sm:pt-28 md:pb-16 md:pt-36 relative overflow-hidden">
+    <div className="pb-12 pt-28 md:pb-16 md:pt-36 relative">
       {/* Spotlights */}
       <div className="pointer-events-none select-none">
         <Spotlight
@@ -57,18 +57,18 @@ export const HeroSection = ({ data = SEED_HERO }: HeroSectionProps) => {
         />
       </div>
 
-      <div className="flex justify-center relative my-8 sm:my-14 md:my-20 z-10">
-        <div className="max-w-[92vw] sm:max-w-[89vw] md:max-w-2xl lg:max-w-[60vw] flex flex-col items-center justify-center">
-          <p className="uppercase tracking-widest text-[10px] sm:text-xs text-center text-blue-100 max-w-80">
+      <div className="flex justify-center relative my-20 z-10">
+        <div className="max-w-[89vw] md:max-w-2xl lg:max-w-[60vw] flex flex-col items-center justify-center">
+          <p className="uppercase tracking-widest text-xs text-center text-blue-100 max-w-80">
             {data.eyebrow || SEED_HERO.eyebrow}
           </p>
 
           <TextGenerateEffect
             words={data.headingWords || SEED_HERO.headingWords}
-            className="text-center text-[28px] xs:text-[34px] sm:text-[40px] md:text-5xl lg:text-6xl leading-tight tracking-tight"
+            className="text-center text-[40px] md:text-5xl lg:text-6xl"
           />
 
-          <p className="text-center md:tracking-wider mb-4 text-xs sm:text-sm md:text-lg lg:text-2xl text-white-200 leading-relaxed max-w-xl">
+          <p className="text-center md:tracking-wider mb-4 text-sm md:text-lg lg:text-2xl text-white-200">
             {data.description || SEED_HERO.description}
           </p>
 
