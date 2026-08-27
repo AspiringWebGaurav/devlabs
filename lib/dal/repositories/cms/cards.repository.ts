@@ -19,12 +19,25 @@ export class CardsRepository extends BaseRepository {
         "asc"
       );
 
-      if (!docs || docs.length === 0) {
-        return SEED_CARDS;
+      // Create a slot-indexed map populated with baseline SEED_CARDS (slots 1..6)
+      const slotMap = new Map<number, BentoCardDocument>();
+      for (const seed of SEED_CARDS) {
+        slotMap.set(seed.slotIndex, seed);
       }
 
-      // Ensure 6 slots are sorted
-      return docs.sort((a, b) => (a.slotIndex || 0) - (b.slotIndex || 0));
+      // Overlay any saved documents from Firestore over the baseline seeds
+      if (docs && docs.length > 0) {
+        for (const doc of docs) {
+          const slot = doc.slotIndex || parseInt(String(doc.id).replace(/\D/g, ""), 10);
+          if (slot >= 1 && slot <= 6) {
+            const base = slotMap.get(slot) || doc;
+            slotMap.set(slot, { ...base, ...doc, slotIndex: slot });
+          }
+        }
+      }
+
+      // Return all 6 sorted slots
+      return Array.from(slotMap.values()).sort((a, b) => (a.slotIndex || 0) - (b.slotIndex || 0));
     });
   }
 

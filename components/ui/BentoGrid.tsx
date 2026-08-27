@@ -170,7 +170,7 @@ export const BentoGridItem = ({
           {isType("tech_stack", 3) && (
             <div className="flex gap-1 lg:gap-5 w-fit absolute -right-3 lg:-right-2">
               <div className="flex flex-col gap-3 md:gap-3 lg:gap-8">
-                {techStackLeft.map((item, i) => (
+                {((techStackLeft && techStackLeft.length > 0) ? techStackLeft : ["ReactJS", "Express", "Typescript"]).map((item, i) => (
                   <span
                     key={i}
                     className="lg:py-3 lg:px-3 py-2 px-3 text-xs lg:text-sm rounded-xl text-center bg-[#10132E] border border-white/[0.08] text-white font-medium shadow-sm"
@@ -182,7 +182,7 @@ export const BentoGridItem = ({
               </div>
               <div className="flex flex-col gap-3 md:gap-3 lg:gap-8">
                 <span className="lg:py-3 lg:px-3 py-3 px-3 rounded-xl text-center bg-[#10132E] border border-white/[0.04]"></span>
-                {techStackRight.map((item, i) => (
+                {((techStackRight && techStackRight.length > 0) ? techStackRight : ["VueJS", "NuxtJS", "GraphQL"]).map((item, i) => (
                   <span
                     key={i}
                     className="lg:py-3 lg:px-2 py-2 px-3 text-xs lg:text-sm rounded-xl text-center bg-[#10132E] border border-white/[0.08] text-white font-medium shadow-sm"
