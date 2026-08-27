@@ -1,2 +1,1 @@
-export * from "./firestore";
-export * from "./rtdb";
+export * from "@/lib/dal/datasource";

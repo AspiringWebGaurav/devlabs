@@ -67,6 +67,32 @@ class InquiriesRepository extends BaseRepository {
       await firestoreDataSource.setDocument("inquiries", id, { status }, true);
     }, { id, status });
   }
+
+  /**
+   * Records a reply to an inquiry and marks it as read.
+   */
+  public async recordInquiryReply(
+    id: string,
+    replyData: {
+      replyMessage: string;
+      replyMessageId?: string;
+      repliedAt?: string;
+      senderIdentity?: string;
+    }
+  ): Promise<RepositoryResult<void>> {
+    const updatePayload: Partial<InquiryItem> = {
+      status: "read",
+      repliedAt: replyData.repliedAt || new Date().toISOString(),
+      replyMessage: replyData.replyMessage,
+      replyMessageId: replyData.replyMessageId,
+      senderIdentity: replyData.senderIdentity || "security@gauravservices.eu.cc",
+    };
+
+    return this.executeQuery("recordInquiryReply", async () => {
+      await firestoreDataSource.setDocument("inquiries", id, updatePayload, true);
+    }, { id, replyMessageId: replyData.replyMessageId });
+  }
 }
 
 export const inquiriesRepository = new InquiriesRepository();
+

@@ -3,6 +3,8 @@
 import React from "react";
 import Link from "next/link";
 
+import { GlobalRefreshButton } from "./GlobalRefreshButton";
+
 interface AdminHeaderProps {
   breadcrumb?: string;
 }
@@ -26,8 +28,10 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         </span>
       </div>
 
-      {/* Right side is completely clean */}
-      <div className="flex items-center" />
+      {/* Right: Global Nuclear Refresh Control */}
+      <div className="flex items-center">
+        <GlobalRefreshButton />
+      </div>
 
       {/* Shiro Horizontal Dashed Divider (4px dash, 4px gap) */}
       <div className="absolute bottom-0 inset-x-0 h-px pointer-events-none">

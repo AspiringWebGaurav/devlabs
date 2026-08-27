@@ -1,8 +1,15 @@
 import React from "react";
-import { workExperience } from "@/data";
 import { Button } from "@/components/ui/MovingBorders";
+import type { ExperienceDocument } from "@/types/portfolio";
+import { SEED_EXPERIENCE } from "@/lib/dal/repositories/seed-data";
 
-export const ExperienceSection = () => {
+interface ExperienceSectionProps {
+  experience?: ExperienceDocument[];
+}
+
+export const ExperienceSection = ({ experience = SEED_EXPERIENCE }: ExperienceSectionProps) => {
+  const sortedExperience = [...experience].sort((a, b) => (a.order || 0) - (b.order || 0));
+
   return (
     <div className="py-20 w-full">
       <h1 className="heading">
@@ -10,10 +17,10 @@ export const ExperienceSection = () => {
       </h1>
 
       <div className="w-full mt-12 grid lg:grid-cols-4 grid-cols-1 gap-10">
-        {workExperience.map((card) => (
+        {sortedExperience.map((card, idx) => (
           <Button
             key={card.id}
-            duration={10000 + (card.id % 4) * 2500}
+            duration={10000 + (idx % 4) * 2500}
             borderRadius="1.75rem"
             style={{
               background: "rgb(4,7,29)",
@@ -25,18 +32,23 @@ export const ExperienceSection = () => {
           >
             <div className="flex lg:flex-row flex-col lg:items-center p-3 py-6 md:p-5 lg:p-10 gap-2">
               <img
-                src={card.thumbnail}
-                alt={card.thumbnail}
+                src={card.thumbnailUrl}
+                alt={card.title}
                 loading="lazy"
                 decoding="async"
-                className="lg:w-32 md:w-20 w-16"
+                className="lg:w-32 md:w-20 w-16 object-contain"
               />
               <div className="lg:ms-5">
                 <h1 className="text-start text-xl md:text-2xl font-bold">
                   {card.title}
                 </h1>
-                <p className="text-start text-white-100 mt-3 font-semibold">
-                  {card.desc}
+                {card.company && (
+                  <p className="text-start text-purple text-xs font-mono mt-1">
+                    {card.company} {card.period ? `• ${card.period}` : ""}
+                  </p>
+                )}
+                <p className="text-start text-white-100 mt-3 font-semibold text-sm">
+                  {card.description}
                 </p>
               </div>
             </div>

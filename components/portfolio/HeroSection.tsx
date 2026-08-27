@@ -6,8 +6,14 @@ import { motion, useScroll, useTransform } from "motion/react";
 import MagicButton from "@/components/ui/MagicButton";
 import { Spotlight } from "@/components/ui/Spotlight";
 import { TextGenerateEffect } from "@/components/ui/TextGenerateEffect";
+import type { HeroDocument } from "@/types/portfolio";
+import { SEED_HERO } from "@/lib/dal/repositories/seed-data";
 
-export const HeroSection = () => {
+interface HeroSectionProps {
+  data?: HeroDocument;
+}
+
+export const HeroSection = ({ data = SEED_HERO }: HeroSectionProps) => {
   const { scrollY } = useScroll();
   const indicatorOpacity = useTransform(scrollY, [0, 100], [1, 0]);
   const indicatorY = useTransform(scrollY, [0, 100], [0, 20]);
@@ -54,27 +60,29 @@ export const HeroSection = () => {
       <div className="flex justify-center relative my-20 z-10">
         <div className="max-w-[89vw] md:max-w-2xl lg:max-w-[60vw] flex flex-col items-center justify-center">
           <p className="uppercase tracking-widest text-xs text-center text-blue-100 max-w-80">
-            Dynamic Web Magic with Next.js
+            {data.eyebrow || SEED_HERO.eyebrow}
           </p>
 
           <TextGenerateEffect
-            words="Transforming Concepts into Seamless User Experiences"
+            words={data.headingWords || SEED_HERO.headingWords}
             className="text-center text-[40px] md:text-5xl lg:text-6xl"
           />
 
           <p className="text-center md:tracking-wider mb-4 text-sm md:text-lg lg:text-2xl text-white-200">
-            Hi! I&apos;m Gaurav, a Front-End Developer based in India.
+            {data.description || SEED_HERO.description}
           </p>
 
           <a
-            href="/about"
+            href={data.ctaLink || SEED_HERO.ctaLink}
             onClick={(e) => {
-              e.preventDefault();
-              handleScrollToAbout();
+              if ((data.ctaLink || "").startsWith("#") || (data.ctaLink || "").startsWith("/")) {
+                e.preventDefault();
+                handleScrollToAbout();
+              }
             }}
           >
             <MagicButton
-              title="Show my work"
+              title={data.ctaTitle || SEED_HERO.ctaTitle}
               icon={<FaLocationArrow />}
               position="right"
             />
@@ -91,7 +99,7 @@ export const HeroSection = () => {
             onClick={handleScrollToAbout}
           >
             <span className="text-[10px] md:text-xs font-mono uppercase tracking-[0.25em] text-[#BEC1DD]/60 group-hover:text-purple transition-colors duration-300">
-              Scroll Down
+              {data.scrollText || SEED_HERO.scrollText}
             </span>
             <div className="w-5 h-8 md:w-6 md:h-9 rounded-full border border-white/20 group-hover:border-purple/50 flex justify-center items-start p-1 transition-colors duration-300">
               <motion.div

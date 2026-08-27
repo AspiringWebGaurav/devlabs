@@ -5,6 +5,8 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { ThemeProvider } from "./provider";
 import { RouteProgressBar } from "@/components/ui/RouteProgressBar";
+import { seoRepository } from "@/lib/dal/repositories/cms/seo.repository";
+import { SEED_SEO } from "@/lib/dal/repositories/seed-data";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,11 +22,45 @@ const geistMono = Geist_Mono({
   preload: true,
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL("https://gauravpatil.online"),
-  title: "Gaurav's Portfolio",
-  description: "Modern, Slick and Minimalist Developer Portfolio",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const seoResult = await seoRepository.getSeo();
+    const seo = seoResult.data || SEED_SEO;
+
+    const canonicalUrl = seo.canonicalUrl || "https://gauravpatil.online";
+    const title = seo.title || "Gaurav's Portfolio";
+    const description = seo.description || "Modern, Slick and Minimalist Developer Portfolio";
+
+    return {
+      metadataBase: new URL(canonicalUrl),
+      title,
+      description,
+      keywords: seo.keywords && seo.keywords.length > 0 ? seo.keywords : ["Developer", "Portfolio", "Frontend", "Next.js"],
+      authors: [{ name: seo.author || "Gaurav Patil" }],
+      openGraph: {
+        title,
+        description,
+        url: canonicalUrl,
+        siteName: "Gaurav Portfolio",
+        images: seo.ogImageUrl ? [{ url: seo.ogImageUrl, width: 1200, height: 630 }] : [],
+        type: "website",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+        creator: seo.twitterHandle || "@gauravpatil",
+        images: seo.ogImageUrl ? [seo.ogImageUrl] : [],
+      },
+    };
+  } catch {
+    return {
+      metadataBase: new URL("https://gauravpatil.online"),
+      title: "Gaurav's Portfolio",
+      description: "Modern, Slick and Minimalist Developer Portfolio",
+    };
+  }
+}
 
 export default function RootLayout({
   children,

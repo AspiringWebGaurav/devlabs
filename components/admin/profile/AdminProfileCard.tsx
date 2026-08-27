@@ -36,7 +36,7 @@ export const AdminProfileCard: React.FC<AdminProfileCardProps> = ({
     >
       {/* Dynamic Profile Avatar with no-referrer for Google CDN */}
       <div
-        className={`relative w-8 h-8 rounded-full overflow-hidden border bg-[#18181B] shrink-0 transition-all duration-150 flex items-center justify-center ${
+        className={`relative w-9 h-9 rounded-full overflow-hidden border bg-[#18181B] shrink-0 transition-all duration-150 flex items-center justify-center ${
           isActive ? "border-[#7C3AED]" : "border-[#CBD5E1] group-hover:border-[#94A3B8]"
         }`}
       >
@@ -49,7 +49,7 @@ export const AdminProfileCard: React.FC<AdminProfileCardProps> = ({
             onError={() => setImageError(true)}
           />
         ) : (
-          <div className="w-full h-full bg-[#18181B] text-white flex items-center justify-center font-admin-mono font-bold text-[10px] tracking-wider">
+          <div className="w-full h-full bg-[#18181B] text-white flex items-center justify-center font-admin-mono font-bold text-xs tracking-wider">
             {initials}
           </div>
         )}
@@ -57,16 +57,16 @@ export const AdminProfileCard: React.FC<AdminProfileCardProps> = ({
 
       {/* Dynamic Identity */}
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-xs font-semibold font-admin-sans text-black leading-tight truncate">
+        <span className="text-xs sm:text-sm font-semibold font-admin-sans text-black leading-tight truncate">
           {displayName}
         </span>
-        <span className="text-[9px] font-admin-mono text-[#64748B] truncate group-hover:text-[#475569]">
+        <span className="text-xs font-admin-mono text-[#64748B] truncate group-hover:text-[#475569] mt-0.5">
           {displayEmail}
         </span>
       </div>
 
       <FaChevronRight
-        className={`w-2.5 h-2.5 transition-all duration-150 shrink-0 ${
+        className={`w-3 h-3 transition-all duration-150 shrink-0 ${
           isActive
             ? "text-[#7C3AED] translate-x-0.5"
             : "text-[#94A3B8] group-hover:text-black group-hover:translate-x-0.5"

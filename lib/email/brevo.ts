@@ -557,3 +557,56 @@ Terms: ${termsUrl} | Privacy: ${privacyUrl}`;
   });
 }
 
+export interface ReplyInquiryEmailParams {
+  toEmail: string;
+  toName?: string;
+  subject: string;
+  message: string;
+  inquiryId?: string;
+}
+
+/**
+ * Dispatches a direct reply to an inbound inquiry or outreach contact via security@gauravservices.eu.cc.
+ * Uses Brevo REST API v3 with clean HTML and plain text formatting.
+ */
+export async function dispatchInquiryReplyEmail(
+  params: ReplyInquiryEmailParams
+): Promise<SendEmailResult> {
+  const trimmedEmail = params.toEmail.trim().toLowerCase();
+  const trimmedName = params.toName?.trim();
+  const trimmedSubject = params.subject.trim();
+  const trimmedMessage = params.message.trim();
+
+  const safeMessageHtml = escapeHtml(trimmedMessage).replace(/\n/g, "<br />");
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(trimmedSubject)}</title>
+</head>
+<body style="margin:0;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#1e293b;line-height:1.6;background-color:#ffffff;">
+  <div style="margin:0 0 20px 0;color:#0f172a;line-height:1.6;white-space:pre-wrap;">${safeMessageHtml}</div>
+  <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 16px 0;" />
+  <p style="margin:0;font-size:12px;color:#64748b;">
+    Sent by Gaurav Patil &bull; <a href="https://gauravpatil.online" style="color:#2563eb;text-decoration:none;">gauravpatil.online</a>
+  </p>
+</body>
+</html>`;
+
+  return sendTransactionalEmail({
+    identity: {
+      ...EMAIL_IDENTITIES.SECURITY,
+      name: "Gaurav Patil",
+    },
+    to: [{ email: trimmedEmail, name: trimmedName || undefined }],
+    replyTo: { email: EMAIL_IDENTITIES.SECURITY.email, name: "Gaurav Patil" },
+    subject: trimmedSubject,
+    htmlContent,
+    textContent: trimmedMessage,
+    tags: ["portfolio_reply", "outreach_response"],
+  });
+}
+
+

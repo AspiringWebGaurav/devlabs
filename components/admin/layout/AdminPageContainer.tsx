@@ -26,17 +26,17 @@ export const AdminPageContainer: React.FC<AdminPageContainerProps> = ({
         <AdminSidebar />
 
         {/* 3. Right-Side Feature Workspace Canvas */}
-        <main className="flex-1 p-4 sm:p-8 flex flex-col max-w-7xl">
+        <main className="flex-1 p-5 sm:p-8 lg:p-10 flex flex-col w-full min-w-0">
           {(title || actions) && (
             <div className="border-b border-[#E5E7EB] pb-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
               <div>
                 {subtitle && (
-                  <span className="font-admin-mono text-[11px] uppercase tracking-[0.2em] text-[#64748B] font-semibold block">
+                  <span className="font-admin-mono text-xs uppercase tracking-[0.2em] text-[#64748B] font-semibold block">
                     {subtitle}
                   </span>
                 )}
                 {title && (
-                  <h1 className="text-2xl font-bold font-admin-sans text-black tracking-tight mt-0.5">
+                  <h1 className="text-2xl sm:text-3xl font-bold font-admin-sans text-black tracking-tight mt-0.5">
                     {title}
                   </h1>
                 )}
@@ -45,7 +45,7 @@ export const AdminPageContainer: React.FC<AdminPageContainerProps> = ({
             </div>
           )}
 
-          <div className="flex-1 flex flex-col">{children}</div>
+          <div className="flex-1 flex flex-col w-full">{children}</div>
         </main>
       </div>
     </div>

@@ -54,6 +54,16 @@ export const getFirebaseStorage = (): FirebaseStorage => {
   return _storage;
 };
 
+import { getFirestore, Firestore } from "firebase/firestore";
+
+let _firestore: Firestore | null = null;
+export const getFirebaseFirestore = (): Firestore => {
+  if (!_firestore) {
+    _firestore = getFirestore(getClientApp());
+  }
+  return _firestore;
+};
+
 export const getGoogleProvider = (emailHint?: string): GoogleAuthProvider => {
   const provider = new GoogleAuthProvider();
   if (emailHint) {

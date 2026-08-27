@@ -3,58 +3,77 @@
 import React from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
+import type { PhaseDocument } from "@/types/portfolio";
+import { SEED_PHASES } from "@/lib/dal/repositories/seed-data";
 
 const CanvasRevealEffect = dynamic(
   () => import("@/components/ui/CanvasRevealEffect").then((mod) => mod.CanvasRevealEffect),
   { ssr: false }
 );
 
-export const ApproachSection = () => {
+interface ApproachSectionProps {
+  phases?: PhaseDocument[];
+}
+
+const THEME_CONFIGS: Record<
+  string,
+  { containerClassName: string; colors?: number[][]; dotSize?: number }
+> = {
+  emerald: {
+    containerClassName: "bg-emerald-900 rounded-3xl overflow-hidden",
+  },
+  pink: {
+    containerClassName: "bg-pink-900 rounded-3xl overflow-hidden",
+    colors: [
+      [255, 166, 158],
+      [221, 255, 247],
+    ],
+    dotSize: 2,
+  },
+  sky: {
+    containerClassName: "bg-sky-600 rounded-3xl overflow-hidden",
+    colors: [[125, 211, 252]],
+  },
+  violet: {
+    containerClassName: "bg-violet-900 rounded-3xl overflow-hidden",
+    colors: [[196, 181, 253]],
+  },
+  amber: {
+    containerClassName: "bg-amber-900 rounded-3xl overflow-hidden",
+    colors: [[252, 211, 77]],
+  },
+};
+
+export const ApproachSection = ({ phases = SEED_PHASES }: ApproachSectionProps) => {
+  const sortedPhases = [...phases].sort((a, b) => (a.order || 0) - (b.order || 0));
+
   return (
     <section className="w-full py-20">
       <h1 className="heading">
         My <span className="text-purple">approach</span>
       </h1>
       <div className="my-20 flex flex-col lg:flex-row items-center justify-center w-full gap-4">
-        <Card
-          title="Planning & Strategy"
-          icon={<AceternityIcon order="Phase 1" />}
-          des="We'll collaborate to map out your website's goals, target audience, and key functionalities. We'll discuss things like site structure, navigation, and content requirements."
-          renderCanvas={() => (
-            <CanvasRevealEffect
-              animationSpeed={5.1}
-              containerClassName="bg-emerald-900 rounded-3xl overflow-hidden"
+        {sortedPhases.map((phase) => {
+          const theme = THEME_CONFIGS[phase.themeColor] || THEME_CONFIGS.emerald;
+          const speed = Math.max(0.1, Math.min(10.0, phase.animationSpeed || 3.0));
+
+          return (
+            <Card
+              key={phase.id}
+              title={phase.title}
+              icon={<AceternityIcon order={phase.phaseBadge || `Phase ${phase.order}`} />}
+              des={phase.description}
+              renderCanvas={() => (
+                <CanvasRevealEffect
+                  animationSpeed={speed}
+                  containerClassName={theme.containerClassName}
+                  colors={theme.colors}
+                  dotSize={theme.dotSize}
+                />
+              )}
             />
-          )}
-        />
-        <Card
-          title="Development & Progress Update"
-          icon={<AceternityIcon order="Phase 2" />}
-          des="Once we agree on the plan, I cue my lofi playlist and dive into coding. From initial sketches to polished code, I keep you updated every step of the way."
-          renderCanvas={() => (
-            <CanvasRevealEffect
-              animationSpeed={3}
-              containerClassName="bg-pink-900 rounded-3xl overflow-hidden"
-              colors={[
-                [255, 166, 158],
-                [221, 255, 247],
-              ]}
-              dotSize={2}
-            />
-          )}
-        />
-        <Card
-          title="Development & Launch"
-          icon={<AceternityIcon order="Phase 3" />}
-          des="This is where the magic happens! Based on the approved design, I'll translate everything into functional code, building your website from the ground up."
-          renderCanvas={() => (
-            <CanvasRevealEffect
-              animationSpeed={3}
-              containerClassName="bg-sky-600 rounded-3xl overflow-hidden"
-              colors={[[125, 211, 252]]}
-            />
-          )}
-        />
+          );
+        })}
       </div>
     </section>
   );

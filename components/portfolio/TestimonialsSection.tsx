@@ -1,10 +1,27 @@
 "use client";
 
 import React from "react";
-import { companies, testimonials } from "@/data";
 import { InfiniteMovingCards } from "@/components/ui/InfiniteMovingCards";
+import type { TestimonialDocument, ClientDocument } from "@/types/portfolio";
+import { SEED_TESTIMONIALS, SEED_CLIENTS } from "@/lib/dal/repositories/seed-data";
 
-export const TestimonialsSection = () => {
+interface TestimonialsSectionProps {
+  testimonials?: TestimonialDocument[];
+  clients?: ClientDocument[];
+}
+
+export const TestimonialsSection = ({
+  testimonials = SEED_TESTIMONIALS,
+  clients = SEED_CLIENTS,
+}: TestimonialsSectionProps) => {
+  const formattedTestimonials = testimonials.map((t) => ({
+    quote: t.quote,
+    name: t.name,
+    title: t.role || t.company,
+  }));
+
+  const sortedClients = [...clients].sort((a, b) => (a.order || 0) - (b.order || 0));
+
   return (
     <section className="py-20">
       <h1 className="heading">
@@ -15,30 +32,34 @@ export const TestimonialsSection = () => {
       <div className="flex flex-col items-center max-lg:mt-10">
         <div className="h-[50vh] md:h-[30rem] rounded-md flex flex-col antialiased items-center justify-center relative overflow-hidden">
           <InfiniteMovingCards
-            items={testimonials}
+            items={formattedTestimonials}
             direction="right"
             speed="slow"
           />
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-4 md:gap-16 max-lg:mt-10">
-          {companies.map(({ id, img, name, nameImg }) => (
-            <div key={id} className="flex md:max-w-60 max-w-32 gap-2">
-              <img
-                src={img}
-                alt={name}
-                loading="lazy"
-                decoding="async"
-                className="md:w-10 w-5"
-              />
-              <img
-                src={nameImg}
-                alt={name}
-                loading="lazy"
-                decoding="async"
-                width={id === 4 || id === 5 ? 100 : 150}
-                className="md:w-24 w-20"
-              />
+          {sortedClients.map((client) => (
+            <div key={client.id} className="flex md:max-w-60 max-w-32 gap-2 items-center">
+              {client.iconUrl && (
+                <img
+                  src={client.iconUrl}
+                  alt={client.name}
+                  loading="lazy"
+                  decoding="async"
+                  className="md:w-10 w-5 object-contain"
+                />
+              )}
+              {client.nameImgUrl && (
+                <img
+                  src={client.nameImgUrl}
+                  alt={client.name}
+                  loading="lazy"
+                  decoding="async"
+                  width={client.logoWidth || 120}
+                  className="md:w-24 w-20 object-contain"
+                />
+              )}
             </div>
           ))}
         </div>
