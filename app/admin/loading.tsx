@@ -1,6 +1,12 @@
 import React from "react";
-import { AdminLoginLoader } from "@/components/admin/auth";
+import { AdminPageContainer, AdminDashboardTabLoader } from "@/components/admin/layout";
 
 export default function AdminLoading() {
-  return <AdminLoginLoader />;
+  return (
+    <AdminPageContainer breadcrumb="LOADING WORKSPACE">
+      <AdminDashboardTabLoader />
+    </AdminPageContainer>
+  );
 }
+
+

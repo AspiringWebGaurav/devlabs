@@ -1,11 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { CtaDocument } from "@/types/portfolio";
 import { updateCtaAction } from "@/lib/actions/cms.actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 import { FaCheck, FaRotateRight, FaFloppyDisk } from "react-icons/fa6";
 
 export const CtaEditor: React.FC<{ initialData: CtaDocument | null }> = ({ initialData }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [formData, setFormData] = useState({
     headingPrefix: initialData?.headingPrefix || "Ready to take ",
     headingHighlight: initialData?.headingHighlight || "your",
@@ -20,6 +27,38 @@ export const CtaEditor: React.FC<{ initialData: CtaDocument | null }> = ({ initi
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Sync state if server props change
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        headingPrefix: initialData.headingPrefix || "Ready to take ",
+        headingHighlight: initialData.headingHighlight || "your",
+        headingSuffix: initialData.headingSuffix || " digital presence to the next level?",
+        description:
+          initialData.description ||
+          "Reach out to me today and let's discuss how I can help you achieve your goals.",
+        buttonText: initialData.buttonText || "Let's get in touch",
+        isEnabled: initialData.isEnabled !== false,
+      });
+    }
+  }, [initialData]);
+
+  // Real-time broadcast synchronization
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("portfolio_cms_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.domain === "cta" || event.data?.domain === "all") {
+          startTransition(() => {
+            router.refresh();
+          });
+        }
+      };
+      return () => channel.close();
+    } catch {}
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsPending(true);
@@ -29,6 +68,10 @@ export const CtaEditor: React.FC<{ initialData: CtaDocument | null }> = ({ initi
     setIsPending(false);
 
     if (res.success) {
+      broadcastClientCmsChange("cta");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: "CTA banner updated and live cache revalidated." });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to update CTA banner." });
@@ -141,10 +184,21 @@ export const CtaEditor: React.FC<{ initialData: CtaDocument | null }> = ({ initi
           disabled={isPending}
           className="flex items-center gap-2.5 px-6 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs sm:text-sm font-admin-mono font-semibold rounded-sm shadow-sm cursor-pointer disabled:opacity-60 transition-all"
         >
-          {isPending ? <FaRotateRight className="w-4 h-4 animate-spin" /> : <FaFloppyDisk className="w-4 h-4" />}
-          <span>Save CTA Settings</span>
+          {isPending ? (
+            <>
+              <FaRotateRight className="w-4 h-4 animate-spin" />
+              <span>Saving Changes...</span>
+            </>
+          ) : (
+            <>
+              <FaFloppyDisk className="w-4 h-4" />
+              <span>Save CTA Settings</span>
+              <ButtonHelpBadge text={BUTTON_HELP.SAVE_AND_PUBLISH} />
+            </>
+          )}
         </button>
       </div>
+
     </form>
   );
 };

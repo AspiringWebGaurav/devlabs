@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -26,6 +26,15 @@ import {
 import { useAdminSession } from "@/components/admin/context";
 import { AdminProfileCard } from "@/components/admin/profile";
 import { SignOutOverlay } from "@/components/admin/auth/SignOutOverlay";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
+
+// Module-level persistent cache across React unmount/remount cycles during App Router transitions
+let cachedSidebarScroll = 0;
+
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export const AdminSidebar: React.FC = () => {
   const pathname = usePathname();
@@ -34,23 +43,66 @@ export const AdminSidebar: React.FC = () => {
   const navScrollRef = useRef<HTMLDivElement | null>(null);
   const activeItemRef = useRef<HTMLAnchorElement | null>(null);
 
-  // Restore scroll position in the navigation region and keep active tab visible
-  useEffect(() => {
-    if (navScrollRef.current) {
-      const savedScroll = sessionStorage.getItem("admin_sidebar_scroll");
-      if (savedScroll !== null) {
-        navScrollRef.current.scrollTop = Number(savedScroll);
-      }
+  // Synchronous restoration helper
+  const restoreScrollPosition = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    let target = cachedSidebarScroll;
+    if (target === 0 && typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem("admin_sidebar_scroll");
+        if (saved) target = Number(saved) || 0;
+      } catch {}
     }
 
-    // Ensure the clicked / active tab is smoothly positioned into view
-    if (activeItemRef.current) {
-      activeItemRef.current.scrollIntoView({ block: "nearest" });
+    if (target > 0) {
+      node.scrollTop = target;
+    }
+  }, []);
+
+  // Frame-0 Callback Ref: Sets scrollTop synchronously upon DOM node instantiation before browser paint
+  const setNavScrollRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      navScrollRef.current = node;
+      restoreScrollPosition(node);
+    },
+    [restoreScrollPosition]
+  );
+
+  // Layout effect to guarantee scroll lock & handle direct deep links
+  useIsomorphicLayoutEffect(() => {
+    if (navScrollRef.current) {
+      let target = cachedSidebarScroll;
+      if (target === 0 && typeof window !== "undefined") {
+        try {
+          const saved = sessionStorage.getItem("admin_sidebar_scroll");
+          if (saved) target = Number(saved) || 0;
+        } catch {}
+      }
+
+      if (target > 0) {
+        navScrollRef.current.scrollTop = target;
+      } else if (activeItemRef.current) {
+        // Direct initial landing without prior scroll history: bring active item into view instantly
+        activeItemRef.current.scrollIntoView({ block: "nearest" });
+      }
     }
   }, [pathname]);
 
+  const recordScroll = (pos: number) => {
+    cachedSidebarScroll = pos;
+    try {
+      sessionStorage.setItem("admin_sidebar_scroll", String(pos));
+    } catch {}
+  };
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    sessionStorage.setItem("admin_sidebar_scroll", String(e.currentTarget.scrollTop));
+    recordScroll(e.currentTarget.scrollTop);
+  };
+
+  const handleNavClick = () => {
+    if (navScrollRef.current) {
+      recordScroll(navScrollRef.current.scrollTop);
+    }
   };
 
   const handleInitiateSignOut = () => {
@@ -108,6 +160,7 @@ export const AdminSidebar: React.FC = () => {
               key={item.id}
               ref={isActive ? activeItemRef : null}
               href={item.href}
+              onClick={handleNavClick}
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-sm text-xs sm:text-[13px] font-admin-mono transition-all duration-150 border ${
                 isActive
                   ? "bg-[#F8FAFC] border-[#E2E8F0] text-black font-semibold shadow-2xs"
@@ -131,12 +184,12 @@ export const AdminSidebar: React.FC = () => {
   );
 
   return (
-    <aside className="w-full md:w-68 lg:w-72 bg-[#FFFFFF] border-r border-[#E5E7EB] shrink-0 flex flex-col md:sticky md:top-[57px] md:h-[calc(100vh-57px)] select-none overflow-hidden">
-      {/* 1. Scrollable Navigation Menu Area (Tabs scroll independently) */}
+    <aside className="w-full md:w-68 lg:w-72 bg-[#FFFFFF] border-r border-[#E5E7EB] shrink-0 flex flex-col md:sticky md:top-[57px] md:h-[calc(100vh-57px)] select-none">
+      {/* 1. Scrollable Navigation Menu Area (Instant Frame-0 persistent locking without animation shake) */}
       <div
-        ref={navScrollRef}
+        ref={setNavScrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-5 space-y-5 scroll-smooth"
+        className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-5 space-y-5"
       >
         {renderNavGroup("Overview", overviewItems)}
         {renderNavGroup("Content Modules", cmsItems)}
@@ -144,14 +197,13 @@ export const AdminSidebar: React.FC = () => {
       </div>
 
       {/* 2. Fixed Stationary Bottom Panel (Profile & Sign-Out never scroll away) */}
-      <div className="p-4 sm:p-5 border-t border-[#E5E7EB] bg-[#FFFFFF] space-y-3 shrink-0 z-10 shadow-2xs">
-        <AdminProfileCard user={user} isActive={isProfileActive} />
+      <div className="p-4 sm:p-5 border-t border-[#E5E7EB] bg-[#FFFFFF] space-y-3 shrink-0 z-10 shadow-2xs relative">
+        <AdminProfileCard user={user} isActive={isProfileActive} onClick={handleNavClick} />
 
         <button
           onClick={handleInitiateSignOut}
           disabled={isSigningOut}
           className="w-full flex items-center justify-center gap-2 py-2.5 px-3 text-xs font-admin-mono text-[#991B1B] hover:text-[#FFFFFF] bg-[#FEF2F2] hover:bg-[#DC2626] border border-[#FCA5A5] hover:border-[#DC2626] rounded-sm transition-all duration-150 cursor-pointer shadow-2xs active:scale-[0.99] disabled:opacity-60"
-          title="Sign out of Admin Console"
         >
           {isSigningOut ? (
             <>
@@ -166,13 +218,17 @@ export const AdminSidebar: React.FC = () => {
               <span className="font-semibold uppercase tracking-wider text-[11px]">
                 Sign Out
               </span>
+              <ButtonHelpBadge text={BUTTON_HELP.SIGN_OUT} position="right" />
             </>
           )}
         </button>
+
       </div>
 
       {/* Dynamic Smooth Balanced Sign-Out Overlay */}
       <SignOutOverlay isOpen={isSigningOut} onComplete={handleExecuteSignOut} />
     </aside>
   );
+
 };
+

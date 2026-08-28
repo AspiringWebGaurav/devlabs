@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   FaHeading,
@@ -25,10 +26,16 @@ import {
 } from "react-icons/fa6";
 
 import { seedAllCollectionsAction } from "@/lib/actions/cms.actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
 
 export const OverviewCanvas: React.FC = () => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [isSeeding, setIsSeeding] = useState(false);
   const [seedMessage, setSeedMessage] = useState<string | null>(null);
+
 
   const domains = [
     {
@@ -58,7 +65,7 @@ export const OverviewCanvas: React.FC = () => {
     {
       id: "04",
       title: "Testimonials",
-      desc: "Client recommendations and testimonials in infinite moving carousel.",
+      desc: "Client recommendations, avatars, company roles, and public display toggles.",
       href: "/admin/testimonials",
       icon: FaQuoteRight,
       badge: "Collection",
@@ -66,39 +73,39 @@ export const OverviewCanvas: React.FC = () => {
     {
       id: "05",
       title: "Client Logos",
-      desc: "Partner brand icons and custom logo strip display widths.",
+      desc: "Partner brand icons, custom width configurations, and corporate links.",
       href: "/admin/clients",
       icon: FaBuilding,
       badge: "Collection",
     },
     {
       id: "06",
-      title: "Work Experience",
-      desc: "Interactive moving border cards, position titles, dates, and descriptions.",
+      title: "Experience Timeline",
+      desc: "Work history cards, role highlights, and corporate engagement records.",
       href: "/admin/experience",
       icon: FaBriefcase,
       badge: "Collection",
     },
     {
       id: "07",
-      title: "Approach Phases",
-      desc: "Process stages, canvas reveal effect, custom speed, and color palettes.",
+      title: "Work Approach",
+      desc: "Phase methodologies, animated canvas speeds, and color palette tags.",
       href: "/admin/approach",
       icon: FaDiagramProject,
       badge: "Collection",
     },
     {
       id: "08",
-      title: "Floating Navigation",
-      desc: "Section glide anchors, reordering, and visibility toggles.",
+      title: "Navigation Floating Bar",
+      desc: "Header navigation links, reordering sequence, and visibility toggles.",
       href: "/admin/navigation",
       icon: FaBars,
       badge: "Singleton",
     },
     {
       id: "09",
-      title: "Social Links",
-      desc: "Preset social icons and custom SVG path coordinate vectors.",
+      title: "Social & Footer Links",
+      desc: "External profile links, brand presets, and custom SVG path strings.",
       href: "/admin/social",
       icon: FaShareNodes,
       badge: "Collection",
@@ -106,7 +113,7 @@ export const OverviewCanvas: React.FC = () => {
     {
       id: "10",
       title: "Call to Action",
-      desc: "Footer CTA headline prefix/highlight, description, and button.",
+      desc: "Closing CTA banner, highlighted heading words, and contact button copy.",
       href: "/admin/cta",
       icon: FaBullhorn,
       badge: "Singleton",
@@ -114,7 +121,7 @@ export const OverviewCanvas: React.FC = () => {
     {
       id: "11",
       title: "Footer & Legal",
-      desc: "Copyright holder identity, Terms of Service, and Privacy Policy links.",
+      desc: "Copyright ownership name, Terms of Service, and Privacy Policy links.",
       href: "/admin/footer",
       icon: FaCopyright,
       badge: "Singleton",
@@ -138,6 +145,10 @@ export const OverviewCanvas: React.FC = () => {
     setIsSeeding(false);
 
     if (res.success) {
+      broadcastClientCmsChange("all");
+      startTransition(() => {
+        router.refresh();
+      });
       setSeedMessage("All 12 CMS domain collections initialized with baseline seed data.");
     } else {
       setSeedMessage("Failed to seed database: " + res.error);
@@ -166,7 +177,6 @@ export const OverviewCanvas: React.FC = () => {
             onClick={handleSeed}
             disabled={isSeeding}
             className="flex items-center gap-2.5 px-4 py-2.5 bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] hover:border-[#CBD5E1] text-[#0F172A] text-xs sm:text-sm font-admin-mono font-semibold rounded-sm transition-all cursor-pointer disabled:opacity-60"
-            title="Non-destructively seed any missing domain documents"
           >
             {isSeeding ? (
               <FaRotateRight className="w-4 h-4 animate-spin text-[#7C3AED]" />
@@ -174,6 +184,7 @@ export const OverviewCanvas: React.FC = () => {
               <FaSeedling className="w-4 h-4 text-[#16A34A]" />
             )}
             <span>Seed Baseline Database</span>
+            <ButtonHelpBadge text={BUTTON_HELP.SEED_DATABASE} />
           </button>
 
           <Link
@@ -183,6 +194,7 @@ export const OverviewCanvas: React.FC = () => {
           >
             <span>View Live Site</span>
             <FaArrowRight className="w-3.5 h-3.5" />
+            <ButtonHelpBadge text={BUTTON_HELP.VIEW_LIVE_SITE} />
           </Link>
         </div>
       </div>

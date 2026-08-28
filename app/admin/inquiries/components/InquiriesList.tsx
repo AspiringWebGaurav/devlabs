@@ -1,16 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { InquiryItem } from "@/lib/admin/repositories/types";
 import { formatRelativeTime } from "@/lib/admin/utils";
 import { FaInbox, FaReply, FaPaperPlane, FaCheck, FaEnvelope } from "react-icons/fa6";
+import { getInquiriesAction } from "../actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
 import { ReplyInquiryModal } from "./ReplyInquiryModal";
+
 
 interface InquiriesListProps {
   inquiries: InquiryItem[];
 }
 
 export const InquiriesList: React.FC<InquiriesListProps> = ({ inquiries: initialInquiries }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [inquiries, setInquiries] = useState<InquiryItem[]>(initialInquiries);
   const [selectedInquiry, setSelectedInquiry] = useState<{
     id?: string;
@@ -22,10 +30,51 @@ export const InquiriesList: React.FC<InquiriesListProps> = ({ inquiries: initial
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Sync state if props change
-  React.useEffect(() => {
+  // Sync state if server props change
+  useEffect(() => {
     setInquiries(initialInquiries);
   }, [initialInquiries]);
+
+  // Synchronous background fetcher
+  const refreshInquiries = useCallback(async () => {
+    try {
+      const res = await getInquiriesAction(1, 50);
+      if (res.success && res.data?.items) {
+        setInquiries(res.data.items);
+      }
+    } catch {}
+  }, []);
+
+  // Real-time window focus & cross-tab broadcast synchronization
+  useEffect(() => {
+    const handleFocus = () => {
+      refreshInquiries();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        refreshInquiries();
+      }
+    });
+
+    let channel: BroadcastChannel | null = null;
+    if ("BroadcastChannel" in window) {
+      try {
+        channel = new BroadcastChannel("portfolio_cms_sync");
+        channel.onmessage = (event) => {
+          if (event.data?.domain === "inquiries" || event.data?.domain === "all") {
+            refreshInquiries();
+          }
+        };
+      } catch {}
+    }
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      channel?.close();
+    };
+  }, [refreshInquiries]);
 
   const handleOpenDirectCompose = () => {
     setSelectedInquiry({
@@ -53,7 +102,7 @@ export const InquiriesList: React.FC<InquiriesListProps> = ({ inquiries: initial
     setIsModalOpen(true);
   };
 
-  const handleSendSuccess = (messageId: string) => {
+  const handleSendSuccess = async (messageId: string) => {
     if (selectedInquiry?.id) {
       setInquiries((prev) =>
         prev.map((item) =>
@@ -70,7 +119,15 @@ export const InquiriesList: React.FC<InquiriesListProps> = ({ inquiries: initial
     }
     setNotification(`Email reply successfully dispatched via Brevo (ID: ${messageId.substring(0, 16)}...)`);
     setTimeout(() => setNotification(null), 6000);
+
+    // Auto-refresh from server and broadcast
+    await refreshInquiries();
+    broadcastClientCmsChange("inquiries");
+    startTransition(() => {
+      router.refresh();
+    });
   };
+
 
   return (
     <div className="space-y-4">
@@ -90,6 +147,7 @@ export const InquiriesList: React.FC<InquiriesListProps> = ({ inquiries: initial
         >
           <FaPaperPlane className="w-3 h-3" />
           <span>Direct Outreach Reply / Compose</span>
+          <ButtonHelpBadge text={BUTTON_HELP.DIRECT_COMPOSE} />
         </button>
       </div>
 
@@ -190,12 +248,14 @@ export const InquiriesList: React.FC<InquiriesListProps> = ({ inquiries: initial
                 >
                   <FaReply className="w-3 h-3" />
                   <span>Reply via Brevo</span>
+                  <ButtonHelpBadge text={BUTTON_HELP.REPLY_INQUIRY} />
                 </button>
               </div>
             </div>
           ))}
         </div>
       )}
+
 
       {/* Reply / Compose Modal */}
       <ReplyInquiryModal

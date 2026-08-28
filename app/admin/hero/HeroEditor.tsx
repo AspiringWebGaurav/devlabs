@@ -1,13 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { HeroDocument } from "@/types/portfolio";
 import { updateHeroAction } from "@/lib/actions/cms.actions";
 import { FaCheck, FaRotateRight, FaFloppyDisk } from "react-icons/fa6";
-
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 
 export const HeroEditor: React.FC<{ initialData: HeroDocument | null }> = ({ initialData }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [formData, setFormData] = useState({
     eyebrow: initialData?.eyebrow || "",
     headingWords: initialData?.headingWords || "",
@@ -21,6 +26,37 @@ export const HeroEditor: React.FC<{ initialData: HeroDocument | null }> = ({ ini
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Sync state if server props change
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        eyebrow: initialData.eyebrow || "",
+        headingWords: initialData.headingWords || "",
+        description: initialData.description || "",
+        ctaTitle: initialData.ctaTitle || "",
+        ctaLink: initialData.ctaLink || "",
+        scrollText: initialData.scrollText || "",
+        isPublished: initialData.isPublished !== false,
+      });
+    }
+  }, [initialData]);
+
+  // Real-time broadcast synchronization
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("portfolio_cms_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.domain === "hero" || event.data?.domain === "all") {
+          startTransition(() => {
+            router.refresh();
+          });
+        }
+      };
+      return () => channel.close();
+    } catch {}
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsPending(true);
@@ -31,11 +67,15 @@ export const HeroEditor: React.FC<{ initialData: HeroDocument | null }> = ({ ini
 
     if (res.success) {
       broadcastClientCmsChange("hero", (res.data as HeroDocument | undefined)?.version);
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: "Hero section published and live cache revalidated successfully." });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to update Hero section." });
     }
   };
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 w-full">
@@ -178,9 +218,11 @@ export const HeroEditor: React.FC<{ initialData: HeroDocument | null }> = ({ ini
             <>
               <FaFloppyDisk className="w-4 h-4" />
               <span>Save Hero Changes</span>
+              <ButtonHelpBadge text={BUTTON_HELP.SAVE_AND_PUBLISH} />
             </>
           )}
         </button>
+
       </div>
     </form>
   );

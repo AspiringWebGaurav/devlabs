@@ -12,6 +12,8 @@ import {
 import type { MailDraftDocument } from "@/lib/dal/repositories/types";
 import { formatRelativeTime } from "@/lib/admin/utils";
 import { deleteMailDraftAction } from "../actions";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
 
 interface DraftsListProps {
   drafts: MailDraftDocument[];
@@ -109,6 +111,7 @@ export const DraftsList: React.FC<DraftsListProps> = ({
                 >
                   <FaPenToSquare className="w-3 h-3" />
                   <span>Resume</span>
+                  <ButtonHelpBadge text={BUTTON_HELP.RESUME_DRAFT} />
                 </button>
 
                 <button
@@ -123,8 +126,10 @@ export const DraftsList: React.FC<DraftsListProps> = ({
                     <FaTrash className="w-3 h-3" />
                   )}
                   <span>Delete</span>
+                  <ButtonHelpBadge text={BUTTON_HELP.DELETE_DRAFT} />
                 </button>
               </div>
+
             </div>
           ))}
         </div>

@@ -5,4 +5,6 @@ export * from "./EnterpriseAccountCard";
 export * from "./SignInOverlay";
 export * from "./SignOutOverlay";
 export * from "./AdminLoginLoader";
+export * from "./AdminOtpLoader";
+export { AdminPanelLoader } from "../overview/AdminPanelLoader";
 

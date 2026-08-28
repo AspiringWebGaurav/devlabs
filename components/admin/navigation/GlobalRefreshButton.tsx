@@ -42,22 +42,22 @@ export const GlobalRefreshButton: React.FC = () => {
     const startTime = Date.now();
 
     try {
-      // 1. Execute Server Action (Cache Invalidation & Realtime Dual-Channel Signaling)
+      // 1. Execute Server Action (Cache Invalidation & Dual-Channel Cross-Tab Broadcast)
       const res = await globalNuclearRefreshAction();
 
-      // Ensure minimum visible animation time (700ms) so fast spin is visibly perceived
+      // Ensure smooth continuous visible rotation cycle (min 800ms)
       const elapsed = Date.now() - startTime;
-      if (elapsed < 700) {
-        await new Promise((resolve) => setTimeout(resolve, 700 - elapsed));
+      if (elapsed < 800) {
+        await new Promise((resolve) => setTimeout(resolve, 800 - elapsed));
       }
 
       if (!isMountedRef.current) return;
 
       if (res.success && res.data) {
-        // 2. Local Same-Origin Cross-Tab Synchronization
+        // 2. Broadcast Real-Time Synchronization to all open tabs
         broadcastClientCmsChange("all", res.data.timestamp);
 
-        // 3. React 19 App Router Server Component Refresh Transition
+        // 3. Trigger React 19 App Router Server Component Refresh
         startTransition(() => {
           router.refresh();
         });
@@ -67,7 +67,7 @@ export const GlobalRefreshButton: React.FC = () => {
           if (isMountedRef.current) {
             setStatus("idle");
           }
-        }, 1800);
+        }, 1600);
       } else {
         setStatus("error");
         setErrorMessage(res.error || "Failed to complete global revalidation");
@@ -80,8 +80,8 @@ export const GlobalRefreshButton: React.FC = () => {
       }
     } catch (err: unknown) {
       const elapsed = Date.now() - startTime;
-      if (elapsed < 700) {
-        await new Promise((resolve) => setTimeout(resolve, 700 - elapsed));
+      if (elapsed < 800) {
+        await new Promise((resolve) => setTimeout(resolve, 800 - elapsed));
       }
 
       if (!isMountedRef.current) return;
@@ -100,13 +100,6 @@ export const GlobalRefreshButton: React.FC = () => {
     }
   };
 
-  const getTooltip = () => {
-    if (isRefreshing) return "Refreshing Admin & Live Portfolio…";
-    if (status === "success") return "Global Refresh Completed";
-    if (status === "error") return errorMessage ? `Refresh Failed: ${errorMessage}` : "Refresh Failed — Click to retry";
-    return "Global Nuclear Refresh • Revalidate all caches and sync live site";
-  };
-
   const getAriaLiveText = () => {
     if (isRefreshing) return "Refreshing application state and synchronizing live portfolio...";
     if (status === "success") return "Global refresh completed successfully.";
@@ -115,59 +108,108 @@ export const GlobalRefreshButton: React.FC = () => {
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleRefresh}
-      disabled={isRefreshing}
-      title={getTooltip()}
-      aria-label={getTooltip()}
-      aria-busy={isRefreshing}
-      aria-disabled={isRefreshing}
-      className={`relative group w-8 h-8 rounded-sm shrink-0 border flex items-center justify-center select-none outline-hidden transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[#7C3AED] focus-visible:ring-offset-1 focus-visible:ring-offset-[#FFFFFF] ${
-        isRefreshing
-          ? "bg-[#F5F3FF] border-[#C4B5FD] text-[#7C3AED] shadow-2xs cursor-wait pointer-events-none"
-          : status === "success"
-          ? "bg-[#F0FDF4] border-[#86EFAC] text-[#16A34A] shadow-2xs"
-          : status === "error"
-          ? "bg-[#FEF2F2] border-[#FCA5A5] text-[#DC2626] shadow-2xs"
-          : "bg-[#FFFFFF] hover:bg-[#F8FAFC] active:scale-[0.94] border-[#E2E8F0] hover:border-[#CBD5E1] text-[#64748B] hover:text-[#0F172A] shadow-2xs cursor-pointer"
-      }`}
-    >
-      {/* Screen Reader Announcement for Live Status Changes */}
-      <span className="sr-only" aria-live="polite" aria-atomic="true">
-        {getAriaLiveText()}
-      </span>
+    <div className="relative inline-flex items-center">
+      <button
+        type="button"
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+        aria-label="Global Nuclear Refresh"
+        aria-busy={isRefreshing}
+        aria-disabled={isRefreshing}
+        className={`relative group w-8 h-8 rounded-sm shrink-0 border flex items-center justify-center select-none outline-hidden transition-all duration-200 transform-gpu focus-visible:ring-2 focus-visible:ring-[#7C3AED] focus-visible:ring-offset-1 focus-visible:ring-offset-[#FFFFFF] ${
+          isRefreshing
+            ? "bg-[#F5F3FF] border-[#7C3AED] text-[#7C3AED] shadow-[0_0_16px_rgba(124,58,237,0.35)] ring-2 ring-[#7C3AED]/20 cursor-wait pointer-events-none scale-[0.98]"
+            : status === "success"
+            ? "bg-[#F0FDF4] border-[#86EFAC] text-[#16A34A] shadow-[0_0_14px_rgba(22,163,74,0.25)] ring-2 ring-[#16A34A]/20 cursor-pointer scale-100"
+            : status === "error"
+            ? "bg-[#FEF2F2] border-[#FCA5A5] text-[#DC2626] shadow-[0_0_14px_rgba(220,38,38,0.25)] ring-2 ring-[#DC2626]/20 cursor-pointer scale-100"
+            : "bg-[#FFFFFF] hover:bg-[#FFFFFF] border-[#E2E8F0] hover:border-[#7C3AED]/60 text-[#64748B] hover:text-[#7C3AED] hover:shadow-[0_0_14px_rgba(124,58,237,0.25)] active:scale-[0.92] shadow-2xs cursor-pointer"
+        }`}
+      >
+        {/* Screen Reader Live Status Announcement */}
+        <span className="sr-only" aria-live="polite" aria-atomic="true">
+          {getAriaLiveText()}
+        </span>
 
-      {/* Dynamic Micro-Radar Halo while Active Refreshing */}
-      {isRefreshing && (
-        <span
-          className="absolute inset-0 rounded-sm bg-[#7C3AED]/20 animate-ping opacity-40 pointer-events-none motion-reduce:hidden"
-          aria-hidden="true"
-        />
-      )}
+        {/* Ambient Pulsing Radar Halo during active refresh */}
+        {isRefreshing && (
+          <span
+            className="absolute inset-0 rounded-sm bg-[#7C3AED]/15 animate-ping opacity-75 pointer-events-none"
+            aria-hidden="true"
+          />
+        )}
 
-      {/* Dynamic Icon States with Fast Smooth Spin & Pop Transition */}
-      {isRefreshing ? (
-        <FaArrowsRotate
-          className="w-3.5 h-3.5 transform-gpu animate-[spin_0.6s_linear_infinite] text-[#7C3AED] motion-reduce:animate-none motion-reduce:opacity-90"
-          aria-hidden="true"
-        />
-      ) : status === "success" ? (
-        <FaCheck
-          className="w-3.5 h-3.5 text-[#16A34A] animate-in zoom-in-75 fade-in duration-200"
-          aria-hidden="true"
-        />
-      ) : status === "error" ? (
-        <FaXmark
-          className="w-3.5 h-3.5 text-[#DC2626] animate-in zoom-in-90 fade-in duration-150"
-          aria-hidden="true"
-        />
-      ) : (
-        <FaArrowsRotate
-          className="w-3.5 h-3.5 text-[#64748B] group-hover:text-[#0F172A] group-hover:rotate-180 transition-transform duration-300 ease-out"
-          aria-hidden="true"
-        />
-      )}
-    </button>
+        {/* Dynamic Multi-State Icon Container with Locked Dimensions & Smooth Transitions */}
+        <div className="relative w-3.5 h-3.5 flex items-center justify-center pointer-events-none transform-gpu">
+          {status === "success" ? (
+            <FaCheck
+              key="check"
+              className="w-3.5 h-3.5 text-[#16A34A] animate-in zoom-in-50 fade-in duration-200"
+              aria-hidden="true"
+            />
+          ) : status === "error" ? (
+            <FaXmark
+              key="error"
+              className="w-3.5 h-3.5 text-[#DC2626] animate-in zoom-in-75 fade-in duration-150"
+              aria-hidden="true"
+            />
+          ) : (
+            <FaArrowsRotate
+              key="arrows"
+              className={`w-3.5 h-3.5 shrink-0 transform-gpu will-change-transform transition-colors duration-200 ${
+                isRefreshing ? "text-[#7C3AED]" : "text-current"
+              }`}
+              style={
+                isRefreshing
+                  ? {
+                      animation: "spin 0.7s linear infinite",
+                      WebkitAnimation: "spin 0.7s linear infinite",
+                      transformOrigin: "50% 50%",
+                    }
+                  : undefined
+              }
+              aria-hidden="true"
+            />
+          )}
+        </div>
+
+        {/* Rich Floating Plain-English Help Tooltip */}
+        <div
+          role="tooltip"
+          className="pointer-events-none absolute right-0 top-full mt-2.5 z-50 w-64 p-3 bg-[#0F172A] text-white border border-[#334155] rounded-xs shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 group-focus-visible:translate-y-0 transition-all duration-150 select-none text-left"
+        >
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="font-admin-mono text-[10px] uppercase font-bold tracking-wider text-[#CBACF9]">
+              Global Revalidation
+            </span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isRefreshing
+                  ? "bg-[#7C3AED] animate-ping"
+                  : status === "success"
+                  ? "bg-[#10B981]"
+                  : status === "error"
+                  ? "bg-[#EF4444]"
+                  : "bg-[#94A3B8]"
+              }`}
+            />
+          </div>
+          <p className="font-admin-sans text-[11px] leading-relaxed text-[#CBD5E1]">
+            {isRefreshing
+              ? "Purging server-side Next.js caches & synchronizing all open tabs in real-time…"
+              : status === "success"
+              ? "Global cache purge & live site sync completed successfully."
+              : status === "error"
+              ? errorMessage || "Revalidation encountered an error."
+              : "Purges server-side caches and synchronizes all open tabs with the latest database state."}
+          </p>
+
+          {/* Micro arrow indicator pointing to button */}
+          <div className="absolute -top-1 right-3 w-2 h-2 bg-[#0F172A] border-t border-l border-[#334155] rotate-45 pointer-events-none" />
+        </div>
+      </button>
+    </div>
   );
 };
+
+

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ProjectDocument } from "@/types/portfolio";
 import {
   createProjectAction,
@@ -8,6 +9,10 @@ import {
   deleteProjectAction,
   reorderProjectsAction,
 } from "@/lib/actions/cms.actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 import {
   FaPlus,
   FaPenToSquare,
@@ -21,11 +26,34 @@ import {
 } from "react-icons/fa6";
 
 export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> = ({ initialProjects }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [projects, setProjects] = useState<ProjectDocument[]>(initialProjects);
   const [editingProject, setEditingProject] = useState<Partial<ProjectDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Sync state if server props change
+  useEffect(() => {
+    setProjects(initialProjects);
+  }, [initialProjects]);
+
+  // Real-time broadcast synchronization
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("portfolio_cms_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.domain === "projects" || event.data?.domain === "all") {
+          startTransition(() => {
+            router.refresh();
+          });
+        }
+      };
+      return () => channel.close();
+    } catch {}
+  }, [router]);
 
   const handleMove = async (index: number, direction: "up" | "down") => {
     if (direction === "up" && index === 0) return;
@@ -45,6 +73,10 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
     setIsPending(false);
 
     if (res.success) {
+      broadcastClientCmsChange("projects");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: "Projects order updated and live cache revalidated." });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to reorder projects." });
@@ -60,6 +92,10 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
 
     if (res.success) {
       setProjects((prev) => prev.filter((p) => p.id !== id));
+      broadcastClientCmsChange("projects");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: `Project "${title}" deleted.` });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to delete project." });
@@ -92,6 +128,10 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
         setProjects((prev) => [...prev, res.data as ProjectDocument]);
         setIsCreating(false);
         setEditingProject(null);
+        broadcastClientCmsChange("projects");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "New project created and published." });
       } else {
         setStatusMessage({ type: "error", text: res.error || "Failed to create project." });
@@ -104,12 +144,17 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
           prev.map((p) => (p.id === editingProject.id ? (res.data as ProjectDocument) : p))
         );
         setEditingProject(null);
+        broadcastClientCmsChange("projects");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "Project updated successfully." });
       } else {
         setStatusMessage({ type: "error", text: res.error || "Failed to update project." });
       }
     }
   };
+
 
   return (
     <div className="space-y-6 w-full">
@@ -149,6 +194,7 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
         >
           <FaPlus className="w-3 h-3" />
           <span>Add New Project</span>
+          <ButtonHelpBadge text={BUTTON_HELP.CREATE_ITEM} />
         </button>
       </div>
 
@@ -176,77 +222,72 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
-              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
+              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#475569] font-bold">
                 Project Title
               </label>
               <input
                 type="text"
                 value={editingProject.title || ""}
                 onChange={(e) => setEditingProject({ ...editingProject, title: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
+                className="w-full px-3.5 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA] focus:bg-[#FFFFFF] focus:outline-hidden focus:ring-1 focus:ring-[#7C3AED]"
                 required
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Cover Image URL
+              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#475569] font-bold">
+                Cover Image URL / Path
               </label>
               <input
                 type="text"
                 value={editingProject.coverImage || ""}
                 onChange={(e) => setEditingProject({ ...editingProject, coverImage: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
+                className="w-full px-3.5 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA] focus:bg-[#FFFFFF] focus:outline-hidden focus:ring-1 focus:ring-[#7C3AED]"
                 required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#475569] font-bold">
+                Live Deployment URL
+              </label>
+              <input
+                type="text"
+                value={editingProject.liveUrl || ""}
+                onChange={(e) => setEditingProject({ ...editingProject, liveUrl: e.target.value })}
+                className="w-full px-3.5 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA] focus:bg-[#FFFFFF] focus:outline-hidden focus:ring-1 focus:ring-[#7C3AED]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#475569] font-bold">
+                GitHub Repository URL
+              </label>
+              <input
+                type="text"
+                value={editingProject.githubUrl || ""}
+                onChange={(e) => setEditingProject({ ...editingProject, githubUrl: e.target.value })}
+                className="w-full px-3.5 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA] focus:bg-[#FFFFFF] focus:outline-hidden focus:ring-1 focus:ring-[#7C3AED]"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
+            <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#475569] font-bold">
               Description
             </label>
             <textarea
-              rows={2}
+              rows={3}
               value={editingProject.description || ""}
               onChange={(e) => setEditingProject({ ...editingProject, description: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
+              className="w-full px-3.5 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA] focus:bg-[#FFFFFF] focus:outline-hidden focus:ring-1 focus:ring-[#7C3AED]"
               required
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Live URL (Strictly HTTPS)
-              </label>
-              <input
-                type="url"
-                value={editingProject.liveUrl || ""}
-                onChange={(e) => setEditingProject({ ...editingProject, liveUrl: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
-                placeholder="https://..."
-                required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                GitHub Repository URL
-              </label>
-              <input
-                type="url"
-                value={editingProject.githubUrl || ""}
-                onChange={(e) => setEditingProject({ ...editingProject, githubUrl: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
-                placeholder="https://github.com/..."
-              />
-            </div>
-          </div>
-
           <div className="space-y-1.5">
-            <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-              Tech Stack Icon Paths (comma-separated)
+            <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#475569] font-bold">
+              Tech Stack Icon URLs (Comma separated)
             </label>
             <input
               type="text"
@@ -257,41 +298,42 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
                   iconLists: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
                 })
               }
-              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
+              className="w-full px-3.5 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA] focus:bg-[#FFFFFF] focus:outline-hidden focus:ring-1 focus:ring-[#7C3AED]"
               placeholder="/re.svg, /tail.svg, /ts.svg"
             />
           </div>
 
           <div className="flex items-center justify-between pt-3 border-t border-[#F1F5F9]">
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-xs font-admin-mono cursor-pointer">
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 text-xs font-admin-mono text-[#0F172A] cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={editingProject.isPublished !== false}
-                  onChange={(e) => setEditingProject({ ...editingProject, isPublished: e.target.checked })}
-                  className="w-4 h-4 text-[#7C3AED] rounded"
-                />
-                <span>Published</span>
-              </label>
-              <label className="flex items-center gap-2 text-xs font-admin-mono cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editingProject.isFeatured !== false}
+                  checked={editingProject.isFeatured ?? true}
                   onChange={(e) => setEditingProject({ ...editingProject, isFeatured: e.target.checked })}
-                  className="w-4 h-4 text-[#7C3AED] rounded"
+                  className="rounded text-[#7C3AED]"
                 />
-                <span>Featured</span>
+                <span>Featured Project</span>
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-admin-mono text-[#0F172A] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editingProject.isPublished ?? true}
+                  onChange={(e) => setEditingProject({ ...editingProject, isPublished: e.target.checked })}
+                  className="rounded text-[#7C3AED]"
+                />
+                <span>Published Live</span>
               </label>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => {
                   setEditingProject(null);
                   setIsCreating(false);
                 }}
-                className="px-4 py-2 border border-[#E2E8F0] text-xs font-admin-mono text-[#64748B] hover:text-black rounded-sm cursor-pointer"
+                className="px-4 py-2 text-xs font-admin-mono text-[#64748B] hover:text-black"
               >
                 Cancel
               </button>
@@ -302,6 +344,7 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
               >
                 {isPending ? <FaRotateRight className="w-3.5 h-3.5 animate-spin" /> : <FaFloppyDisk className="w-3.5 h-3.5" />}
                 <span>{isCreating ? "Create Project" : "Save Changes"}</span>
+                <ButtonHelpBadge text={BUTTON_HELP.SAVE_AND_PUBLISH} />
               </button>
             </div>
           </div>
@@ -344,7 +387,7 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
                   onClick={() => handleMove(index, "up")}
                   disabled={index === 0 || isPending}
                   className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
-                  title="Move Up"
+                  title={BUTTON_HELP.MOVE_UP}
                 >
                   <FaArrowUp className="w-3 h-3" />
                 </button>
@@ -352,7 +395,7 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
                   onClick={() => handleMove(index, "down")}
                   disabled={index === projects.length - 1 || isPending}
                   className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
-                  title="Move Down"
+                  title={BUTTON_HELP.MOVE_DOWN}
                 >
                   <FaArrowDown className="w-3 h-3" />
                 </button>
@@ -367,15 +410,17 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
                 >
                   <FaPenToSquare className="w-3 h-3" />
                   <span>Edit</span>
+                  <ButtonHelpBadge text={BUTTON_HELP.EDIT_ITEM} />
                 </button>
 
                 {/* Delete Button */}
                 <button
                   onClick={() => handleDelete(project.id, project.title)}
-                  className="p-2 text-[#991B1B] hover:text-[#FFFFFF] bg-[#FEF2F2] hover:bg-[#DC2626] border border-[#FCA5A5] hover:border-[#DC2626] rounded-sm cursor-pointer"
+                  className="flex items-center gap-1 p-2 text-[#991B1B] hover:text-[#FFFFFF] bg-[#FEF2F2] hover:bg-[#DC2626] border border-[#FCA5A5] hover:border-[#DC2626] rounded-sm cursor-pointer"
                   title="Delete Project"
                 >
                   <FaTrash className="w-3 h-3" />
+                  <ButtonHelpBadge text={BUTTON_HELP.DELETE_ITEM} />
                 </button>
               </div>
             </div>

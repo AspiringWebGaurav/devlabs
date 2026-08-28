@@ -1,8 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { BentoCardDocument } from "@/types/portfolio";
 import { updateCardAction, resetCardAction } from "@/lib/actions/cms.actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 import {
   FaCheck,
   FaRotateRight,
@@ -12,60 +17,28 @@ import {
   FaXmark,
   FaGlobe,
   FaLayerGroup,
-  FaLaptopCode,
-  FaHeart,
   FaCode,
   FaEnvelope,
+  FaRocket,
 } from "react-icons/fa6";
 
-const SLOT_METADATA: Record<
-  number,
-  { label: string; icon: React.ComponentType<{ className?: string }>; description: string }
-> = {
-  1: {
-    label: "Client Collaboration",
-    icon: FaLaptopCode,
-    description: "Span 3x4 layout with primary hero graphic.",
-  },
-  2: {
-    label: "Earth & 3D Globe",
-    icon: FaGlobe,
-    description: "Timezone communication with interactive WebGL Earth Globe.",
-  },
-  3: {
-    label: "Tech Stack & Skills",
-    icon: FaLayerGroup,
-    description: "Dual-column floating tech stack skill badges.",
-  },
-  4: {
-    label: "Tech Passion",
-    icon: FaHeart,
-    description: "Developer enthusiast quote with background grid overlay.",
-  },
-  5: {
-    label: "Inside Scoop",
-    icon: FaCode,
-    description: "Current project focus & animation library spotlight.",
-  },
-  6: {
-    label: "Contact CTA",
-    icon: FaEnvelope,
-    description: "Direct email copy button with celebration confetti.",
-  },
+const SLOT_METADATA: Record<number, { label: string; description: string; icon: React.ComponentType<{ className?: string }> }> = {
+  1: { label: "Client Collaboration", description: "Hero bento quadrant featuring partnership commitment and live client feedback copy.", icon: FaLayerGroup },
+  2: { label: "Global Communications", description: "Interactive Three.js 3D WebGL globe with dynamic timezone tracking and worldwide client reach.", icon: FaGlobe },
+  3: { label: "Tech Stack Arrays", description: "Dual marquee arrays showcasing primary development frameworks and backend infrastructure.", icon: FaCode },
+  4: { label: "Engineering Passion", description: "Core technological focus, code quality philosophy, and enthusiast identity.", icon: FaRocket },
+  5: { label: "Architecture Roadmap", description: "Currently building a high-performance JavaScript Animation Engine with live telemetry.", icon: FaLayerGroup },
+  6: { label: "Direct Email CTA", description: "Quick-copy Superadmin email trigger with confetti celebratory feedback.", icon: FaEnvelope },
 };
 
 const SUGGESTED_TECH_SKILLS = [
   "React.js",
-  "Next.js 15",
+  "Next.js",
   "TypeScript",
-  "Tailwind CSS",
+  "TailwindCSS",
   "Node.js",
-  "Express",
-  "VueJS",
-  "NuxtJS",
-  "GraphQL",
   "Firebase",
-  "PostgreSQL",
+  "GraphQL",
   "Docker",
   "Three.js",
   "Python",
@@ -73,11 +46,35 @@ const SUGGESTED_TECH_SKILLS = [
   "Framer Motion",
 ];
 
+
 export const CardsEditor: React.FC<{ initialCards: BentoCardDocument[] }> = ({ initialCards }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [cards, setCards] = useState<BentoCardDocument[]>(initialCards);
   const [activeSlot, setActiveSlot] = useState<number>(1);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Sync state if server props change
+  useEffect(() => {
+    setCards(initialCards);
+  }, [initialCards]);
+
+  // Real-time broadcast synchronization
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("portfolio_cms_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.domain === "cards" || event.data?.domain === "all") {
+          startTransition(() => {
+            router.refresh();
+          });
+        }
+      };
+      return () => channel.close();
+    } catch {}
+  }, [router]);
 
   // New skill input states for Slot 3
   const [newLeftSkill, setNewLeftSkill] = useState("");
@@ -143,6 +140,10 @@ export const CardsEditor: React.FC<{ initialCards: BentoCardDocument[] }> = ({ i
     setIsPending(false);
 
     if (res.success) {
+      broadcastClientCmsChange("cards");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({
         type: "success",
         text: `Slot 0${activeSlot} (${SLOT_METADATA[activeSlot]?.label || currentCard.cardType}) saved and published live.`,
@@ -162,6 +163,10 @@ export const CardsEditor: React.FC<{ initialCards: BentoCardDocument[] }> = ({ i
 
     if (res.success && res.data) {
       setCards((prev) => prev.map((c) => (c.slotIndex === activeSlot ? (res.data as BentoCardDocument) : c)));
+      broadcastClientCmsChange("cards");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: `Slot 0${activeSlot} reset to defaults.` });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to reset card." });
@@ -263,7 +268,9 @@ export const CardsEditor: React.FC<{ initialCards: BentoCardDocument[] }> = ({ i
             >
               <FaArrowRotateLeft className="w-3.5 h-3.5" />
               <span>Reset to Defaults</span>
+              <ButtonHelpBadge text={BUTTON_HELP.RESET_CARD_DEFAULTS} />
             </button>
+
           </div>
 
           {/* Title and Subtitle */}
@@ -580,9 +587,11 @@ export const CardsEditor: React.FC<{ initialCards: BentoCardDocument[] }> = ({ i
                 <>
                   <FaFloppyDisk className="w-4 h-4" />
                   <span>Save Slot 0{currentCard.slotIndex}</span>
+                  <ButtonHelpBadge text={BUTTON_HELP.SAVE_AND_PUBLISH} />
                 </>
               )}
             </button>
+
           </div>
         </form>
       )}

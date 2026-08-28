@@ -3,6 +3,9 @@
 import React, { useState, useTransition } from "react";
 import { FaPaperPlane, FaXmark, FaLock, FaSpinner, FaCircleExclamation } from "react-icons/fa6";
 import { replyToInquiryAction } from "../actions";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 
 interface ReplyInquiryModalProps {
   isOpen: boolean;
@@ -230,9 +233,11 @@ export const ReplyInquiryModal: React.FC<ReplyInquiryModalProps> = ({
                   <>
                     <FaPaperPlane className="w-3 h-3" />
                     <span>Send Reply via Brevo</span>
+                    <ButtonHelpBadge text={BUTTON_HELP.DISPATCH_REPLY} />
                   </>
                 )}
               </button>
+
             </div>
           </div>
         </form>

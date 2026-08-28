@@ -25,12 +25,9 @@ export default async function AdminMailPage() {
   const initialDrafts = draftsResult.data || [];
 
   return (
-    <AdminPageContainer
-      breadcrumb="MAIL CENTER"
-      subtitle="Authenticated Custom-Domain Gateway"
-      title="Outbound Communications"
-    >
+    <AdminPageContainer breadcrumb="MAIL CENTER">
       <AdminSuspense fallbackTitle="Mail Center">
+
         <MailWorkspace
           initialSentData={initialSentData}
           initialDrafts={initialDrafts}

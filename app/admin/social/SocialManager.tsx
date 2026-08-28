@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { SocialLinkDocument } from "@/types/portfolio";
 import {
   createSocialLinkAction,
@@ -8,6 +9,10 @@ import {
   deleteSocialLinkAction,
   reorderSocialLinksAction,
 } from "@/lib/actions/cms.actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 import {
   FaPlus,
   FaPenToSquare,
@@ -21,11 +26,34 @@ import {
 } from "react-icons/fa6";
 
 export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = ({ initialLinks }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [links, setLinks] = useState<SocialLinkDocument[]>(initialLinks);
   const [editingItem, setEditingItem] = useState<Partial<SocialLinkDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Sync state if server props change
+  useEffect(() => {
+    setLinks(initialLinks);
+  }, [initialLinks]);
+
+  // Real-time broadcast synchronization
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("portfolio_cms_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.domain === "social" || event.data?.domain === "all") {
+          startTransition(() => {
+            router.refresh();
+          });
+        }
+      };
+      return () => channel.close();
+    } catch {}
+  }, [router]);
 
   const handleMove = async (index: number, direction: "up" | "down") => {
     if (direction === "up" && index === 0) return;
@@ -45,6 +73,10 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
     setIsPending(false);
 
     if (res.success) {
+      broadcastClientCmsChange("social");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: "Social links reordered successfully." });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to reorder." });
@@ -60,6 +92,10 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
 
     if (res.success) {
       setLinks((prev) => prev.filter((l) => l.id !== id));
+      broadcastClientCmsChange("social");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: `Social link "${platform}" deleted.` });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to delete." });
@@ -89,6 +125,10 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
         setLinks((prev) => [...prev, res.data as SocialLinkDocument]);
         setIsCreating(false);
         setEditingItem(null);
+        broadcastClientCmsChange("social");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "Social link added." });
       } else {
         setStatusMessage({ type: "error", text: res.error || "Failed to create." });
@@ -101,6 +141,10 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
           prev.map((l) => (l.id === editingItem.id ? (res.data as SocialLinkDocument) : l))
         );
         setEditingItem(null);
+        broadcastClientCmsChange("social");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "Social link updated." });
       } else {
         setStatusMessage({ type: "error", text: res.error || "Failed to update." });
@@ -131,8 +175,8 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
           onClick={() => {
             setIsCreating(true);
             setEditingItem({
-              platform: "GitHub",
-              url: "https://github.com/",
+              platform: "",
+              url: "https://",
               iconType: "preset",
               presetName: "github",
               isPublished: true,
@@ -142,6 +186,7 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
         >
           <FaPlus className="w-3 h-3" />
           <span>Add Social Link</span>
+          <ButtonHelpBadge text={BUTTON_HELP.CREATE_ITEM} />
         </button>
       </div>
 
@@ -281,6 +326,7 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
               >
                 {isPending ? <FaRotateRight className="w-3.5 h-3.5 animate-spin" /> : <FaFloppyDisk className="w-3.5 h-3.5" />}
                 <span>{isCreating ? "Add Link" : "Save Changes"}</span>
+                <ButtonHelpBadge text={BUTTON_HELP.SAVE_AND_PUBLISH} />
               </button>
             </div>
           </div>
@@ -313,6 +359,7 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
                 onClick={() => handleMove(index, "up")}
                 disabled={index === 0 || isPending}
                 className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
+                title={BUTTON_HELP.MOVE_UP}
               >
                 <FaArrowUp className="w-3 h-3" />
               </button>
@@ -320,6 +367,7 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
                 onClick={() => handleMove(index, "down")}
                 disabled={index === links.length - 1 || isPending}
                 className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
+                title={BUTTON_HELP.MOVE_DOWN}
               >
                 <FaArrowDown className="w-3 h-3" />
               </button>
@@ -332,12 +380,14 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
               >
                 <FaPenToSquare className="w-3 h-3" />
                 <span>Edit</span>
+                <ButtonHelpBadge text={BUTTON_HELP.EDIT_ITEM} />
               </button>
               <button
                 onClick={() => handleDelete(link.id, link.platform)}
-                className="p-2 text-[#991B1B] bg-[#FEF2F2] border border-[#FCA5A5] rounded-sm cursor-pointer"
+                className="flex items-center gap-1 p-2 text-[#991B1B] bg-[#FEF2F2] border border-[#FCA5A5] rounded-sm cursor-pointer"
               >
                 <FaTrash className="w-3 h-3" />
+                <ButtonHelpBadge text={BUTTON_HELP.DELETE_ITEM} />
               </button>
             </div>
           </div>

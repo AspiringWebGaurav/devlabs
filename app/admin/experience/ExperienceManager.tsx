@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ExperienceDocument } from "@/types/portfolio";
 import {
   createExperienceAction,
@@ -8,6 +9,10 @@ import {
   deleteExperienceAction,
   reorderExperienceAction,
 } from "@/lib/actions/cms.actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 import {
   FaPlus,
   FaPenToSquare,
@@ -21,11 +26,34 @@ import {
 } from "react-icons/fa6";
 
 export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument[] }> = ({ initialExperience }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [experience, setExperience] = useState<ExperienceDocument[]>(initialExperience);
   const [editingItem, setEditingItem] = useState<Partial<ExperienceDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Sync state if server props change
+  useEffect(() => {
+    setExperience(initialExperience);
+  }, [initialExperience]);
+
+  // Real-time broadcast synchronization
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("portfolio_cms_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.domain === "experience" || event.data?.domain === "all") {
+          startTransition(() => {
+            router.refresh();
+          });
+        }
+      };
+      return () => channel.close();
+    } catch {}
+  }, [router]);
 
   const handleMove = async (index: number, direction: "up" | "down") => {
     if (direction === "up" && index === 0) return;
@@ -45,6 +73,10 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
     setIsPending(false);
 
     if (res.success) {
+      broadcastClientCmsChange("experience");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: "Experience reordered successfully." });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to reorder." });
@@ -60,6 +92,10 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
 
     if (res.success) {
       setExperience((prev) => prev.filter((e) => e.id !== id));
+      broadcastClientCmsChange("experience");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: `Experience "${title}" deleted.` });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to delete." });
@@ -90,6 +126,10 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
         setExperience((prev) => [...prev, res.data as ExperienceDocument]);
         setIsCreating(false);
         setEditingItem(null);
+        broadcastClientCmsChange("experience");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "Experience item created." });
       } else {
         setStatusMessage({ type: "error", text: res.error || "Failed to create." });
@@ -102,6 +142,10 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
           prev.map((e) => (e.id === editingItem.id ? (res.data as ExperienceDocument) : e))
         );
         setEditingItem(null);
+        broadcastClientCmsChange("experience");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "Experience item updated." });
       } else {
         setStatusMessage({ type: "error", text: res.error || "Failed to update." });
@@ -144,6 +188,7 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
         >
           <FaPlus className="w-3 h-3" />
           <span>Add Experience Card</span>
+          <ButtonHelpBadge text={BUTTON_HELP.CREATE_ITEM} />
         </button>
       </div>
 
@@ -168,7 +213,7 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
                 Position Title
@@ -196,44 +241,42 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
 
             <div className="space-y-1.5">
               <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Period / Duration
+                Time Period (e.g. 2023 - Present)
               </label>
               <input
                 type="text"
                 value={editingItem.period || ""}
                 onChange={(e) => setEditingItem({ ...editingItem, period: e.target.value })}
                 className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
-                placeholder="2024 - Present"
+                required
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Thumbnail SVG / Image URL
-              </label>
-              <input
-                type="text"
-                value={editingItem.thumbnailUrl || ""}
-                onChange={(e) => setEditingItem({ ...editingItem, thumbnailUrl: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
-                required
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
+              Description / Responsibilities
+            </label>
+            <textarea
+              rows={3}
+              value={editingItem.description || ""}
+              onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
+              required
+            />
+          </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Description
-              </label>
-              <textarea
-                rows={2}
-                value={editingItem.description || ""}
-                onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
-                required
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
+              Thumbnail Icon URL / Path
+            </label>
+            <input
+              type="text"
+              value={editingItem.thumbnailUrl || ""}
+              onChange={(e) => setEditingItem({ ...editingItem, thumbnailUrl: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
+              required
+            />
           </div>
 
           <div className="flex items-center justify-between pt-3 border-t border-[#F1F5F9]">
@@ -265,6 +308,7 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
               >
                 {isPending ? <FaRotateRight className="w-3.5 h-3.5 animate-spin" /> : <FaFloppyDisk className="w-3.5 h-3.5" />}
                 <span>{isCreating ? "Add Experience" : "Save Changes"}</span>
+                <ButtonHelpBadge text={BUTTON_HELP.SAVE_AND_PUBLISH} />
               </button>
             </div>
           </div>
@@ -295,6 +339,7 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
                 onClick={() => handleMove(index, "up")}
                 disabled={index === 0 || isPending}
                 className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
+                title={BUTTON_HELP.MOVE_UP}
               >
                 <FaArrowUp className="w-3 h-3" />
               </button>
@@ -302,6 +347,7 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
                 onClick={() => handleMove(index, "down")}
                 disabled={index === experience.length - 1 || isPending}
                 className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
+                title={BUTTON_HELP.MOVE_DOWN}
               >
                 <FaArrowDown className="w-3 h-3" />
               </button>
@@ -314,12 +360,15 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
               >
                 <FaPenToSquare className="w-3 h-3" />
                 <span>Edit</span>
+                <ButtonHelpBadge text={BUTTON_HELP.EDIT_ITEM} />
               </button>
               <button
                 onClick={() => handleDelete(exp.id, exp.title)}
-                className="p-2 text-[#991B1B] bg-[#FEF2F2] border border-[#FCA5A5] rounded-sm cursor-pointer"
+                className="flex items-center gap-1 p-2 text-[#991B1B] bg-[#FEF2F2] border border-[#FCA5A5] rounded-sm cursor-pointer"
+                title="Delete Experience Item"
               >
                 <FaTrash className="w-3 h-3" />
+                <ButtonHelpBadge text={BUTTON_HELP.DELETE_ITEM} />
               </button>
             </div>
           </div>

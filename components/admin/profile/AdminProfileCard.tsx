@@ -8,11 +8,13 @@ import type { AdminUser } from "@/types/admin";
 interface AdminProfileCardProps {
   user: AdminUser | null;
   isActive?: boolean;
+  onClick?: () => void;
 }
 
 export const AdminProfileCard: React.FC<AdminProfileCardProps> = ({
   user,
   isActive = false,
+  onClick,
 }) => {
   const [imageError, setImageError] = useState(false);
   const displayName = user?.name || "Gaurav Patil";
@@ -27,6 +29,7 @@ export const AdminProfileCard: React.FC<AdminProfileCardProps> = ({
   return (
     <Link
       href="/admin/profile"
+      onClick={onClick}
       className={`w-full text-left flex items-center gap-2.5 p-2.5 rounded-sm transition-all duration-150 cursor-pointer group shadow-2xs border ${
         isActive
           ? "bg-[#F8FAFC] border-[#CBD5E1] ring-1 ring-[#7C3AED]/30 text-black font-semibold"

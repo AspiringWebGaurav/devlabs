@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { PhaseDocument } from "@/types/portfolio";
 import {
   createPhaseAction,
@@ -8,6 +9,10 @@ import {
   deletePhaseAction,
   reorderPhasesAction,
 } from "@/lib/actions/cms.actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 import {
   FaPlus,
   FaPenToSquare,
@@ -21,11 +26,34 @@ import {
 } from "react-icons/fa6";
 
 export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ initialPhases }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [phases, setPhases] = useState<PhaseDocument[]>(initialPhases);
   const [editingItem, setEditingItem] = useState<Partial<PhaseDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Sync state if server props change
+  useEffect(() => {
+    setPhases(initialPhases);
+  }, [initialPhases]);
+
+  // Real-time broadcast synchronization
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("portfolio_cms_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.domain === "approach" || event.data?.domain === "all") {
+          startTransition(() => {
+            router.refresh();
+          });
+        }
+      };
+      return () => channel.close();
+    } catch {}
+  }, [router]);
 
   const handleMove = async (index: number, direction: "up" | "down") => {
     if (direction === "up" && index === 0) return;
@@ -45,6 +73,10 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
     setIsPending(false);
 
     if (res.success) {
+      broadcastClientCmsChange("approach");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: "Phases reordered successfully." });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to reorder." });
@@ -60,6 +92,10 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
 
     if (res.success) {
       setPhases((prev) => prev.filter((p) => p.id !== id));
+      broadcastClientCmsChange("approach");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: `Phase "${title}" deleted.` });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to delete." });
@@ -89,6 +125,10 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
         setPhases((prev) => [...prev, res.data as PhaseDocument]);
         setIsCreating(false);
         setEditingItem(null);
+        broadcastClientCmsChange("approach");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "Phase created." });
       } else {
         setStatusMessage({ type: "error", text: res.error || "Failed to create." });
@@ -101,6 +141,10 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
           prev.map((p) => (p.id === editingItem.id ? (res.data as PhaseDocument) : p))
         );
         setEditingItem(null);
+        broadcastClientCmsChange("approach");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "Phase updated." });
       } else {
         setStatusMessage({ type: "error", text: res.error || "Failed to update." });
@@ -131,8 +175,8 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
           onClick={() => {
             setIsCreating(true);
             setEditingItem({
-              phaseBadge: `Phase ${phases.length + 1}`,
               title: "",
+              phaseBadge: `Phase 0${phases.length + 1}`,
               description: "",
               themeColor: "emerald",
               animationSpeed: 3.0,
@@ -143,6 +187,7 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
         >
           <FaPlus className="w-3 h-3" />
           <span>Add Process Phase</span>
+          <ButtonHelpBadge text={BUTTON_HELP.CREATE_ITEM} />
         </button>
       </div>
 
@@ -177,14 +222,14 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
                 value={editingItem.phaseBadge || ""}
                 onChange={(e) => setEditingItem({ ...editingItem, phaseBadge: e.target.value })}
                 className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
-                placeholder="Phase 1"
+                placeholder="Phase 01"
                 required
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Phase Title
+                Phase Title / Methodology
               </label>
               <input
                 type="text"
@@ -196,49 +241,9 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Canvas Theme Color
-              </label>
-              <select
-                value={editingItem.themeColor || "emerald"}
-                onChange={(e) =>
-                  setEditingItem({
-                    ...editingItem,
-                    themeColor: e.target.value as "emerald" | "pink" | "sky" | "violet" | "amber",
-                  })
-                }
-                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
-              >
-                <option value="emerald">Emerald Deep Teal</option>
-                <option value="pink">Neon Pink & Mint Dot Matrix</option>
-                <option value="sky">Vibrant Sky Blue</option>
-                <option value="violet">Royal Purple / Violet</option>
-                <option value="amber">Warm Amber Gold</option>
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Animation Speed (0.1 - 10.0)
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0.1"
-                max="10.0"
-                value={editingItem.animationSpeed || 3.0}
-                onChange={(e) => setEditingItem({ ...editingItem, animationSpeed: Number(e.target.value) })}
-                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
-                required
-              />
-            </div>
-          </div>
-
           <div className="space-y-1.5">
             <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-              Phase Description
+              Description & Strategy Execution
             </label>
             <textarea
               rows={3}
@@ -247,6 +252,38 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
               className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
               required
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
+                Theme Color Variant
+              </label>
+              <select
+                value={editingItem.themeColor || "emerald"}
+                onChange={(e) => setEditingItem({ ...editingItem, themeColor: e.target.value as PhaseDocument["themeColor"] })}
+                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
+              >
+                <option value="emerald">Emerald (Green Canvas)</option>
+                <option value="violet">Violet (Purple Canvas)</option>
+                <option value="cyan">Cyan (Sky Canvas)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
+                Canvas Animation Speed
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="1.0"
+                max="10.0"
+                value={editingItem.animationSpeed || 3.0}
+                onChange={(e) => setEditingItem({ ...editingItem, animationSpeed: Number(e.target.value) })}
+                className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-3 border-t border-[#F1F5F9]">
@@ -278,6 +315,7 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
               >
                 {isPending ? <FaRotateRight className="w-3.5 h-3.5 animate-spin" /> : <FaFloppyDisk className="w-3.5 h-3.5" />}
                 <span>{isCreating ? "Add Phase" : "Save Changes"}</span>
+                <ButtonHelpBadge text={BUTTON_HELP.SAVE_AND_PUBLISH} />
               </button>
             </div>
           </div>
@@ -308,6 +346,7 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
                 onClick={() => handleMove(index, "up")}
                 disabled={index === 0 || isPending}
                 className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
+                title={BUTTON_HELP.MOVE_UP}
               >
                 <FaArrowUp className="w-3 h-3" />
               </button>
@@ -315,6 +354,7 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
                 onClick={() => handleMove(index, "down")}
                 disabled={index === phases.length - 1 || isPending}
                 className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
+                title={BUTTON_HELP.MOVE_DOWN}
               >
                 <FaArrowDown className="w-3 h-3" />
               </button>
@@ -327,12 +367,15 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
               >
                 <FaPenToSquare className="w-3 h-3" />
                 <span>Edit</span>
+                <ButtonHelpBadge text={BUTTON_HELP.EDIT_ITEM} />
               </button>
               <button
                 onClick={() => handleDelete(phase.id, phase.title)}
-                className="p-2 text-[#991B1B] bg-[#FEF2F2] border border-[#FCA5A5] rounded-sm cursor-pointer"
+                className="flex items-center gap-1 p-2 text-[#991B1B] bg-[#FEF2F2] border border-[#FCA5A5] rounded-sm cursor-pointer"
+                title="Delete Process Phase"
               >
                 <FaTrash className="w-3 h-3" />
+                <ButtonHelpBadge text={BUTTON_HELP.DELETE_ITEM} />
               </button>
             </div>
           </div>

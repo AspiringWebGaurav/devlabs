@@ -45,9 +45,13 @@ export const AdminPageContainer: React.FC<AdminPageContainerProps> = ({
             </div>
           )}
 
-          <div className="flex-1 flex flex-col w-full">{children}</div>
+          <div className="flex-1 flex flex-col w-full animate-in fade-in duration-150">
+            {children}
+          </div>
         </main>
       </div>
     </div>
   );
 };
+
+

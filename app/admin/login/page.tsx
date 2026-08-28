@@ -8,7 +8,7 @@ export default function AdminLoginPage() {
   return (
     <div className="h-screen max-h-screen w-full flex flex-col justify-between bg-[#FFFFFF] text-black relative overflow-hidden select-none">
       {/* 1. Edge-to-Edge Top Navigation Bar with Exact Shiro Proportions */}
-      <header className="w-full bg-[#FFFFFF] px-6 sm:px-12 py-3.5 sm:py-4 flex items-center justify-between z-20 relative shrink-0">
+      <header className="w-full h-[57px] bg-[#FFFFFF] px-6 sm:px-12 flex items-center justify-between z-20 relative shrink-0">
         <Link
           href="/"
           className="font-admin-sans text-[20px] sm:text-[24px] font-extrabold tracking-tight text-black hover:opacity-80 transition-opacity"
@@ -66,27 +66,9 @@ export default function AdminLoginPage() {
                     </p>
                   </div>
                   <div className="p-6 sm:p-8 space-y-4">
-                    <div className="w-full h-11 bg-[#000000] text-white rounded-none sm:rounded-[2px] flex items-center justify-center gap-3 font-admin-mono text-xs font-semibold shadow-2xs">
-                      <svg
-                        className="w-3.5 h-3.5 animate-spin text-[#7C3AED]"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      <span className="tracking-wide">Preparing Gateway...</span>
+                    <div className="w-full py-3.5 px-4 bg-[#000000] text-[#FFFFFF] rounded-sm flex items-center justify-center gap-2.5 font-admin-mono text-xs font-bold uppercase tracking-[0.16em] shadow-xs">
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                      <span>Preparing Gateway...</span>
                     </div>
                     <p className="text-[11px] font-admin-sans text-[#94A3B8] text-center pt-1 leading-relaxed">
                       By signing in you agree to the{" "}

@@ -1,9 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { StorageAssetLedgerDocument } from "@/types/portfolio";
 import type { MediaAuditReport } from "@/lib/dal/repositories/media.repository";
 import { uploadMediaAction, sweepOrphansAction } from "@/lib/actions/cms.actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 import {
   FaCloudArrowUp,
   FaBroom,
@@ -16,12 +21,39 @@ export const MediaManager: React.FC<{
   initialAssets: StorageAssetLedgerDocument[];
   initialAudit: MediaAuditReport | null;
 }> = ({ initialAssets, initialAudit }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [assets, setAssets] = useState<StorageAssetLedgerDocument[]>(initialAssets);
-  const [audit] = useState<MediaAuditReport | null>(initialAudit);
+  const [audit, setAudit] = useState<MediaAuditReport | null>(initialAudit);
   const [isUploading, setIsUploading] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
   const [folder, setFolder] = useState("uploads");
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Sync state if server props change
+  useEffect(() => {
+    setAssets(initialAssets);
+  }, [initialAssets]);
+
+  useEffect(() => {
+    setAudit(initialAudit);
+  }, [initialAudit]);
+
+  // Real-time broadcast synchronization
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("portfolio_cms_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.domain === "media" || event.data?.domain === "all") {
+          startTransition(() => {
+            router.refresh();
+          });
+        }
+      };
+      return () => channel.close();
+    } catch {}
+  }, [router]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -39,6 +71,10 @@ export const MediaManager: React.FC<{
 
     if (res.success && res.data) {
       setAssets((prev) => [res.data as StorageAssetLedgerDocument, ...prev]);
+      broadcastClientCmsChange("media");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: `File "${file.name}" uploaded and recorded in ledger.` });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to upload file." });
@@ -58,6 +94,10 @@ export const MediaManager: React.FC<{
 
     if (res.success && res.data) {
       const { deletedCount } = res.data as { deletedCount: number };
+      broadcastClientCmsChange("media");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: `Orphan sweeper completed. Purged ${deletedCount} unmanaged/aged assets.` });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to sweep orphans." });
@@ -142,6 +182,7 @@ export const MediaManager: React.FC<{
               <FaCloudArrowUp className="w-3.5 h-3.5" />
             )}
             <span>{isUploading ? "Uploading File..." : "Upload Asset"}</span>
+            <ButtonHelpBadge text={BUTTON_HELP.UPLOAD_ASSET} />
             <input
               type="file"
               accept="image/*,.svg,.pdf"
@@ -163,8 +204,10 @@ export const MediaManager: React.FC<{
             <FaBroom className="w-3.5 h-3.5 text-[#7C3AED]" />
           )}
           <span>Sweep Orphans (&gt;24h)</span>
+          <ButtonHelpBadge text={BUTTON_HELP.SWEEP_ORPHANS} />
         </button>
       </div>
+
 
       {/* Asset Ledger Table */}
       <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-sm overflow-hidden shadow-2xs">

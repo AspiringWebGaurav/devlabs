@@ -30,6 +30,9 @@ import {
   saveMailDraftAction,
   sendAdminMailAction,
 } from "../actions";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 
 interface ComposeMailFormProps {
   initialDraft?: MailDraftDocument | null;
@@ -276,7 +279,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
   return (
     <div className="bg-[#FFFFFF] border border-[#E2E8F0] rounded-sm shadow-2xs font-admin-sans">
       {/* Compose Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E2E8F0] bg-[#FAFAFA]">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[#E2E8F0] bg-[#FAFAFA]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-sm bg-[#F5F3FF] border border-[#DDD6FE] flex items-center justify-center text-[#7C3AED]">
             <FaPaperPlane className="w-3.5 h-3.5" />
@@ -348,35 +351,34 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
       )}
 
       {/* Main Form */}
-      <form onSubmit={handleSubmit} className="p-5 space-y-4">
+      <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
         {/* From Identity Selector */}
         <div>
-          <label className="block font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B] mb-1">
-            From Identity (Verified Brevo Senders)
-          </label>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <select
-              value={senderKey}
-              onChange={(e) => setSenderKey(e.target.value as MailSenderKey)}
-              disabled={isPending}
-              className="w-full sm:w-80 px-3 py-2 text-xs font-admin-sans font-semibold bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors cursor-pointer"
-            >
-              {Object.values(ADMIN_MAIL_SENDERS).map((identity) => (
-                <option key={identity.key} value={identity.key}>
-                  {identity.displayName} &lt;{identity.email}&gt;
-                </option>
-              ))}
-            </select>
-
-            <div className="font-admin-mono text-[11px] text-[#64748B] flex items-center gap-1.5">
+          <div className="flex items-center justify-between mb-1">
+            <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B] font-bold">
+              From Identity (Verified Brevo Senders)
+            </label>
+            <div className="font-admin-mono text-[11px] text-[#10B981] flex items-center gap-1.5 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
               <span>Reply-To: {selectedIdentity.defaultReplyTo}</span>
             </div>
           </div>
+          <select
+            value={senderKey}
+            onChange={(e) => setSenderKey(e.target.value as MailSenderKey)}
+            disabled={isPending}
+            className="w-full px-3 py-2 text-xs font-admin-sans font-semibold bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors cursor-pointer"
+          >
+            {Object.values(ADMIN_MAIL_SENDERS).map((identity) => (
+              <option key={identity.key} value={identity.key}>
+                {identity.displayName} &lt;{identity.email}&gt;
+              </option>
+            ))}
+          </select>
 
           {/* No-Reply Advisory Notice */}
           {selectedIdentity.isNoReply && (
-            <div className="mt-2.5 p-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-sm text-xs text-[#92400E] flex items-center gap-2">
+            <div className="mt-2 p-2 bg-[#FFFBEB] border border-[#FDE68A] rounded-sm text-xs text-[#92400E] flex items-center gap-2">
               <FaTriangleExclamation className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
               <span>
                 <strong>Unmonitored Mailbox:</strong> Recipients replying to this address will not receive a response.
@@ -388,7 +390,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
         {/* To Recipient Field */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B]">
+            <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B] font-bold">
               To Recipients
             </label>
             <div className="flex items-center gap-3 font-admin-mono text-[11px] text-[#7C3AED]">
@@ -396,7 +398,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCc(true)}
-                  className="hover:underline cursor-pointer"
+                  className="hover:underline cursor-pointer font-semibold"
                 >
                   + CC
                 </button>
@@ -405,7 +407,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowBcc(true)}
-                  className="hover:underline cursor-pointer"
+                  className="hover:underline cursor-pointer font-semibold"
                 >
                   + BCC
                 </button>
@@ -426,7 +428,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
         {showCc && (
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B]">
+              <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B] font-bold">
                 CC Recipients
               </label>
               <button
@@ -455,7 +457,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
         {showBcc && (
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B]">
+              <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B] font-bold">
                 BCC Recipients (Private Copy)
               </label>
               <button
@@ -483,7 +485,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
         {/* Subject Line */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B]">
+            <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B] font-bold">
               Subject Line
             </label>
             <span className="font-admin-mono text-[10px] text-[#94A3B8]">
@@ -501,10 +503,10 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           />
         </div>
 
-        {/* Rich Formatting Toolbar & Body */}
+        {/* Message Content & Rich Formatting */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B]">
+            <label className="font-admin-mono text-[11px] uppercase tracking-wider text-[#64748B] font-bold">
               Message Content
             </label>
 
@@ -543,7 +545,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           </div>
 
           {isPreview ? (
-            <div className="w-full min-h-[220px] p-4 bg-[#FFFFFF] border border-[#E2E8F0] rounded-sm text-xs leading-relaxed font-admin-sans">
+            <div className="w-full min-h-[160px] max-h-[220px] overflow-y-auto p-3.5 bg-[#FFFFFF] border border-[#E2E8F0] rounded-sm text-xs leading-relaxed font-admin-sans">
               <div
                 dangerouslySetInnerHTML={{
                   __html: compileSafeHtml(body, subject),
@@ -553,7 +555,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           ) : (
             <textarea
               id="compose-body-input"
-              rows={9}
+              rows={6}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={isPending}
@@ -579,6 +581,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
             >
               {isSavingDraft ? <FaSpinner className="w-3 h-3 animate-spin" /> : <FaFloppyDisk className="w-3 h-3 text-[#7C3AED]" />}
               <span>{isSavingDraft ? "Saving..." : "Save Draft"}</span>
+              <ButtonHelpBadge text={BUTTON_HELP.SAVE_DRAFT} />
             </button>
 
             <button
@@ -589,6 +592,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
             >
               <FaTrash className="w-3 h-3" />
               <span>Discard</span>
+              <ButtonHelpBadge text={BUTTON_HELP.DISCARD_DRAFT} />
             </button>
           </div>
 
@@ -605,12 +609,15 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
             ) : (
               <>
                 <FaPaperPlane className="w-3.5 h-3.5" />
-                <span>Send via Brevo Gateway</span>
+                <span>Send Email Now</span>
+                <ButtonHelpBadge text={BUTTON_HELP.SEND_MAIL} />
               </>
             )}
           </button>
         </div>
       </form>
     </div>
+
+
   );
 };

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ClientDocument } from "@/types/portfolio";
 import {
   createClientAction,
@@ -8,6 +9,10 @@ import {
   deleteClientAction,
   reorderClientsAction,
 } from "@/lib/actions/cms.actions";
+import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
+import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+
 import {
   FaPlus,
   FaPenToSquare,
@@ -21,11 +26,34 @@ import {
 } from "react-icons/fa6";
 
 export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({ initialClients }) => {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [clients, setClients] = useState<ClientDocument[]>(initialClients);
   const [editingItem, setEditingItem] = useState<Partial<ClientDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Sync state if server props change
+  useEffect(() => {
+    setClients(initialClients);
+  }, [initialClients]);
+
+  // Real-time broadcast synchronization
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("portfolio_cms_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.domain === "clients" || event.data?.domain === "all") {
+          startTransition(() => {
+            router.refresh();
+          });
+        }
+      };
+      return () => channel.close();
+    } catch {}
+  }, [router]);
 
   const handleMove = async (index: number, direction: "up" | "down") => {
     if (direction === "up" && index === 0) return;
@@ -45,6 +73,10 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
     setIsPending(false);
 
     if (res.success) {
+      broadcastClientCmsChange("clients");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: "Client logos reordered successfully." });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to reorder." });
@@ -60,6 +92,10 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
 
     if (res.success) {
       setClients((prev) => prev.filter((c) => c.id !== id));
+      broadcastClientCmsChange("clients");
+      startTransition(() => {
+        router.refresh();
+      });
       setStatusMessage({ type: "success", text: `Client "${name}" deleted.` });
     } else {
       setStatusMessage({ type: "error", text: res.error || "Failed to delete." });
@@ -91,6 +127,10 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
         setClients((prev) => [...prev, res.data as ClientDocument]);
         setIsCreating(false);
         setEditingItem(null);
+        broadcastClientCmsChange("clients");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "Client logo added." });
       } else {
         setStatusMessage({ type: "error", text: res.error || "Failed to add client." });
@@ -103,9 +143,13 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
           prev.map((c) => (c.id === editingItem.id ? (res.data as ClientDocument) : c))
         );
         setEditingItem(null);
+        broadcastClientCmsChange("clients");
+        startTransition(() => {
+          router.refresh();
+        });
         setStatusMessage({ type: "success", text: "Client logo updated." });
       } else {
-        setStatusMessage({ type: "error", text: res.error || "Failed to update client." });
+        setStatusMessage({ type: "error", text: res.error || "Failed to update." });
       }
     }
   };
@@ -145,6 +189,7 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
         >
           <FaPlus className="w-3 h-3" />
           <span>Add Client Logo</span>
+          <ButtonHelpBadge text={BUTTON_HELP.CREATE_ITEM} />
         </button>
       </div>
 
@@ -185,7 +230,7 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
 
             <div className="space-y-1.5">
               <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Website URL (Strictly HTTPS)
+                Official Website URL
               </label>
               <input
                 type="url"
@@ -200,7 +245,7 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-1.5">
               <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Icon URL / Path
+                Icon Image URL / Path
               </label>
               <input
                 type="text"
@@ -213,7 +258,7 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
 
             <div className="space-y-1.5">
               <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Name Image URL / Path
+                Name/Wordmark Image URL
               </label>
               <input
                 type="text"
@@ -226,15 +271,16 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
 
             <div className="space-y-1.5">
               <label className="block text-xs font-admin-mono uppercase tracking-wider text-[#64748B] font-semibold">
-                Display Width (px)
+                Logo Display Width (px)
               </label>
               <input
                 type="number"
-                min="20"
-                max="300"
+                min={20}
+                max={200}
                 value={editingItem.logoWidth || 50}
                 onChange={(e) => setEditingItem({ ...editingItem, logoWidth: Number(e.target.value) })}
                 className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA]"
+                required
               />
             </div>
           </div>
@@ -268,6 +314,7 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
               >
                 {isPending ? <FaRotateRight className="w-3.5 h-3.5 animate-spin" /> : <FaFloppyDisk className="w-3.5 h-3.5" />}
                 <span>{isCreating ? "Add Logo" : "Save Changes"}</span>
+                <ButtonHelpBadge text={BUTTON_HELP.SAVE_AND_PUBLISH} />
               </button>
             </div>
           </div>
@@ -292,6 +339,7 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
                 onClick={() => handleMove(index, "up")}
                 disabled={index === 0 || isPending}
                 className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
+                title={BUTTON_HELP.MOVE_UP}
               >
                 <FaArrowUp className="w-3 h-3" />
               </button>
@@ -299,6 +347,7 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
                 onClick={() => handleMove(index, "down")}
                 disabled={index === clients.length - 1 || isPending}
                 className="p-2 border border-[#E2E8F0] rounded-sm text-[#64748B] hover:text-black disabled:opacity-30 cursor-pointer"
+                title={BUTTON_HELP.MOVE_DOWN}
               >
                 <FaArrowDown className="w-3 h-3" />
               </button>
@@ -311,12 +360,15 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
               >
                 <FaPenToSquare className="w-3 h-3" />
                 <span>Edit</span>
+                <ButtonHelpBadge text={BUTTON_HELP.EDIT_ITEM} />
               </button>
               <button
                 onClick={() => handleDelete(c.id, c.name)}
-                className="p-2 text-[#991B1B] bg-[#FEF2F2] border border-[#FCA5A5] rounded-sm cursor-pointer"
+                className="flex items-center gap-1 p-2 text-[#991B1B] bg-[#FEF2F2] border border-[#FCA5A5] rounded-sm cursor-pointer"
+                title="Delete Client Logo"
               >
                 <FaTrash className="w-3 h-3" />
+                <ButtonHelpBadge text={BUTTON_HELP.DELETE_ITEM} />
               </button>
             </div>
           </div>
