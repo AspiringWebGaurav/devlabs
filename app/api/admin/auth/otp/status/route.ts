@@ -3,35 +3,61 @@ import {
   ADMIN_COOKIE_NAME,
   ADMIN_OTP_COOKIE_NAME,
   ADMIN_SESSION_MAX_AGE_SECONDS,
+  OTP_RESEND_COOLDOWN_MS,
+  OTP_MAX_RESENDS,
+  OTP_MAX_ATTEMPTS,
 } from "@/lib/admin/constants";
-import { createAdminSessionPayload, signAdminSession } from "@/lib/admin/auth";
+import {
+  createAdminSessionPayload,
+  signAdminSession,
+  type AuthStatusApiResponse,
+} from "@/lib/admin/auth";
 import { otpService } from "@/lib/admin/services/otp.service";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse<AuthStatusApiResponse>> {
+  const now = Date.now();
+
   try {
     const challengeId = request.cookies.get(ADMIN_OTP_COOKIE_NAME)?.value;
     if (!challengeId) {
-      return NextResponse.json({ status: "UNAUTHORIZED" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, status: "UNAUTHORIZED", serverTime: now, error: "No active challenge cookie." },
+        { status: 401 }
+      );
     }
 
     const challenge = await otpService.getChallenge(challengeId);
     if (!challenge) {
-      const response = NextResponse.json({ status: "EXPIRED" });
+      const response = NextResponse.json<AuthStatusApiResponse>({
+        success: false,
+        status: "EXPIRED",
+        serverTime: now,
+        error: "Challenge not found.",
+      });
       response.cookies.delete(ADMIN_OTP_COOKIE_NAME);
       return response;
     }
 
-    const now = Date.now();
     if (now > challenge.expiresAt || challenge.otpStatus === "EXPIRED") {
-      const response = NextResponse.json({ status: "EXPIRED" });
+      const response = NextResponse.json<AuthStatusApiResponse>({
+        success: false,
+        status: "EXPIRED",
+        serverTime: now,
+        error: "Verification challenge expired.",
+      });
       response.cookies.delete(ADMIN_OTP_COOKIE_NAME);
       return response;
     }
 
     if (challenge.otpStatus === "INVALIDATED") {
-      const response = NextResponse.json({ status: "UNAUTHORIZED", error: "Challenge invalidated." });
+      const response = NextResponse.json<AuthStatusApiResponse>({
+        success: false,
+        status: "INVALIDATED",
+        serverTime: now,
+        error: "Challenge invalidated.",
+      });
       response.cookies.delete(ADMIN_OTP_COOKIE_NAME);
       return response;
     }
@@ -46,8 +72,10 @@ export async function GET(request: NextRequest) {
       );
       const signedToken = await signAdminSession(session);
 
-      const response = NextResponse.json({
+      const response = NextResponse.json<AuthStatusApiResponse>({
+        success: true,
         status: "VERIFIED",
+        serverTime: now,
         redirect: "/admin",
       });
 
@@ -67,17 +95,37 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    return NextResponse.json({
+    const lastResent = challenge.lastResentAt || challenge.createdAt;
+    const resendAvailableAt = lastResent + OTP_RESEND_COOLDOWN_MS;
+    const fallbackResendAvailableAt = challenge.fallbackLastResentAt
+      ? challenge.fallbackLastResentAt + OTP_RESEND_COOLDOWN_MS
+      : 0;
+
+    return NextResponse.json<AuthStatusApiResponse>({
+      success: true,
       status: "PENDING",
       primaryOtpVerified: isPrimaryDone,
       ipVerified: Boolean(challenge.ipVerified),
-      remainingAttempts: Math.max(0, 3 - (challenge.attemptsCount || 0)),
+      createdAt: challenge.createdAt,
       expiresAt: challenge.expiresAt,
+      resendAvailableAt,
+      resendCount: challenge.resendCount || 0,
+      maxResends: OTP_MAX_RESENDS,
+      fallbackResendAvailableAt,
+      fallbackResendCount: challenge.fallbackResendCount || 0,
+      maxFallbackResends: OTP_MAX_RESENDS,
+      remainingAttempts: Math.max(0, OTP_MAX_ATTEMPTS - (challenge.attemptsCount || 0)),
+      serverTime: now,
     });
   } catch (err: unknown) {
     const error = err as Error;
-    return NextResponse.json(
-      { status: "ERROR", error: error.message || "Failed to check status." },
+    return NextResponse.json<AuthStatusApiResponse>(
+      {
+        success: false,
+        status: "ERROR",
+        serverTime: now,
+        error: error.message || "Failed to check status.",
+      },
       { status: 500 }
     );
   }

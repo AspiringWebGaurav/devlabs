@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_OTP_COOKIE_NAME } from "@/lib/admin/constants";
+import {
+  ADMIN_OTP_COOKIE_NAME,
+  OTP_RESEND_COOLDOWN_MS,
+  OTP_MAX_ATTEMPTS,
+} from "@/lib/admin/constants";
+import { type AuthResendApiResponse } from "@/lib/admin/auth";
 import { otpService } from "@/lib/admin/services/otp.service";
 import { extractClientIp } from "@/lib/admin/services/ip-security.service";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse<AuthResendApiResponse>> {
   try {
     const challengeId = request.cookies.get(ADMIN_OTP_COOKIE_NAME)?.value;
     if (!challengeId) {
@@ -32,9 +37,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    const challenge = await otpService.getChallenge(challengeId);
+    const now = Date.now();
+
+    return NextResponse.json<AuthResendApiResponse>({
       success: true,
       message: result.message || "A new 6-digit verification code has been dispatched to your email.",
+      resendAvailableAt: now + OTP_RESEND_COOLDOWN_MS,
+      expiresAt: challenge?.expiresAt,
+      resendCount: challenge?.resendCount || 1,
+      remainingAttempts: challenge ? Math.max(0, OTP_MAX_ATTEMPTS - (challenge.attemptsCount || 0)) : 3,
     });
   } catch (err: unknown) {
     const error = err as Error;

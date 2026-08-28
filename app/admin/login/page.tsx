@@ -1,12 +1,26 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { AdminLoginForm, AdminFooter } from "@/components/admin";
+import { AdminLoginForm, AdminFooter, AdminLoginLoader } from "@/components/admin";
 
 export default function AdminLoginPage() {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // Brief smooth hydration hold on mount/refresh
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!isReady) {
+    return <AdminLoginLoader />;
+  }
+
   return (
-    <div className="h-screen max-h-screen w-full flex flex-col justify-between bg-[#FFFFFF] text-black relative overflow-hidden select-none">
+    <div className="h-screen max-h-screen w-full flex flex-col justify-between bg-[#FFFFFF] text-black relative overflow-hidden select-none animate-in fade-in duration-150">
       {/* 1. Edge-to-Edge Top Navigation Bar with Exact Shiro Proportions */}
       <header className="w-full h-[57px] bg-[#FFFFFF] px-6 sm:px-12 flex items-center justify-between z-20 relative shrink-0">
         <Link
@@ -53,34 +67,7 @@ export default function AdminLoginPage() {
 
         {/* Center Sign-In Card */}
         <div className="flex-1 min-h-0 flex flex-col justify-center items-center px-4 py-2 sm:py-4 relative z-10 overflow-hidden">
-          <Suspense
-            fallback={
-              <div className="w-full max-w-md">
-                <div className="w-full bg-[#FFFFFF] border border-[#E2E8F0] rounded-none sm:rounded-[2px] shadow-2xs overflow-hidden">
-                  <div className="p-6 sm:p-8 space-y-1.5 border-b border-[#F1F5F9]">
-                    <h1 className="text-2xl font-bold font-admin-sans text-black tracking-[-0.035em]">
-                      Sign in to Admin.
-                    </h1>
-                    <p className="text-xs text-[#475569] font-admin-sans leading-relaxed">
-                      Access is strictly restricted to authorized Superadmin identities.
-                    </p>
-                  </div>
-                  <div className="p-6 sm:p-8 space-y-4">
-                    <div className="w-full py-3.5 px-4 bg-[#000000] text-[#FFFFFF] rounded-sm flex items-center justify-center gap-2.5 font-admin-mono text-xs font-bold uppercase tracking-[0.16em] shadow-xs">
-                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
-                      <span>Preparing Gateway...</span>
-                    </div>
-                    <p className="text-[11px] font-admin-sans text-[#94A3B8] text-center pt-1 leading-relaxed">
-                      By signing in you agree to the{" "}
-                      <span className="text-[#64748B] underline decoration-[#CBD5E1]">Admin Terms</span>{" "}
-                      and{" "}
-                      <span className="text-[#64748B] underline decoration-[#CBD5E1]">Privacy Policy</span>.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            }
-          >
+          <Suspense fallback={<AdminLoginLoader />}>
             <AdminLoginForm />
           </Suspense>
         </div>
@@ -91,3 +78,4 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+

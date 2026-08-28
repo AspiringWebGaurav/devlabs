@@ -4,7 +4,11 @@ import {
   ADMIN_OTP_COOKIE_NAME,
   ADMIN_SESSION_MAX_AGE_SECONDS,
 } from "@/lib/admin/constants";
-import { createAdminSessionPayload, signAdminSession } from "@/lib/admin/auth";
+import {
+  createAdminSessionPayload,
+  signAdminSession,
+  type AuthVerifyApiResponse,
+} from "@/lib/admin/auth";
 import { otpService } from "@/lib/admin/services/otp.service";
 import { ipSecurityService, normalizeIpAddress } from "@/lib/admin/services/ip-security.service";
 import { authChallengesRepository } from "@/lib/admin/repositories/auth-challenges.repository";
@@ -12,12 +16,12 @@ import { dispatchNewIpSecurityAlert } from "@/lib/email/brevo";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse<AuthVerifyApiResponse>> {
   try {
     const challengeId = request.cookies.get(ADMIN_OTP_COOKIE_NAME)?.value;
     if (!challengeId) {
-      return NextResponse.json(
-        { success: false, error: "No active verification challenge. Please sign in again." },
+      return NextResponse.json<AuthVerifyApiResponse>(
+        { success: false, verified: false, error: "No active verification challenge. Please sign in again." },
         { status: 401 }
       );
     }
@@ -26,8 +30,8 @@ export async function POST(request: NextRequest) {
     const rawOtp = typeof body.otp === "string" ? body.otp.trim() : "";
 
     if (!rawOtp || rawOtp.length !== 6) {
-      return NextResponse.json(
-        { success: false, error: "Please enter a valid 6-digit code." },
+      return NextResponse.json<AuthVerifyApiResponse>(
+        { success: false, verified: false, error: "Please enter a valid 6-digit code." },
         { status: 400 }
       );
     }
@@ -41,9 +45,10 @@ export async function POST(request: NextRequest) {
         typeof verifyResult.remainingAttempts === "number" ? verifyResult.remainingAttempts : 0;
       const isInvalidated = verifyResult.invalidated === true || remainingAttempts === 0;
 
-      const response = NextResponse.json(
+      const response = NextResponse.json<AuthVerifyApiResponse>(
         {
           success: false,
+          verified: false,
           error: verifyResult.error || "Verification failed.",
           remainingAttempts,
           invalidated: isInvalidated,
@@ -63,8 +68,8 @@ export async function POST(request: NextRequest) {
 
     // Explicit OTP Authentication Gate: Stage 1 must be satisfied
     if (!challenge.primaryOtpVerified && challenge.otpStatus !== "VERIFIED") {
-      return NextResponse.json(
-        { success: false, error: "OTP verification requirement not satisfied." },
+      return NextResponse.json<AuthVerifyApiResponse>(
+        { success: false, verified: false, error: "OTP verification requirement not satisfied." },
         { status: 400 }
       );
     }
@@ -113,13 +118,13 @@ export async function POST(request: NextRequest) {
         requestHeaders: request.headers,
       });
 
-      return NextResponse.json({
+      return NextResponse.json<AuthVerifyApiResponse>({
         success: true,
+        verified: false,
         requiresIpVerification: true,
-        clientIp: displayIp,
         expiresAt,
         remainingAttempts: Math.max(0, 3 - (challenge.attemptsCount || 0)),
-        message: "New IP address detected. A verification link has been sent to your email.",
+        message: "New sign-in location detected. An authorization link has been sent to your email.",
       });
     }
 
@@ -133,7 +138,7 @@ export async function POST(request: NextRequest) {
     const session = createAdminSessionPayload(email, challenge.avatar, challenge.name);
     const signedToken = await signAdminSession(session);
 
-    const response = NextResponse.json({
+    const response = NextResponse.json<AuthVerifyApiResponse>({
       success: true,
       verified: true,
       redirect: "/admin",
@@ -158,9 +163,10 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (err: unknown) {
     const error = err as Error;
-    return NextResponse.json(
+    return NextResponse.json<AuthVerifyApiResponse>(
       {
         success: false,
+        verified: false,
         error: error.message || "An unexpected error occurred during verification.",
         invalidated: false,
       },

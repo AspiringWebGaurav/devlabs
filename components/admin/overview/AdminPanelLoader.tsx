@@ -98,10 +98,22 @@ export const AdminPanelLoader: React.FC<AdminPanelLoaderProps> = ({
           </div>
           <div className="min-w-0">
             <h4 className="font-admin-sans font-bold text-xs text-black">
-              {progress === 100 ? "Ready" : "Signing in..."}
+              {progress === 100
+                ? "Ready"
+                : progress < 35
+                ? "Session Verified"
+                : progress < 75
+                ? "Preparing Workspace"
+                : "Initializing Console"}
             </h4>
             <p className="font-admin-mono text-[10px] text-[#64748B]">
-              {progress === 100 ? "Opening workspace" : "Authenticating superadmin"}
+              {progress === 100
+                ? "Opening workspace"
+                : progress < 35
+                ? "Superadmin authenticated"
+                : progress < 75
+                ? "Mounting control modules"
+                : "Hydrating session telemetry"}
             </p>
           </div>
         </div>
@@ -126,7 +138,7 @@ export const AdminPanelLoader: React.FC<AdminPanelLoaderProps> = ({
               progress === 100 ? "text-[#10B981]" : "text-[#7C3AED]"
             }`}
           >
-            {progress === 100 ? "AUTHENTICATED" : "LOADING"}
+            {progress === 100 ? "AUTHENTICATED" : "PREPARING"}
           </span>
         </div>
       </div>

@@ -58,13 +58,16 @@ export async function middleware(request: NextRequest) {
     }
 
     // Case C: Unauthenticated user trying to access protected /admin routes -> redirect to /admin/login
+    // The root /admin entrypoint is permitted to render the AdminPanelLoader gateway
     if (!isAuthenticated && !isPublicAdminRoute) {
-      const loginUrl = new URL("/admin/login", request.url);
-      const response = NextResponse.redirect(loginUrl);
-      if (sessionCookie) {
-        response.cookies.delete(ADMIN_COOKIE_NAME);
+      if (pathname !== "/admin") {
+        const loginUrl = new URL("/admin/login", request.url);
+        const response = NextResponse.redirect(loginUrl);
+        if (sessionCookie) {
+          response.cookies.delete(ADMIN_COOKIE_NAME);
+        }
+        return response;
       }
-      return response;
     }
 
     return NextResponse.next({

@@ -13,6 +13,12 @@ import {
   FaKey,
 } from "react-icons/fa6";
 import { AdminPanelLoader } from "../overview/AdminPanelLoader";
+import {
+  type AuthStatusApiResponse,
+  type AuthVerifyApiResponse,
+  type AuthResendApiResponse,
+  type AuthFallbackApiResponse,
+} from "@/lib/admin/auth";
 
 export type AuthUiStage = "PRIMARY_OTP" | "AWAITING_IP" | "FALLBACK_PASSCODE";
 
@@ -39,12 +45,15 @@ export const AdminOtpForm: React.FC = () => {
   const [isInvalidated, setIsInvalidated] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
 
-  // Cooldown countdown timers (60s)
-  const [primaryCooldown, setPrimaryCooldown] = useState<number>(60);
-  const [fallbackCooldown, setFallbackCooldown] = useState<number>(0);
+  // Form-Scoped Server-Authoritative Timestamps
+  const [clockOffset, setClockOffset] = useState<number>(0);
+  const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
+  const [fallbackResendAvailableAt, setFallbackResendAvailableAt] = useState<number | null>(null);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [resendCount, setResendCount] = useState<number>(0);
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
 
-  // New IP Verification flow
-  const [detectedIp, setDetectedIp] = useState<string | null>(null);
+  // Strictly Conditional IP Polling refs
   const pollingDeadlineRef = useRef<number | null>(null);
   const stopPollingFnRef = useRef<((reason: string) => void) | null>(null);
 
@@ -76,24 +85,92 @@ export const AdminOtpForm: React.FC = () => {
     }
   }, [stage, isInvalidated, isSuccess]);
 
-  // 2. 60-Second Cooldown Timer Countdown
+  // 2. Form-Scoped 1000ms Ticker & Visibility Change Listener
   useEffect(() => {
-    if (primaryCooldown <= 0) return;
-    const timer = setInterval(() => {
-      setPrimaryCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    const handleSync = () => {
+      setNowTick(Date.now());
+    };
+    document.addEventListener("visibilitychange", handleSync);
+    window.addEventListener("focus", handleSync);
+    const interval = setInterval(() => {
+      setNowTick(Date.now());
     }, 1000);
-    return () => clearInterval(timer);
-  }, [primaryCooldown]);
+    return () => {
+      document.removeEventListener("visibilitychange", handleSync);
+      window.removeEventListener("focus", handleSync);
+      clearInterval(interval);
+    };
+  }, []);
 
+  // 3. Initial Server-Authoritative Status Hydration on Mount
   useEffect(() => {
-    if (fallbackCooldown <= 0) return;
-    const timer = setInterval(() => {
-      setFallbackCooldown((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [fallbackCooldown]);
+    let isMounted = true;
+    const hydrateInitialStatus = async () => {
+      try {
+        const res = await fetch("/api/admin/auth/otp/status", { cache: "no-store" });
+        const data: AuthStatusApiResponse = await res.json();
+        if (!isMounted) return;
 
-  // 3. Trigger Shake Animation on Invalid Attempt
+        if (data.status === "VERIFIED") {
+          isSuccessRef.current = true;
+          setIsSuccess(true);
+          return;
+        }
+
+        if (data.status === "EXPIRED" || data.status === "INVALIDATED" || data.status === "UNAUTHORIZED") {
+          setIsInvalidated(true);
+          setErrorMsg(data.error || "Verification session expired. Redirecting to sign in...");
+          scheduleTimeout(() => {
+            router.push("/admin/login?error=Session+expired");
+          }, 2000);
+          return;
+        }
+
+        if (data.serverTime) {
+          const offset = data.serverTime - Date.now();
+          setClockOffset(offset);
+        }
+        if (data.resendAvailableAt) setResendAvailableAt(data.resendAvailableAt);
+        if (data.fallbackResendAvailableAt) setFallbackResendAvailableAt(data.fallbackResendAvailableAt);
+        if (data.expiresAt) setExpiresAt(data.expiresAt);
+        if (typeof data.remainingAttempts === "number") setRemainingAttempts(data.remainingAttempts);
+        if (typeof data.resendCount === "number") setResendCount(data.resendCount);
+
+        if (data.primaryOtpVerified && !data.ipVerified) {
+          setStage("AWAITING_IP");
+        }
+      } catch {
+        // Non-blocking initial hydration fallback
+      }
+    };
+
+    hydrateInitialStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, [router, scheduleTimeout]);
+
+  // 4. Wall-Clock Derived Countdowns (in seconds)
+  const authoritativeNow = nowTick + clockOffset;
+  const primaryCooldown = resendAvailableAt
+    ? Math.max(0, Math.ceil((resendAvailableAt - authoritativeNow) / 1000))
+    : 0;
+  const fallbackCooldown = fallbackResendAvailableAt
+    ? Math.max(0, Math.ceil((fallbackResendAvailableAt - authoritativeNow) / 1000))
+    : 0;
+  const challengeExpirySec = expiresAt
+    ? Math.max(0, Math.ceil((expiresAt - authoritativeNow) / 1000))
+    : null;
+
+  // 5. Expiry Gate Watcher
+  useEffect(() => {
+    if (challengeExpirySec !== null && challengeExpirySec <= 0 && !isSuccess && !isInvalidated) {
+      setIsInvalidated(true);
+      setErrorMsg("Your verification code has expired. Please restart sign-in.");
+    }
+  }, [challengeExpirySec, isSuccess, isInvalidated]);
+
+  // 6. Trigger Shake Animation on Invalid Attempt
   const triggerShake = useCallback(() => {
     if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
     setIsShaking(true);
@@ -103,7 +180,7 @@ export const AdminOtpForm: React.FC = () => {
     }, 500);
   }, []);
 
-  // 4. Handle Single Digit Input
+  // 7. Handle Single Digit Input
   const handleDigitChange = (index: number, value: string) => {
     if (isInvalidated || isSubmitting || isSubmittingRef.current || isSuccess || isSuccessRef.current) return;
 
@@ -125,7 +202,7 @@ export const AdminOtpForm: React.FC = () => {
     }
   };
 
-  // 5. Handle Backspace & Arrow Navigation
+  // 8. Handle Backspace & Arrow Navigation
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isSuccess || isSuccessRef.current) return;
     if (e.key === "Backspace") {
@@ -141,7 +218,7 @@ export const AdminOtpForm: React.FC = () => {
     }
   };
 
-  // 6. Handle 6-digit Paste
+  // 9. Handle 6-digit Paste
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     if (isInvalidated || isSubmitting || isSubmittingRef.current || isSuccess || isSuccessRef.current) return;
@@ -159,7 +236,7 @@ export const AdminOtpForm: React.FC = () => {
     inputRefs.current[nextIndex]?.focus();
   };
 
-  // 7. Single-Flight Primary OTP Verification
+  // 10. Single-Flight Primary OTP Verification
   const handleVerifyPrimaryOtp = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isSubmittingRef.current || isInvalidated || isSuccessRef.current) return;
@@ -183,7 +260,7 @@ export const AdminOtpForm: React.FC = () => {
         body: JSON.stringify({ otp: otpCode }),
       });
 
-      const data = await res.json();
+      const data: AuthVerifyApiResponse = await res.json();
 
       if (!res.ok || !data.success) {
         const isServerInvalidated =
@@ -218,7 +295,6 @@ export const AdminOtpForm: React.FC = () => {
       if (data.requiresIpVerification) {
         setIsShaking(false);
         setStage("AWAITING_IP");
-        setDetectedIp(data.clientIp || "Unrecognized IP");
         if (typeof data.remainingAttempts === "number") {
           setRemainingAttempts(data.remainingAttempts);
         }
@@ -228,12 +304,12 @@ export const AdminOtpForm: React.FC = () => {
         return;
       }
 
-      // Case: Primary OTP Verified and IP is immediately trusted
+      // Case: Primary OTP Verified and IP is immediately trusted (Session already issued by server)
       isSuccessRef.current = true;
       setIsSuccess(true);
       setErrorMsg(null);
     } catch {
-      setErrorMsg("Network error connecting to verification service. Please try again.");
+      setErrorMsg("Connection interrupted. Your attempt was not counted. Please try again.");
       triggerShake();
     } finally {
       if (!isSuccessRef.current) {
@@ -243,7 +319,7 @@ export const AdminOtpForm: React.FC = () => {
     }
   }, [digits, router, triggerShake, scheduleTimeout, isInvalidated]);
 
-  // 8. Single-Flight Fallback Passcode Verification
+  // 11. Single-Flight Fallback Passcode Verification
   const handleVerifyFallbackPasscode = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isSubmittingRef.current || isInvalidated || isSuccessRef.current) return;
@@ -267,7 +343,7 @@ export const AdminOtpForm: React.FC = () => {
         body: JSON.stringify({ action: "verify", passcode }),
       });
 
-      const data = await res.json();
+      const data: AuthFallbackApiResponse = await res.json();
 
       if (!res.ok || !data.success) {
         const isServerInvalidated =
@@ -298,12 +374,12 @@ export const AdminOtpForm: React.FC = () => {
         return;
       }
 
-      // Success via Fallback Passcode
+      // Success via Fallback Passcode (Session already issued by server)
       isSuccessRef.current = true;
       setIsSuccess(true);
       setErrorMsg(null);
     } catch {
-      setErrorMsg("Network error connecting to authorization service. Please try again.");
+      setErrorMsg("Connection interrupted. Your attempt was not counted. Please try again.");
       triggerShake();
     } finally {
       if (!isSuccessRef.current) {
@@ -313,7 +389,7 @@ export const AdminOtpForm: React.FC = () => {
     }
   }, [digits, router, triggerShake, scheduleTimeout, isInvalidated]);
 
-  // 9. Auto-submit when all 6 digits are filled
+  // 12. Auto-submit when all 6 digits are filled
   useEffect(() => {
     const isFilled = digits.every((d) => d.length === 1);
     if (!isFilled || isSubmitting || isSubmittingRef.current || isSuccess || isSuccessRef.current || isInvalidated) {
@@ -327,7 +403,7 @@ export const AdminOtpForm: React.FC = () => {
     }
   }, [digits, isSubmitting, isSuccess, stage, isInvalidated, handleVerifyPrimaryOtp, handleVerifyFallbackPasscode]);
 
-  // 10. Resend Primary OTP Handler
+  // 13. Resend Primary OTP Handler (Server-Confirmed)
   const handleResendPrimaryOtp = async () => {
     if (primaryCooldown > 0 || isResending || isInvalidated || isSubmittingRef.current || isSuccess || isSuccessRef.current) return;
 
@@ -337,28 +413,42 @@ export const AdminOtpForm: React.FC = () => {
 
     try {
       const res = await fetch("/api/admin/auth/otp/resend", { method: "POST" });
-      const data = await res.json();
+      const data: AuthResendApiResponse = await res.json();
 
       if (!res.ok || !data.success) {
-        if (data.cooldownSeconds) setPrimaryCooldown(data.cooldownSeconds);
+        if (data.cooldownSeconds) {
+          setResendAvailableAt(Date.now() + data.cooldownSeconds * 1000);
+        }
         setErrorMsg(data.error || "Failed to resend verification code.");
         return;
       }
 
-      setSuccessMsg("A fresh 6-digit verification code has been dispatched to your email.");
-      setPrimaryCooldown(60);
+      if (data.resendAvailableAt) {
+        setResendAvailableAt(data.resendAvailableAt);
+      }
+      if (data.expiresAt) {
+        setExpiresAt(data.expiresAt);
+      }
+      if (typeof data.resendCount === "number") {
+        setResendCount(data.resendCount);
+      }
+      if (typeof data.remainingAttempts === "number") {
+        setRemainingAttempts(data.remainingAttempts);
+      }
+
+      setSuccessMsg(data.message || "A fresh 6-digit verification code has been dispatched to your email.");
       setDigits(["", "", "", "", "", ""]);
       setTimeout(() => {
         inputRefs.current[0]?.focus();
       }, 50);
     } catch {
-      setErrorMsg("Failed to connect to resend service. Please try again.");
+      setErrorMsg("Network error connecting to resend service. Please try again.");
     } finally {
       setIsResending(false);
     }
   };
 
-  // 11. Request Fallback Passcode Handler
+  // 14. Request Fallback Passcode Handler
   const handleRequestFallbackPasscode = async () => {
     if (isRequestingFallback || isInvalidated || isSuccessRef.current) return;
 
@@ -378,7 +468,7 @@ export const AdminOtpForm: React.FC = () => {
         body: JSON.stringify({ action: "request" }),
       });
 
-      const data = await res.json();
+      const data: AuthFallbackApiResponse = await res.json();
 
       if (!res.ok || !data.success) {
         setErrorMsg(data.error || "Failed to request authorization passcode.");
@@ -387,7 +477,9 @@ export const AdminOtpForm: React.FC = () => {
 
       // Switch to Fallback Passcode Input View
       setStage("FALLBACK_PASSCODE");
-      setFallbackCooldown(60);
+      if (data.fallbackResendAvailableAt) {
+        setFallbackResendAvailableAt(data.fallbackResendAvailableAt);
+      }
       setDigits(["", "", "", "", "", ""]);
       if (typeof data.remainingAttempts === "number") {
         setRemainingAttempts(data.remainingAttempts);
@@ -403,10 +495,10 @@ export const AdminOtpForm: React.FC = () => {
     }
   };
 
-  // 12. Bounded Status Polling for New IP Authorization
+  // 15. Strictly Conditional Status Polling for New IP Authorization
   // Monotonic wall-clock deadline: Date.now() + 120_000 (120 seconds max total)
   useEffect(() => {
-    if (stage !== "AWAITING_IP") return;
+    if (stage !== "AWAITING_IP" || isSuccess || isInvalidated) return;
 
     if (!pollingDeadlineRef.current) {
       pollingDeadlineRef.current = Date.now() + 120_000;
@@ -440,7 +532,7 @@ export const AdminOtpForm: React.FC = () => {
           cache: "no-store",
         });
 
-        const data = await res.json();
+        const data: AuthStatusApiResponse = await res.json();
 
         if (data.status === "VERIFIED") {
           stopPolling("VERIFIED");
@@ -453,9 +545,9 @@ export const AdminOtpForm: React.FC = () => {
           scheduleTimeout(() => {
             router.push("/admin/login?error=Session+expired");
           }, 2000);
-        } else if (data.status === "UNAUTHORIZED") {
+        } else if (data.status === "UNAUTHORIZED" || data.status === "INVALIDATED") {
           stopPolling("UNAUTHORIZED");
-          setErrorMsg("Unauthorized request. Redirecting to sign in...");
+          setErrorMsg("Challenge session invalidated. Redirecting to sign in...");
           scheduleTimeout(() => {
             router.push("/admin/login");
           }, 2000);
@@ -470,7 +562,7 @@ export const AdminOtpForm: React.FC = () => {
     return () => {
       stopPolling("UNMOUNT");
     };
-  }, [stage, router, scheduleTimeout]);
+  }, [stage, isSuccess, isInvalidated, router, scheduleTimeout]);
 
   const hasNavigatedRef = useRef(false);
   const handleAuthComplete = useCallback(() => {
@@ -514,14 +606,14 @@ export const AdminOtpForm: React.FC = () => {
             {stage === "PRIMARY_OTP"
               ? "Enter Verification Code."
               : stage === "AWAITING_IP"
-              ? "Authorize New IP Address."
+              ? "Authorize New Location."
               : "Enter Device Passcode."}
           </h1>
           <p className="text-xs sm:text-[13px] text-[#475569] font-admin-sans leading-relaxed pt-0.5">
             {stage === "PRIMARY_OTP"
               ? "A 6-digit one-time passcode was dispatched to your Superadmin email."
               : stage === "AWAITING_IP"
-              ? `We detected a sign-in attempt from an unrecognized IP address (${detectedIp || "Unknown"}).`
+              ? "We detected a sign-in attempt from an unrecognized location or device."
               : "A 6-digit passcode was sent to your registered Superadmin email to approve this device."}
           </p>
         </div>
@@ -550,9 +642,9 @@ export const AdminOtpForm: React.FC = () => {
 
                 <div className="pt-2.5 border-t border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-admin-mono text-[11px] text-[#475569]">
-                    <span>Detected IP:</span>
+                    <span>Security Check:</span>
                     <span className="font-bold text-[#0F172A] px-1.5 py-0.5 bg-[#FFFFFF] border border-[#E2E8F0] rounded-xs">
-                      {detectedIp}
+                      New Device
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 font-admin-mono text-[11px] font-semibold text-[#7C3AED]">
@@ -622,7 +714,11 @@ export const AdminOtpForm: React.FC = () => {
             >
               {/* Feedback Banners */}
               {errorMsg && (
-                <div className="p-2.5 sm:p-3 bg-[#FEF2F2] border border-[#FCA5A5] text-[#991B1B] text-xs rounded-sm flex items-start gap-2 animate-in fade-in duration-150 shadow-2xs">
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="p-2.5 sm:p-3 bg-[#FEF2F2] border border-[#FCA5A5] text-[#991B1B] text-xs rounded-sm flex items-start gap-2 animate-in fade-in duration-150 shadow-2xs"
+                >
                   <FaTriangleExclamation className="w-3.5 h-3.5 text-[#EF4444] shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="font-admin-mono leading-relaxed text-[11px] font-semibold">{errorMsg}</p>
@@ -636,7 +732,11 @@ export const AdminOtpForm: React.FC = () => {
               )}
 
               {successMsg && (
-                <div className="p-2.5 sm:p-3 bg-[#F0FDF4] border border-[#86EFAC] text-[#166534] text-xs rounded-sm flex items-center gap-2 animate-in fade-in duration-150 shadow-2xs">
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="p-2.5 sm:p-3 bg-[#F0FDF4] border border-[#86EFAC] text-[#166534] text-xs rounded-sm flex items-center gap-2 animate-in fade-in duration-150 shadow-2xs"
+                >
                   <FaCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
                   <p className="font-admin-mono font-semibold text-[11px]">{successMsg}</p>
                 </div>
@@ -659,6 +759,7 @@ export const AdminOtpForm: React.FC = () => {
                     autoComplete="one-time-code"
                     maxLength={1}
                     value={digit}
+                    aria-label={`Digit ${idx + 1} of 6`}
                     disabled={isInvalidated || isSubmitting || isSuccess}
                     onChange={(e) => handleDigitChange(idx, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(idx, e)}
@@ -705,6 +806,7 @@ export const AdminOtpForm: React.FC = () => {
                   onClick={stage === "PRIMARY_OTP" ? handleResendPrimaryOtp : handleRequestFallbackPasscode}
                   disabled={
                     (stage === "PRIMARY_OTP" ? primaryCooldown > 0 : fallbackCooldown > 0) ||
+                    (stage === "PRIMARY_OTP" && resendCount >= 3) ||
                     isResending ||
                     isRequestingFallback ||
                     isInvalidated ||
@@ -712,6 +814,7 @@ export const AdminOtpForm: React.FC = () => {
                   }
                   className={`font-admin-mono text-[11px] font-bold flex items-center gap-1.5 transition-colors ${
                     (stage === "PRIMARY_OTP" ? primaryCooldown > 0 : fallbackCooldown > 0) ||
+                    (stage === "PRIMARY_OTP" && resendCount >= 3) ||
                     isResending ||
                     isRequestingFallback ||
                     isInvalidated ||
@@ -725,6 +828,8 @@ export const AdminOtpForm: React.FC = () => {
                       <FaCircleNotch className="w-3 h-3 animate-spin" />
                       <span>Sending...</span>
                     </>
+                  ) : stage === "PRIMARY_OTP" && resendCount >= 3 ? (
+                    <span>Max resends reached</span>
                   ) : (stage === "PRIMARY_OTP" ? primaryCooldown > 0 : fallbackCooldown > 0) ? (
                     <span>Resend in {stage === "PRIMARY_OTP" ? primaryCooldown : fallbackCooldown}s</span>
                   ) : (
@@ -736,8 +841,14 @@ export const AdminOtpForm: React.FC = () => {
                 </button>
               </div>
 
-              {/* Stage-Specific Back / Cancel Navigation */}
+              {/* Challenge Lifetime & Stage Navigation */}
               <div className="text-center pt-1.5 flex flex-col gap-1">
+                {challengeExpirySec !== null && challengeExpirySec > 0 && (
+                  <p className="font-admin-mono text-[10px] text-[#94A3B8]">
+                    Session security window: {Math.floor(challengeExpirySec / 60)}m{" "}
+                    {String(challengeExpirySec % 60).padStart(2, "0")}s
+                  </p>
+                )}
                 {stage === "FALLBACK_PASSCODE" && (
                   <button
                     type="button"
@@ -765,4 +876,5 @@ export const AdminOtpForm: React.FC = () => {
     </div>
   );
 };
+
 

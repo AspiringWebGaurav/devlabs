@@ -3,14 +3,19 @@ import {
   ADMIN_COOKIE_NAME,
   ADMIN_OTP_COOKIE_NAME,
   ADMIN_SESSION_MAX_AGE_SECONDS,
+  OTP_RESEND_COOLDOWN_MS,
 } from "@/lib/admin/constants";
-import { createAdminSessionPayload, signAdminSession } from "@/lib/admin/auth";
+import {
+  createAdminSessionPayload,
+  signAdminSession,
+  type AuthFallbackApiResponse,
+} from "@/lib/admin/auth";
 import { otpService } from "@/lib/admin/services/otp.service";
 import { extractClientIp } from "@/lib/admin/services/ip-security.service";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse<AuthFallbackApiResponse>> {
   try {
     const challengeId = request.cookies.get(ADMIN_OTP_COOKIE_NAME)?.value;
     if (!challengeId) {
@@ -45,10 +50,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json({
+      return NextResponse.json<AuthFallbackApiResponse>({
         success: true,
         message: result.message,
         remainingAttempts: result.remainingAttempts,
+        fallbackResendAvailableAt: Date.now() + OTP_RESEND_COOLDOWN_MS,
       });
     }
 
@@ -74,7 +80,7 @@ export async function POST(request: NextRequest) {
           typeof verifyResult.remainingAttempts === "number" ? verifyResult.remainingAttempts : 0;
         const isInvalidated = verifyResult.invalidated === true || remainingAttempts === 0;
 
-        const response = NextResponse.json(
+        const response = NextResponse.json<AuthFallbackApiResponse>(
           {
             success: false,
             error: verifyResult.error || "Passcode verification failed.",
@@ -109,10 +115,10 @@ export async function POST(request: NextRequest) {
       );
       const signedToken = await signAdminSession(session);
 
-      const response = NextResponse.json({
+      const response = NextResponse.json<AuthFallbackApiResponse>({
         success: true,
         verified: true,
-        redirect: "/admin/authenticating",
+        redirect: "/admin",
       });
 
       const isSecure = process.env.NODE_ENV === "production";

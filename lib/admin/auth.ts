@@ -17,6 +17,62 @@ export interface AdminSession {
   expiresAt: number;
 }
 
+export type AuthChallengeStatus = "PENDING" | "VERIFIED" | "EXPIRED" | "INVALIDATED" | "UNAUTHORIZED" | "ERROR";
+
+export interface AuthStatusApiResponse {
+  success: boolean;
+  status: AuthChallengeStatus;
+  primaryOtpVerified?: boolean;
+  ipVerified?: boolean;
+  createdAt?: number;
+  expiresAt?: number;
+  resendAvailableAt?: number;
+  resendCount?: number;
+  maxResends?: number;
+  fallbackResendAvailableAt?: number;
+  fallbackResendCount?: number;
+  maxFallbackResends?: number;
+  remainingAttempts?: number;
+  serverTime: number;
+  redirect?: string;
+  error?: string;
+}
+
+export interface AuthVerifyApiResponse {
+  success: boolean;
+  verified: boolean;
+  requiresIpVerification?: boolean;
+  expiresAt?: number;
+  remainingAttempts?: number;
+  invalidated?: boolean;
+  redirect?: string;
+  message?: string;
+  error?: string;
+}
+
+export interface AuthResendApiResponse {
+  success: boolean;
+  message?: string;
+  resendAvailableAt?: number;
+  expiresAt?: number;
+  resendCount?: number;
+  remainingAttempts?: number;
+  cooldownSeconds?: number;
+  error?: string;
+}
+
+export interface AuthFallbackApiResponse {
+  success: boolean;
+  message?: string;
+  verified?: boolean;
+  redirect?: string;
+  remainingAttempts?: number;
+  invalidated?: boolean;
+  cooldownSeconds?: number;
+  fallbackResendAvailableAt?: number;
+  error?: string;
+}
+
 const SESSION_SECRET =
   process.env.ADMIN_SESSION_SECRET ||
   process.env.FIREBASE_ADMIN_PRIVATE_KEY ||
