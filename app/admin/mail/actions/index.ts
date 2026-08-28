@@ -15,6 +15,7 @@ import {
   MailQuerySchema,
   SaveDraftSchema,
   SendMailSchema,
+  sanitizeAttachmentFilename,
 } from "../validators";
 import type { MailRecipient, MailSendStatus } from "@/lib/dal/repositories/types";
 
@@ -47,7 +48,7 @@ export async function sendAdminMailAction(
     };
   }
 
-  const { idempotencyKey, draftId, senderKey, to, cc, bcc, subject, body } = parsed.data;
+  const { idempotencyKey, draftId, senderKey, to, cc, bcc, subject, body, attachments } = parsed.data;
 
   // 2. Resolve Verified Sender Identity
   const identity = ADMIN_MAIL_SENDERS[senderKey];
@@ -85,7 +86,14 @@ export async function sendAdminMailAction(
   const cleanSubject = subject.replace(/[\r\n]/g, " ").trim();
   const htmlBody = compileSafeHtml(body, cleanSubject);
 
-  // 5. Acquire Atomic Idempotency Lock in Firestore
+  // Extract lightweight metadata for Firestore document audit ledger (Base64 is strictly omitted)
+  const attachmentMeta = attachments?.map((att) => ({
+    name: sanitizeAttachmentFilename(att.name),
+    sizeBytes: att.sizeBytes,
+    contentType: att.contentType ? att.contentType.replace(/[\r\n\x00-\x1F]/g, "").substring(0, 100) : undefined,
+  }));
+
+  // 5. Acquire Atomic Idempotency Lock in Firestore (Transactional)
   const lockResult = await mailRepository.initiateSendLock(idempotencyKey, {
     senderKey: identity.key,
     senderEmail: identity.email,
@@ -97,6 +105,7 @@ export async function sendAdminMailAction(
     subject: cleanSubject,
     textBody: body.trim(),
     htmlBody,
+    attachments: attachmentMeta && attachmentMeta.length > 0 ? attachmentMeta : undefined,
     sentByAdminEmail: session.email,
   });
 
@@ -124,11 +133,15 @@ export async function sendAdminMailAction(
     bcc: sanitizedBcc,
     subject: cleanSubject,
     body,
+    attachments: attachments?.map((att) => ({
+      name: sanitizeAttachmentFilename(att.name),
+      content: att.content,
+    })),
     idempotencyKey,
     adminEmail: session.email,
   });
 
-  // 7. Finalize State in Firestore
+  // 7. Finalize State in Firestore (Atomic Batch Commit with Draft Cleanup)
   await mailRepository.finalizeSendStatus(idempotencyKey, {
     status: dispatchResult.status,
     brevoMessageId: dispatchResult.messageId,
@@ -165,6 +178,12 @@ export async function saveMailDraftAction(formData: unknown) {
     };
   }
 
+  const sanitizedDraftAttachments = parsed.data.attachments.map((att) => ({
+    name: sanitizeAttachmentFilename(att.name),
+    sizeBytes: att.sizeBytes,
+    contentType: att.contentType ? att.contentType.replace(/[\r\n\x00-\x1F]/g, "").substring(0, 100) : undefined,
+  }));
+
   const result = await mailRepository.saveDraft({
     id: parsed.data.id,
     senderKey: parsed.data.senderKey,
@@ -173,6 +192,7 @@ export async function saveMailDraftAction(formData: unknown) {
     bcc: parsed.data.bcc as MailRecipient[],
     subject: parsed.data.subject || "",
     body: parsed.data.body || "",
+    attachments: sanitizedDraftAttachments,
     savedByAdminEmail: session.email,
   });
 

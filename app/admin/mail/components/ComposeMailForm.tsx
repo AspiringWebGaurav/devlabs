@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useRef, useTransition } from "react";
 import {
   FaPaperPlane,
   FaFloppyDisk,
@@ -15,6 +15,8 @@ import {
   FaItalic,
   FaCode,
   FaLock,
+  FaPaperclip,
+  FaXmark,
 } from "react-icons/fa6";
 import {
   ADMIN_MAIL_SENDERS,
@@ -33,6 +35,20 @@ import {
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
 
+interface ComposerAttachment {
+  name: string;
+  sizeBytes: number;
+  contentType: string;
+  content: string; // Base64 Data URL
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+const DISALLOWED_EXTENSIONS = [".exe", ".bat", ".cmd", ".sh", ".vbs", ".msi", ".dll", ".scr"];
 
 interface ComposeMailFormProps {
   initialDraft?: MailDraftDocument | null;
@@ -46,7 +62,6 @@ function generateIdempotencyKey(): string {
 }
 
 function parseEmailList(raw: string): MailRecipient[] {
-
   if (!raw.trim()) return [];
   return raw
     .split(/[,;\n]+/)
@@ -86,6 +101,11 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
   const [subject, setSubject] = useState(initialDraft?.subject || "");
   const [body, setBody] = useState(initialDraft?.body || "");
 
+  // Attachments State & Refs
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+
   const [isPreview, setIsPreview] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -108,11 +128,92 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
       setShowBcc(Boolean(initialDraft.bcc && initialDraft.bcc.length > 0));
       setSubject(initialDraft.subject || "");
       setBody(initialDraft.body || "");
-      setAlert(null);
+      setAttachments([]);
+      setAttachmentError(null);
+      if (initialDraft.attachments && initialDraft.attachments.length > 0) {
+        const fileNames = initialDraft.attachments.map((a) => a.name).join(", ");
+        setAlert({
+          type: "warning",
+          message: `Draft loaded with ${initialDraft.attachments.length} saved attachment reference(s).`,
+          detail: `Referenced files (${fileNames}) must be re-attached from your device before sending to stream active Base64 payloads.`,
+        });
+      } else {
+        setAlert(null);
+      }
     }
   }, [initialDraft]);
 
   const selectedIdentity = ADMIN_MAIL_SENDERS[senderKey] || ADMIN_MAIL_SENDERS.SECURITY;
+
+  // File Attachment Handlers
+  const handleFileSelect = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setAttachmentError(null);
+
+    if (attachments.length + fileList.length > 5) {
+      setAttachmentError("Maximum 5 attachments allowed per email.");
+      return;
+    }
+
+    let runningTotal = attachments.reduce((sum, a) => sum + a.sizeBytes, 0);
+    const validFiles: File[] = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+
+      if (DISALLOWED_EXTENSIONS.includes(ext)) {
+        setAttachmentError(`File "${file.name}" has an executable file extension (${ext}) which is blocked.`);
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        setAttachmentError(`File "${file.name}" exceeds the 5MB single file limit.`);
+        return;
+      }
+
+      if (runningTotal + file.size > 10 * 1024 * 1024) {
+        setAttachmentError("Combined attachments exceed 10MB maximum quota.");
+        return;
+      }
+
+      // Check for duplicates by name
+      if (attachments.some((a) => a.name === file.name)) {
+        setAttachmentError(`Attachment "${file.name}" is already attached.`);
+        return;
+      }
+
+      runningTotal += file.size;
+      validFiles.push(file);
+    }
+
+    // Read to Base64 asynchronously
+    validFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Data = reader.result as string;
+        setAttachments((prev) => {
+          if (prev.some((a) => a.name === file.name)) return prev;
+          return [
+            ...prev,
+            {
+              name: file.name,
+              sizeBytes: file.size,
+              contentType: file.type || "application/octet-stream",
+              content: base64Data,
+            },
+          ];
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveAttachment = (indexToRemove: number) => {
+    setAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    setAttachmentError(null);
+  };
+
 
   // Rich Text Insertion Helper
   const handleInsertFormatting = (prefix: string, suffix: string = prefix) => {
@@ -142,6 +243,12 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
     const ccRecipients = parseEmailList(ccInput);
     const bccRecipients = parseEmailList(bccInput);
 
+    const draftAttachments = attachments.map((att) => ({
+      name: att.name,
+      sizeBytes: att.sizeBytes,
+      contentType: att.contentType,
+    }));
+
     try {
       const res = await saveMailDraftAction({
         id: draftId,
@@ -151,6 +258,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
         bcc: bccRecipients,
         subject: subject.trim(),
         body: body.trim(),
+        attachments: draftAttachments,
       });
 
       if (res.success && res.data) {
@@ -186,6 +294,8 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
     setBccInput("");
     setSubject("");
     setBody("");
+    setAttachments([]);
+    setAttachmentError(null);
     setAlert(null);
     setIdempotencyKey(generateIdempotencyKey());
     if (onDiscard) onDiscard();
@@ -224,6 +334,13 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
 
     startTransition(async () => {
       try {
+        const payloadAttachments = attachments.map((att) => ({
+          name: att.name,
+          sizeBytes: att.sizeBytes,
+          contentType: att.contentType,
+          content: att.content,
+        }));
+
         const res = await sendAdminMailAction({
           idempotencyKey,
           draftId,
@@ -233,6 +350,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           bcc: bccRecipients,
           subject: subject.trim(),
           body: body.trim(),
+          attachments: payloadAttachments.length > 0 ? payloadAttachments : undefined,
         });
 
         if (res.status === "SENT" && res.messageId) {
@@ -249,8 +367,9 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           setBccInput("");
           setSubject("");
           setBody("");
+          setAttachments([]);
+          setAttachmentError(null);
           setIdempotencyKey(generateIdempotencyKey());
-
 
           if (onSendSuccess) onSendSuccess(res.messageId);
         } else if (res.status === "DELIVERY_UNCERTAIN") {
@@ -503,6 +622,19 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           />
         </div>
 
+        {/* Hidden File Input for Attachments */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp,.zip"
+          onChange={(e) => {
+            handleFileSelect(e.target.files);
+            e.target.value = "";
+          }}
+        />
+
         {/* Message Content & Rich Formatting */}
         <div>
           <div className="flex items-center justify-between mb-1">
@@ -510,42 +642,63 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
               Message Content
             </label>
 
-            {/* Quick Formatting Buttons */}
+            {/* Quick Formatting & Attachment Controls */}
             {!isPreview && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleInsertFormatting("**")}
+                    title="Bold (**text**)"
+                    className="p-1 px-2 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
+                  >
+                    <FaBold className="w-2.5 h-2.5" />
+                    <span>B</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInsertFormatting("*")}
+                    title="Italic (*text*)"
+                    className="p-1 px-2 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
+                  >
+                    <FaItalic className="w-2.5 h-2.5" />
+                    <span>I</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInsertFormatting("`")}
+                    title="Code (`code`)"
+                    className="p-1 px-2 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
+                  >
+                    <FaCode className="w-2.5 h-2.5" />
+                    <span>Code</span>
+                  </button>
+                </div>
+
+                <div className="h-3.5 w-[1px] bg-[#CBD5E1]" />
+
+                {/* Attach File Button */}
                 <button
                   type="button"
-                  onClick={() => handleInsertFormatting("**")}
-                  title="Bold (**text**)"
-                  className="p-1 px-2 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isPending || attachments.length >= 5}
+                  title="Attach files (PDF, images, documents up to 10MB total)"
+                  className={`p-1 px-2 text-[11px] font-admin-mono rounded-xs transition-colors flex items-center gap-1 cursor-pointer border ${
+                    attachments.length > 0
+                      ? "bg-[#F5F3FF] text-[#7C3AED] border-[#DDD6FE] hover:bg-[#EDE9FE] font-bold"
+                      : "text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] border-transparent"
+                  } disabled:opacity-50`}
                 >
-                  <FaBold className="w-2.5 h-2.5" />
-                  <span>B</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleInsertFormatting("*")}
-                  title="Italic (*text*)"
-                  className="p-1 px-2 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
-                >
-                  <FaItalic className="w-2.5 h-2.5" />
-                  <span>I</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleInsertFormatting("`")}
-                  title="Code (`code`)"
-                  className="p-1 px-2 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
-                >
-                  <FaCode className="w-2.5 h-2.5" />
-                  <span>Code</span>
+                  <FaPaperclip className="w-2.5 h-2.5 text-[#7C3AED]" />
+                  <span>Attach ({attachments.length}/5)</span>
+                  <ButtonHelpBadge text={BUTTON_HELP.ATTACH_FILES} />
                 </button>
               </div>
             )}
           </div>
 
           {isPreview ? (
-            <div className="w-full min-h-[160px] max-h-[220px] overflow-y-auto p-3.5 bg-[#FFFFFF] border border-[#E2E8F0] rounded-sm text-xs leading-relaxed font-admin-sans">
+            <div className="w-full min-h-[140px] max-h-[200px] overflow-y-auto p-3.5 bg-[#FFFFFF] border border-[#E2E8F0] rounded-sm text-xs leading-relaxed font-admin-sans">
               <div
                 dangerouslySetInnerHTML={{
                   __html: compileSafeHtml(body, subject),
@@ -555,13 +708,70 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           ) : (
             <textarea
               id="compose-body-input"
-              rows={6}
+              rows={5}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={isPending}
               placeholder="Compose your email message here. Use standard paragraphs and formatting..."
               className="w-full px-3 py-2.5 text-xs font-admin-sans leading-relaxed bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors resize-none"
             />
+          )}
+
+          {/* Attached Files List Container (Zero Shake / Compact) */}
+          {attachments.length > 0 && (
+            <div className="mt-2 p-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-sm space-y-1.5 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between font-admin-mono text-[10px] text-[#64748B]">
+                <span className="flex items-center gap-1 font-semibold uppercase tracking-wider text-black">
+                  <FaPaperclip className="w-2.5 h-2.5 text-[#7C3AED]" />
+                  Attached Files ({attachments.length}/5)
+                </span>
+                <span>
+                  {formatBytes(attachments.reduce((sum, a) => sum + a.sizeBytes, 0))} / 10 MB Max
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {attachments.map((att, idx) => (
+                  <div
+                    key={`${att.name}-${idx}`}
+                    className="flex items-center gap-1.5 px-2 py-0.5 bg-[#FFFFFF] border border-[#E2E8F0] hover:border-[#CBD5E1] rounded-xs text-xs font-admin-mono text-black transition-colors"
+                  >
+                    <FaPaperclip className="w-2.5 h-2.5 text-[#7C3AED] shrink-0" />
+                    <span className="font-medium truncate max-w-[160px] sm:max-w-[220px]" title={att.name}>
+                      {att.name}
+                    </span>
+                    <span className="text-[#94A3B8] text-[10px]">
+                      ({formatBytes(att.sizeBytes)})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(idx)}
+                      disabled={isPending}
+                      className="ml-1 text-[#94A3B8] hover:text-[#DC2626] cursor-pointer p-0.5"
+                      title="Remove attachment"
+                    >
+                      <FaXmark className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Attachment Error Notice */}
+          {attachmentError && (
+            <div className="mt-2 p-2 bg-[#FEF2F2] border border-[#FECACA] rounded-xs text-xs font-admin-mono text-[#991B1B] flex items-center justify-between animate-in fade-in duration-100">
+              <div className="flex items-center gap-1.5">
+                <FaCircleExclamation className="w-3 h-3 text-[#EF4444] shrink-0" />
+                <span>{attachmentError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttachmentError(null)}
+                className="text-[#991B1B] hover:text-black cursor-pointer"
+              >
+                <FaXmark className="w-3 h-3" />
+              </button>
+            </div>
           )}
 
           <div className="flex items-center justify-between font-admin-mono text-[10px] text-[#94A3B8] mt-1">

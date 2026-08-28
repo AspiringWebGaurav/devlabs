@@ -244,6 +244,7 @@ export interface DispatchAdminMailParams {
   bcc?: MailRecipient[];
   subject: string;
   body: string;
+  attachments?: { name: string; content: string }[];
   idempotencyKey: string;
   adminEmail: string;
 }
@@ -316,6 +317,14 @@ export async function dispatchAdminMail(
     }));
   }
 
+  if (params.attachments && params.attachments.length > 0) {
+    payload.attachment = params.attachments.map((att) => ({
+      name: att.name,
+      content: att.content.replace(/^data:[^;]+;base64,/, ""),
+    }));
+  }
+
+
   // 3. Dispatch with 10-Second Abort Controller
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -343,6 +352,7 @@ export async function dispatchAdminMail(
         idempotencyKey: params.idempotencyKey,
         senderKey: identity.key,
         recipientCount: params.to.length,
+        attachmentCount: params.attachments?.length || 0,
         hasCc: Boolean(params.cc && params.cc.length > 0),
         hasBcc: Boolean(params.bcc && params.bcc.length > 0),
         durationMs,

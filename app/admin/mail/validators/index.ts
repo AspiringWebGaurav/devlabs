@@ -1,5 +1,56 @@
 import { z } from "zod";
 
+export const BLOCKED_ATTACHMENT_EXTENSIONS = new Set([
+  ".exe", ".bat", ".cmd", ".sh", ".vbs", ".msi", ".dll", ".scr",
+  ".com", ".pif", ".application", ".gadget", ".wsf", ".cpl", ".hta",
+  ".jar", ".ps1", ".vb", ".vbe", ".jse", ".ws", ".wsc", ".msc"
+]);
+
+/**
+ * Sanitizes an attachment filename to prevent path traversal, control character injection,
+ * and dangerous executable execution while preserving normal international characters.
+ */
+export function sanitizeAttachmentFilename(rawName: string): string {
+  let clean = rawName
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .replace(/[\r\n]/g, "")
+    .replace(/[/\\]/g, "_")
+    .replace(/\.\.+/g, ".")
+    .trim();
+
+  // Strip leading/trailing dots or spaces
+  clean = clean.replace(/^[.\s]+|[.\s]+$/g, "");
+
+  if (!clean || clean.length === 0) {
+    clean = "attachment_" + Date.now();
+  }
+
+  return clean.substring(0, 120);
+}
+
+/**
+ * Validates Base64 encoding structure and computes exact decoded byte size.
+ */
+export function validateBase64Payload(content: string): { valid: boolean; decodedSizeBytes: number; error?: string } {
+  const clean = content.replace(/^data:[^;]+;base64,/, "").trim();
+  if (!clean || clean.length === 0) {
+    return { valid: false, decodedSizeBytes: 0, error: "Attachment content is empty." };
+  }
+
+  // Base64 character set validation
+  const base64Regex = /^[A-Za-z0-9+/]+={0,2}$/;
+  if (clean.length % 4 !== 0 || !base64Regex.test(clean)) {
+    return { valid: false, decodedSizeBytes: 0, error: "Invalid Base64 encoding format." };
+  }
+
+  let padding = 0;
+  if (clean.endsWith("==")) padding = 2;
+  else if (clean.endsWith("=")) padding = 1;
+  const decodedSizeBytes = Math.floor((clean.length * 3) / 4) - padding;
+
+  return { valid: true, decodedSizeBytes };
+}
+
 export const MailRecipientSchema = z.object({
   email: z
     .string()
@@ -14,6 +65,55 @@ export const MailRecipientSchema = z.object({
     .max(60, "Recipient name must be under 60 characters.")
     .refine((val) => !/[\r\n]/.test(val), "Name must not contain newline characters.")
     .optional(),
+});
+
+export const MailAttachmentPayloadSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Attachment filename is required.")
+      .max(120, "Filename must be under 120 characters.")
+      .refine((val) => !/[\r\n\x00-\x1F]/.test(val), "Filename contains invalid characters.")
+      .refine((val) => !val.includes("/") && !val.includes("\\"), "Filename cannot contain path separators.")
+      .refine((val) => {
+        const ext = val.substring(val.lastIndexOf(".")).toLowerCase();
+        return !BLOCKED_ATTACHMENT_EXTENSIONS.has(ext);
+      }, "Executable and script file attachments are blocked."),
+    sizeBytes: z.number().int().min(1, "File cannot be empty.").max(5 * 1024 * 1024, "Single file cannot exceed 5MB."),
+    contentType: z.string().max(100).optional(),
+    content: z.string().min(1, "Attachment content is required."),
+  })
+  .refine(
+    (data) => {
+      const b64Check = validateBase64Payload(data.content);
+      if (!b64Check.valid) return false;
+      // Ensure decoded binary is within 5MB limit
+      if (b64Check.decodedSizeBytes > 5 * 1024 * 1024) return false;
+      // Ensure declared size matches decoded size within 2KB tolerance (accounting for client header estimations)
+      const diff = Math.abs(b64Check.decodedSizeBytes - data.sizeBytes);
+      return diff <= 2048;
+    },
+    {
+      message: "Attachment content is malformed or payload size does not match declared sizeBytes.",
+      path: ["content"],
+    }
+  );
+
+export const MailAttachmentMetaSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .refine((val) => !/[\r\n\x00-\x1F]/.test(val), "Filename contains invalid characters.")
+    .refine((val) => !val.includes("/") && !val.includes("\\"), "Filename cannot contain path separators.")
+    .refine((val) => {
+      const ext = val.substring(val.lastIndexOf(".")).toLowerCase();
+      return !BLOCKED_ATTACHMENT_EXTENSIONS.has(ext);
+    }, "Executable file metadata is not permitted."),
+  sizeBytes: z.number().int().min(0).max(10 * 1024 * 1024),
+  contentType: z.string().max(100).optional(),
 });
 
 export const SendMailSchema = z
@@ -38,6 +138,7 @@ export const SendMailSchema = z
       .trim()
       .min(1, "Message content is required.")
       .max(10000, "Message content must be under 10,000 characters."),
+    attachments: z.array(MailAttachmentPayloadSchema).max(5, "Maximum 5 attachments allowed.").optional(),
   })
   .refine(
     (data) => {
@@ -47,6 +148,28 @@ export const SendMailSchema = z
     {
       message: "Total combined recipients (To + CC + BCC) cannot exceed 50.",
       path: ["to"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (!data.attachments || data.attachments.length === 0) return true;
+      const totalBytes = data.attachments.reduce((sum, att) => sum + att.sizeBytes, 0);
+      return totalBytes <= 10 * 1024 * 1024;
+    },
+    {
+      message: "Total attachments size cannot exceed 10MB.",
+      path: ["attachments"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (!data.attachments || data.attachments.length <= 1) return true;
+      const names = data.attachments.map((a) => a.name.toLowerCase());
+      return new Set(names).size === names.length;
+    },
+    {
+      message: "Duplicate attachment filenames are not permitted.",
+      path: ["attachments"],
     }
   );
 
@@ -58,6 +181,7 @@ export const SaveDraftSchema = z.object({
   bcc: z.array(MailRecipientSchema).default([]),
   subject: z.string().trim().max(200).default(""),
   body: z.string().max(10000).default(""),
+  attachments: z.array(MailAttachmentMetaSchema).max(5).default([]),
 });
 
 export const MailQuerySchema = z.object({
@@ -65,3 +189,5 @@ export const MailQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
   cursor: z.string().optional(),
 });
+
+

@@ -8,6 +8,7 @@ import {
   FaClock,
   FaInbox,
   FaSpinner,
+  FaPaperclip,
 } from "react-icons/fa6";
 import type { MailDraftDocument } from "@/lib/dal/repositories/types";
 import { formatRelativeTime } from "@/lib/admin/utils";
@@ -88,6 +89,12 @@ export const DraftsList: React.FC<DraftsListProps> = ({
                   <span className="px-1.5 py-0.5 bg-[#F5F3FF] border border-[#DDD6FE] text-[#7C3AED] font-admin-mono text-[10px] rounded-xs font-bold">
                     {draft.senderKey}
                   </span>
+                  {draft.attachments && draft.attachments.length > 0 && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#F8FAFC] border border-[#E2E8F0] text-[#64748B] font-admin-mono text-[10px] rounded-xs font-semibold">
+                      <FaPaperclip className="w-2.5 h-2.5 text-[#7C3AED]" />
+                      <span>{draft.attachments.length} {draft.attachments.length === 1 ? "file" : "files"}</span>
+                    </span>
+                  )}
                   <span className="font-semibold text-xs text-black truncate">
                     {draft.subject || "(No Subject)"}
                   </span>

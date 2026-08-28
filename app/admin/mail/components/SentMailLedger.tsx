@@ -13,9 +13,16 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaLock,
+  FaPaperclip,
 } from "react-icons/fa6";
 import type { MailDocument, PaginatedResult } from "@/lib/dal/repositories/types";
 import { formatRelativeTime } from "@/lib/admin/utils";
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 interface SentMailLedgerProps {
   initialData: PaginatedResult<MailDocument>;
@@ -90,6 +97,14 @@ export const SentMailLedger: React.FC<SentMailLedgerProps> = ({
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#EFF6FF] border border-[#BFDBFE] text-[#1E40AF] font-admin-mono text-[10px] rounded-xs font-semibold shrink-0">
                       <FaSpinner className="w-2.5 h-2.5 animate-spin" />
                       IN-FLIGHT
+                    </span>
+                  )}
+
+                  {/* Attachment Badge */}
+                  {mail.attachments && mail.attachments.length > 0 && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#F5F3FF] border border-[#DDD6FE] text-[#7C3AED] font-admin-mono text-[10px] rounded-xs font-semibold shrink-0">
+                      <FaPaperclip className="w-2.5 h-2.5 text-[#7C3AED]" />
+                      <span>{mail.attachments.length} {mail.attachments.length === 1 ? "file" : "files"}</span>
                     </span>
                   )}
 
@@ -217,6 +232,23 @@ export const SentMailLedger: React.FC<SentMailLedgerProps> = ({
                   <div className="sm:col-span-2">
                     <span className="text-[#94A3B8] block text-[10px] uppercase">Brevo Message ID</span>
                     <span className="text-[#7C3AED] select-all">{selectedMail.brevoMessageId}</span>
+                  </div>
+                )}
+                {selectedMail.attachments && selectedMail.attachments.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <span className="text-[#94A3B8] block text-[10px] uppercase mb-1">Attached Documents ({selectedMail.attachments.length})</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMail.attachments.map((att, idx) => (
+                        <div
+                          key={`${att.name}-${idx}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#FFFFFF] border border-[#E2E8F0] rounded-xs font-admin-mono text-[11px] text-black"
+                        >
+                          <FaPaperclip className="w-2.5 h-2.5 text-[#7C3AED]" />
+                          <span className="font-semibold">{att.name}</span>
+                          <span className="text-[#94A3B8] text-[10px]">({formatBytes(att.sizeBytes)})</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

@@ -69,6 +69,11 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["firebase-admin", "otplib", "qrcode"],
   transpilePackages: ["three", "three-globe"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "15mb",
+    },
+  },
   turbopack: {
     resolveAlias: {},
   },

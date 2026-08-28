@@ -90,82 +90,87 @@ export class MailRepository extends BaseRepository {
 
   /**
    * Atomically acquires an in-flight send lock in admin_mails keyed by idempotencyKey.
-   * If the key was already used, returns existing state without permitting duplicate dispatches.
+   * Uses an atomic Firestore transaction to eliminate race conditions between concurrent requests.
    */
   public async initiateSendLock(
     idempotencyKey: string,
     mailData: Omit<MailDocument, "id" | "status" | "createdAt" | "updatedAt">
   ): Promise<RepositoryResult<InitiateSendLockResult>> {
     return this.executeMutation("initiateSendLock", async () => {
-      const existing = await firestoreDataSource.getDocument<MailDocument>("admin_mails", idempotencyKey);
-      const now = Date.now();
+      return await firestoreDataSource.runTransaction(async (transaction, db) => {
+        const docRef = db.collection("admin_mails").doc(idempotencyKey);
+        const snapshot = await transaction.get(docRef);
+        const now = Date.now();
 
-      if (existing) {
-        if (existing.status === "SENT") {
-          return {
-            acquired: false,
-            existingStatus: "SENT",
-            existingMessageId: existing.brevoMessageId,
-            error: "This email was already sent successfully.",
-          };
-        }
+        if (snapshot.exists) {
+          const existing = snapshot.data() as MailDocument;
 
-        if (existing.status === "SENDING") {
-          if (now - existing.updatedAt < 30000) {
+          if (existing.status === "SENT") {
             return {
               acquired: false,
-              existingStatus: "SENDING",
-              error: "Send operation is currently in progress. Please wait.",
+              existingStatus: "SENT",
+              existingMessageId: existing.brevoMessageId,
+              error: "This email was already sent successfully.",
             };
           }
 
-          // Interrupted send -> reconcile to DELIVERY_UNCERTAIN
-          await firestoreDataSource.setDocument(
-            "admin_mails",
-            idempotencyKey,
-            { status: "DELIVERY_UNCERTAIN", errorMessage: "Operation timed out in-flight.", updatedAt: now },
-            true
-          );
-          return {
-            acquired: false,
-            existingStatus: "DELIVERY_UNCERTAIN",
-            error: "Delivery status unconfirmed. Automatic resend is blocked to prevent duplicates.",
-          };
+          if (existing.status === "SENDING") {
+            if (now - existing.updatedAt < 30000) {
+              return {
+                acquired: false,
+                existingStatus: "SENDING",
+                error: "Send operation is currently in progress. Please wait.",
+              };
+            }
+
+            // Interrupted send -> reconcile to DELIVERY_UNCERTAIN
+            transaction.set(
+              docRef,
+              { status: "DELIVERY_UNCERTAIN", errorMessage: "Operation timed out in-flight.", updatedAt: now },
+              { merge: true }
+            );
+            return {
+              acquired: false,
+              existingStatus: "DELIVERY_UNCERTAIN",
+              error: "Delivery status unconfirmed. Automatic resend is blocked to prevent duplicates.",
+            };
+          }
+
+          if (existing.status === "DELIVERY_UNCERTAIN") {
+            return {
+              acquired: false,
+              existingStatus: "DELIVERY_UNCERTAIN",
+              error: "Delivery status unconfirmed. Automatic resend is blocked to prevent duplicates.",
+            };
+          }
+
+          if (existing.status === "FAILED") {
+            return {
+              acquired: false,
+              existingStatus: "FAILED",
+              error: "Previous send operation failed. Please start a new compose operation.",
+            };
+          }
         }
 
-        if (existing.status === "DELIVERY_UNCERTAIN") {
-          return {
-            acquired: false,
-            existingStatus: "DELIVERY_UNCERTAIN",
-            error: "Delivery status unconfirmed. Automatic resend is blocked to prevent duplicates.",
-          };
-        }
+        // Atomically create initial SENDING record
+        const initialRecord: MailDocument = {
+          ...mailData,
+          id: idempotencyKey,
+          status: "SENDING",
+          createdAt: new Date(now).toISOString(),
+          updatedAt: now,
+        };
 
-        if (existing.status === "FAILED") {
-          return {
-            acquired: false,
-            existingStatus: "FAILED",
-            error: "Previous send operation failed. Please start a new compose operation.",
-          };
-        }
-      }
-
-      // Atomically create initial SENDING record
-      const initialRecord: MailDocument = {
-        ...mailData,
-        id: idempotencyKey,
-        status: "SENDING",
-        createdAt: new Date(now).toISOString(),
-        updatedAt: now,
-      };
-
-      await firestoreDataSource.setDocument("admin_mails", idempotencyKey, initialRecord, false);
-      return { acquired: true };
+        transaction.set(docRef, initialRecord);
+        return { acquired: true };
+      });
     }, { idempotencyKey, senderKey: mailData.senderKey, toCount: mailData.to.length });
   }
 
   /**
    * Finalizes the state of a send operation after Brevo HTTP resolution.
+   * Atomically commits status finalization and draft cleanup via an atomic batch.
    */
   public async finalizeSendStatus(
     idempotencyKey: string,
@@ -186,11 +191,14 @@ export class MailRepository extends BaseRepository {
         ...(params.status === "SENT" && { sentAt: new Date(now).toISOString() }),
       };
 
-      await firestoreDataSource.setDocument("admin_mails", idempotencyKey, updatePayload, true);
-
-      // If send succeeded and an associated draft existed, remove the draft
+      // Atomic batch: commit sent status AND delete draft simultaneously to prevent orphaned drafts
       if (params.status === "SENT" && params.draftIdToDelete) {
-        await firestoreDataSource.deleteDocument("admin_mail_drafts", params.draftIdToDelete).catch(() => {});
+        await firestoreDataSource.executeBatch([
+          { type: "set", collection: "admin_mails", id: idempotencyKey, data: updatePayload, merge: true },
+          { type: "delete", collection: "admin_mail_drafts", id: params.draftIdToDelete },
+        ]);
+      } else {
+        await firestoreDataSource.setDocument("admin_mails", idempotencyKey, updatePayload, true);
       }
     }, { idempotencyKey, finalStatus: params.status, messageId: params.brevoMessageId });
   }
@@ -250,6 +258,7 @@ export class MailRepository extends BaseRepository {
       bcc: draftData.bcc || [],
       subject: draftData.subject,
       body: draftData.body,
+      attachments: draftData.attachments || [],
       savedByAdminEmail: draftData.savedByAdminEmail,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),

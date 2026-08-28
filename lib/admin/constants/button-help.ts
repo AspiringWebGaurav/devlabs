@@ -19,6 +19,7 @@ export const BUTTON_HELP = {
   RESUME_DRAFT: "Loads this saved draft back into the compose editor so you can edit and send it.",
   DELETE_DRAFT: "Permanently deletes this saved draft from your database.",
   INSPECT_MAIL: "Opens full email details including delivery status, recipient, timestamp, and Brevo message ID.",
+  ATTACH_FILES: "Select documents, PDFs, or images (up to 10MB total) to attach to this email.",
 
   // Inquiries (/admin/inquiries)
   DIRECT_COMPOSE: "Opens a blank compose window to send a direct email to any client or visitor.",

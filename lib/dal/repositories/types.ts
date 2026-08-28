@@ -53,6 +53,16 @@ export interface MailRecipient {
   name?: string;
 }
 
+export interface MailAttachmentMeta {
+  name: string;
+  sizeBytes: number;
+  contentType?: string;
+}
+
+export interface MailAttachmentPayload extends MailAttachmentMeta {
+  content: string; // Base64 string for in-flight dispatch
+}
+
 export interface MailDocument {
   id: string; // idempotencyKey
   senderKey: MailSenderKey;
@@ -65,6 +75,7 @@ export interface MailDocument {
   subject: string;
   textBody: string;
   htmlBody?: string;
+  attachments?: MailAttachmentMeta[];
   status: MailSendStatus;
   brevoMessageId?: string;
   errorMessage?: string;
@@ -82,10 +93,12 @@ export interface MailDraftDocument {
   bcc?: MailRecipient[];
   subject: string;
   body: string;
+  attachments?: MailAttachmentMeta[];
   savedByAdminEmail: string;
   createdAt: string;
   updatedAt: string;
   expiresAt: string; // ISO 8601 (createdAt + 30 days) for Firestore TTL
 }
+
 
 
