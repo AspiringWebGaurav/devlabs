@@ -398,14 +398,14 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
   return (
     <div className="bg-[#FFFFFF] border border-[#E2E8F0] rounded-sm shadow-2xs font-admin-sans">
       {/* Compose Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#E2E8F0] bg-[#FAFAFA]">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#E2E8F0] bg-[#FAFAFA]">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-sm bg-[#F5F3FF] border border-[#DDD6FE] flex items-center justify-center text-[#7C3AED]">
-            <FaPaperPlane className="w-3.5 h-3.5" />
+          <div className="w-7 h-7 rounded-sm bg-[#F5F3FF] border border-[#DDD6FE] flex items-center justify-center text-[#7C3AED]">
+            <FaPaperPlane className="w-3 h-3" />
           </div>
           <div>
-            <h3 className="font-bold text-sm text-black">Compose Outbound Message</h3>
-            <p className="font-admin-mono text-[11px] text-[#64748B] flex items-center gap-1.5 mt-0.5">
+            <h3 className="font-bold text-xs sm:text-sm text-black">Compose Outbound Message</h3>
+            <p className="font-admin-mono text-[10px] sm:text-[11px] text-[#64748B] flex items-center gap-1.5 mt-0.5">
               <FaLock className="w-2.5 h-2.5 text-[#10B981]" />
               <span>Brevo REST API v3 Dedicated Outbound Channel</span>
             </p>
@@ -416,7 +416,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           <button
             type="button"
             onClick={() => setIsPreview(!isPreview)}
-            className={`px-3 py-1.5 text-xs font-admin-mono rounded-sm transition-colors border flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 py-1 text-xs font-admin-mono rounded-sm transition-colors border flex items-center gap-1.5 cursor-pointer ${
               isPreview
                 ? "bg-[#7C3AED] text-white border-[#6D28D9]"
                 : "bg-[#FFFFFF] text-[#475569] border-[#E2E8F0] hover:bg-[#F8FAFC]"
@@ -430,9 +430,9 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
 
       {/* Status Alerts */}
       {alert && (
-        <div className="p-4 border-b border-[#E2E8F0]">
+        <div className="p-3.5 border-b border-[#E2E8F0]">
           {alert.type === "success" && (
-            <div className="p-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded-sm text-xs text-[#166534] space-y-1">
+            <div className="p-2.5 bg-[#F0FDF4] border border-[#BBF7D0] rounded-sm text-xs text-[#166534] space-y-1">
               <div className="flex items-center gap-2 font-semibold">
                 <FaCheck className="w-3.5 h-3.5 text-[#10B981]" />
                 <span>{alert.message}</span>
@@ -444,7 +444,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           )}
 
           {alert.type === "warning" && (
-            <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-sm text-xs text-[#92400E] space-y-1">
+            <div className="p-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-sm text-xs text-[#92400E] space-y-1">
               <div className="flex items-center gap-2 font-semibold">
                 <FaTriangleExclamation className="w-3.5 h-3.5 text-[#F59E0B]" />
                 <span>{alert.message}</span>
@@ -458,7 +458,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           )}
 
           {alert.type === "error" && (
-            <div className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-sm text-xs text-[#991B1B] flex items-start gap-2.5">
+            <div className="p-2.5 bg-[#FEF2F2] border border-[#FECACA] rounded-sm text-xs text-[#991B1B] flex items-start gap-2.5">
               <FaCircleExclamation className="w-4 h-4 text-[#EF4444] shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold">{alert.message}</span>
@@ -470,7 +470,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
       )}
 
       {/* Main Form */}
-      <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
+      <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-3">
         {/* From Identity Selector */}
         <div>
           <div className="flex items-center justify-between mb-1">
@@ -486,7 +486,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
             value={senderKey}
             onChange={(e) => setSenderKey(e.target.value as MailSenderKey)}
             disabled={isPending}
-            className="w-full px-3 py-2 text-xs font-admin-sans font-semibold bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors cursor-pointer"
+            className="w-full px-3 py-1.5 text-xs font-admin-sans font-semibold bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors cursor-pointer"
           >
             {Object.values(ADMIN_MAIL_SENDERS).map((identity) => (
               <option key={identity.key} value={identity.key}>
@@ -497,7 +497,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
 
           {/* No-Reply Advisory Notice */}
           {selectedIdentity.isNoReply && (
-            <div className="mt-2 p-2 bg-[#FFFBEB] border border-[#FDE68A] rounded-sm text-xs text-[#92400E] flex items-center gap-2">
+            <div className="mt-1.5 p-2 bg-[#FFFBEB] border border-[#FDE68A] rounded-sm text-xs text-[#92400E] flex items-center gap-2">
               <FaTriangleExclamation className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
               <span>
                 <strong>Unmonitored Mailbox:</strong> Recipients replying to this address will not receive a response.
@@ -539,7 +539,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
             onChange={(e) => setToInput(e.target.value)}
             disabled={isPending}
             placeholder="john@example.com, Sarah <sarah@domain.com>"
-            className="w-full px-3 py-2 text-xs font-admin-mono bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors"
+            className="w-full px-3 py-1.5 text-xs font-admin-mono bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors"
           />
         </div>
 
@@ -567,7 +567,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
               onChange={(e) => setCcInput(e.target.value)}
               disabled={isPending}
               placeholder="colleague@domain.com"
-              className="w-full px-3 py-2 text-xs font-admin-mono bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors"
+              className="w-full px-3 py-1.5 text-xs font-admin-mono bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors"
             />
           </div>
         )}
@@ -596,7 +596,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
               onChange={(e) => setBccInput(e.target.value)}
               disabled={isPending}
               placeholder="archive@domain.com"
-              className="w-full px-3 py-2 text-xs font-admin-mono bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors"
+              className="w-full px-3 py-1.5 text-xs font-admin-mono bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors"
             />
           </div>
         )}
@@ -618,7 +618,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
             disabled={isPending}
             maxLength={200}
             placeholder="Official Portfolio Communication"
-            className="w-full px-3 py-2 text-xs font-admin-sans font-semibold bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors"
+            className="w-full px-3 py-1.5 text-xs font-admin-sans font-semibold bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors"
           />
         </div>
 
@@ -650,7 +650,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
                     type="button"
                     onClick={() => handleInsertFormatting("**")}
                     title="Bold (**text**)"
-                    className="p-1 px-2 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
+                    className="p-1 px-1.5 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
                   >
                     <FaBold className="w-2.5 h-2.5" />
                     <span>B</span>
@@ -659,7 +659,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
                     type="button"
                     onClick={() => handleInsertFormatting("*")}
                     title="Italic (*text*)"
-                    className="p-1 px-2 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
+                    className="p-1 px-1.5 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
                   >
                     <FaItalic className="w-2.5 h-2.5" />
                     <span>I</span>
@@ -668,7 +668,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
                     type="button"
                     onClick={() => handleInsertFormatting("`")}
                     title="Code (`code`)"
-                    className="p-1 px-2 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
+                    className="p-1 px-1.5 text-[11px] font-admin-mono text-[#475569] hover:text-black bg-[#F1F5F9] hover:bg-[#E2E8F0] rounded-xs transition-colors flex items-center gap-1"
                   >
                     <FaCode className="w-2.5 h-2.5" />
                     <span>Code</span>
@@ -698,7 +698,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           </div>
 
           {isPreview ? (
-            <div className="w-full min-h-[140px] max-h-[200px] overflow-y-auto p-3.5 bg-[#FFFFFF] border border-[#E2E8F0] rounded-sm text-xs leading-relaxed font-admin-sans">
+            <div className="w-full min-h-[120px] max-h-[180px] overflow-y-auto p-3 bg-[#FFFFFF] border border-[#E2E8F0] rounded-sm text-xs leading-relaxed font-admin-sans">
               <div
                 dangerouslySetInnerHTML={{
                   __html: compileSafeHtml(body, subject),
@@ -708,18 +708,18 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           ) : (
             <textarea
               id="compose-body-input"
-              rows={5}
+              rows={4}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={isPending}
               placeholder="Compose your email message here. Use standard paragraphs and formatting..."
-              className="w-full px-3 py-2.5 text-xs font-admin-sans leading-relaxed bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors resize-none"
+              className="w-full px-3 py-2 text-xs font-admin-sans leading-relaxed bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors resize-none min-h-[90px]"
             />
           )}
 
           {/* Attached Files List Container (Zero Shake / Compact) */}
           {attachments.length > 0 && (
-            <div className="mt-2 p-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-sm space-y-1.5 animate-in fade-in duration-150">
+            <div className="mt-1.5 p-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-sm space-y-1.5 animate-in fade-in duration-150">
               <div className="flex items-center justify-between font-admin-mono text-[10px] text-[#64748B]">
                 <span className="flex items-center gap-1 font-semibold uppercase tracking-wider text-black">
                   <FaPaperclip className="w-2.5 h-2.5 text-[#7C3AED]" />
@@ -759,7 +759,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
 
           {/* Attachment Error Notice */}
           {attachmentError && (
-            <div className="mt-2 p-2 bg-[#FEF2F2] border border-[#FECACA] rounded-xs text-xs font-admin-mono text-[#991B1B] flex items-center justify-between animate-in fade-in duration-100">
+            <div className="mt-1.5 p-2 bg-[#FEF2F2] border border-[#FECACA] rounded-xs text-xs font-admin-mono text-[#991B1B] flex items-center justify-between animate-in fade-in duration-100">
               <div className="flex items-center gap-1.5">
                 <FaCircleExclamation className="w-3 h-3 text-[#EF4444] shrink-0" />
                 <span>{attachmentError}</span>
@@ -781,13 +781,13 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="pt-3 border-t border-[#E2E8F0] flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="pt-2.5 border-t border-[#E2E8F0] flex flex-col sm:flex-row items-center justify-between gap-2.5">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={handleSaveDraft}
               disabled={isPending || isSavingDraft}
-              className="px-3.5 py-2 text-xs font-admin-mono text-[#475569] hover:text-black bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3 py-1.5 text-xs font-admin-mono text-[#475569] hover:text-black bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {isSavingDraft ? <FaSpinner className="w-3 h-3 animate-spin" /> : <FaFloppyDisk className="w-3 h-3 text-[#7C3AED]" />}
               <span>{isSavingDraft ? "Saving..." : "Save Draft"}</span>
@@ -798,7 +798,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
               type="button"
               onClick={handleDiscard}
               disabled={isPending}
-              className="px-3.5 py-2 text-xs font-admin-mono text-[#DC2626] hover:text-white bg-[#FEF2F2] hover:bg-[#DC2626] border border-[#FECACA] hover:border-[#DC2626] rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3 py-1.5 text-xs font-admin-mono text-[#DC2626] hover:text-white bg-[#FEF2F2] hover:bg-[#DC2626] border border-[#FECACA] hover:border-[#DC2626] rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <FaTrash className="w-3 h-3" />
               <span>Discard</span>
@@ -809,7 +809,7 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
           <button
             type="submit"
             disabled={isPending}
-            className="w-full sm:w-auto px-5 py-2 text-xs font-admin-sans font-bold text-white bg-[#7C3AED] hover:bg-[#6D28D9] border border-[#6D28D9] rounded-sm shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-4 py-1.5 text-xs font-admin-sans font-bold text-white bg-[#7C3AED] hover:bg-[#6D28D9] border border-[#6D28D9] rounded-sm shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isPending ? (
               <>

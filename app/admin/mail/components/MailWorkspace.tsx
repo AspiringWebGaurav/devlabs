@@ -123,7 +123,7 @@ export const MailWorkspace: React.FC<MailWorkspaceProps> = ({
   ] as const;
 
   return (
-    <div className="space-y-3.5 font-admin-sans">
+    <div className="space-y-3 font-admin-sans">
       {/* Tab Navigation Toolbar */}
       <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#FFFFFF] border border-[#E2E8F0] rounded-none sm:rounded-sm shadow-2xs">
         {tabs.map((tab) => {
