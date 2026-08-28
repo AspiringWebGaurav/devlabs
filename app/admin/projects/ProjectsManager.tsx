@@ -12,6 +12,8 @@ import {
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+import { useAdminConfirm } from "@/components/admin/context";
+
 
 import {
   FaPlus,
@@ -28,11 +30,13 @@ import {
 export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> = ({ initialProjects }) => {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const confirm = useAdminConfirm();
   const [projects, setProjects] = useState<ProjectDocument[]>(initialProjects);
   const [editingProject, setEditingProject] = useState<Partial<ProjectDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
 
   // Sync state if server props change
   useEffect(() => {
@@ -84,7 +88,15 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Permanently delete project "${title}"? Associated storage files will be cleaned.`)) return;
+    const confirmed = await confirm({
+      title: `Delete Project "${title}"?`,
+      description: `This will permanently delete the project "${title}" from the database and clean all associated thumbnail and media assets from Firebase Storage. This action cannot be undone.`,
+      variant: "danger",
+      confirmLabel: "Delete Permanently",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
     setIsPending(true);
 
     const res = await deleteProjectAction(id);
@@ -101,6 +113,7 @@ export const ProjectsManager: React.FC<{ initialProjects: ProjectDocument[] }> =
       setStatusMessage({ type: "error", text: res.error || "Failed to delete project." });
     }
   };
+
 
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -12,6 +12,8 @@ import {
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+import { useAdminConfirm } from "@/components/admin/context";
+
 
 import {
   FaPlus,
@@ -28,11 +30,13 @@ import {
 export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument[] }> = ({ initialExperience }) => {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const confirm = useAdminConfirm();
   const [experience, setExperience] = useState<ExperienceDocument[]>(initialExperience);
   const [editingItem, setEditingItem] = useState<Partial<ExperienceDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
 
   // Sync state if server props change
   useEffect(() => {
@@ -84,7 +88,15 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Delete experience item "${title}"?`)) return;
+    const confirmed = await confirm({
+      title: `Delete Experience Item "${title}"?`,
+      description: `This will permanently remove "${title}" from the work experience timeline on the live portfolio.`,
+      variant: "danger",
+      confirmLabel: "Delete Experience",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
     setIsPending(true);
 
     const res = await deleteExperienceAction(id);
@@ -101,6 +113,7 @@ export const ExperienceManager: React.FC<{ initialExperience: ExperienceDocument
       setStatusMessage({ type: "error", text: res.error || "Failed to delete." });
     }
   };
+
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

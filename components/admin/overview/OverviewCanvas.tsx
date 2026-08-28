@@ -28,13 +28,17 @@ import {
 import { seedAllCollectionsAction } from "@/lib/actions/cms.actions";
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
+import { useAdminConfirm } from "@/components/admin/context";
+
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
 
 export const OverviewCanvas: React.FC = () => {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const confirm = useAdminConfirm();
   const [isSeeding, setIsSeeding] = useState(false);
   const [seedMessage, setSeedMessage] = useState<string | null>(null);
+
 
 
   const domains = [
@@ -137,7 +141,16 @@ export const OverviewCanvas: React.FC = () => {
   ];
 
   const handleSeed = async () => {
-    if (!confirm("Populate any uninitialized collections with baseline portfolio data? (Non-destructive)")) return;
+    const confirmed = await confirm({
+      title: "Seed Baseline Collections?",
+      description:
+        "Populate any uninitialized collections with baseline portfolio data. This operation is non-destructive and will not overwrite existing records.",
+      variant: "purple",
+      confirmLabel: "Seed Baseline Data",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
     setIsSeeding(true);
     setSeedMessage(null);
 
@@ -154,6 +167,7 @@ export const OverviewCanvas: React.FC = () => {
       setSeedMessage("Failed to seed database: " + res.error);
     }
   };
+
 
   return (
     <div className="space-y-8 w-full">

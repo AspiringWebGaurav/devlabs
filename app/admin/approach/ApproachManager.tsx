@@ -12,6 +12,8 @@ import {
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+import { useAdminConfirm } from "@/components/admin/context";
+
 
 import {
   FaPlus,
@@ -28,11 +30,13 @@ import {
 export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ initialPhases }) => {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const confirm = useAdminConfirm();
   const [phases, setPhases] = useState<PhaseDocument[]>(initialPhases);
   const [editingItem, setEditingItem] = useState<Partial<PhaseDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
 
   // Sync state if server props change
   useEffect(() => {
@@ -84,7 +88,15 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Delete phase "${title}"?`)) return;
+    const confirmed = await confirm({
+      title: `Delete Approach Phase "${title}"?`,
+      description: `This will permanently remove "${title}" from the development methodology section on the live portfolio.`,
+      variant: "danger",
+      confirmLabel: "Delete Phase",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
     setIsPending(true);
 
     const res = await deletePhaseAction(id);
@@ -101,6 +113,7 @@ export const ApproachManager: React.FC<{ initialPhases: PhaseDocument[] }> = ({ 
       setStatusMessage({ type: "error", text: res.error || "Failed to delete." });
     }
   };
+
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

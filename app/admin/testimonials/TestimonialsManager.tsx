@@ -12,6 +12,8 @@ import {
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+import { useAdminConfirm } from "@/components/admin/context";
+
 
 import {
   FaPlus,
@@ -28,11 +30,13 @@ import {
 export const TestimonialsManager: React.FC<{ initialTestimonials: TestimonialDocument[] }> = ({ initialTestimonials }) => {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const confirm = useAdminConfirm();
   const [testimonials, setTestimonials] = useState<TestimonialDocument[]>(initialTestimonials);
   const [editingItem, setEditingItem] = useState<Partial<TestimonialDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
 
   // Sync state if server props change
   useEffect(() => {
@@ -84,7 +88,15 @@ export const TestimonialsManager: React.FC<{ initialTestimonials: TestimonialDoc
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete testimonial from "${name}"?`)) return;
+    const confirmed = await confirm({
+      title: `Delete Testimonial from "${name}"?`,
+      description: `This will permanently remove the testimonial from "${name}" and revalidate live cache feeds across the portfolio.`,
+      variant: "danger",
+      confirmLabel: "Delete Testimonial",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
     setIsPending(true);
 
     const res = await deleteTestimonialAction(id);
@@ -101,6 +113,7 @@ export const TestimonialsManager: React.FC<{ initialTestimonials: TestimonialDoc
       setStatusMessage({ type: "error", text: res.error || "Failed to delete." });
     }
   };
+
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

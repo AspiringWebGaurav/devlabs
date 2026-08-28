@@ -3,8 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin/constants";
 import { type AdminSession, verifyAdminSession } from "@/lib/admin/auth";
-import { AdminSessionProvider } from "@/components/admin/context";
+import { AdminSessionProvider, AdminConfirmProvider } from "@/components/admin/context";
 import { AdminThemeEnforcer } from "@/components/admin/layout";
+
 
 const adminSans = Geist({
   variable: "--font-admin-sans",
@@ -75,8 +76,11 @@ export default async function AdminLayout({
         {/* Subtle Swiss grid background lines */}
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#E2E8F0_1px,transparent_1px)] [background-size:24px_24px] opacity-70" />
         <AdminSessionProvider initialSession={initialSession}>
-          <div className="relative z-10">{children}</div>
+          <AdminConfirmProvider>
+            <div className="relative z-10">{children}</div>
+          </AdminConfirmProvider>
         </AdminSessionProvider>
+
       </div>
     </>
   );

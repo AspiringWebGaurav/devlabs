@@ -12,6 +12,8 @@ import {
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+import { useAdminConfirm } from "@/components/admin/context";
+
 
 import {
   FaPlus,
@@ -28,11 +30,13 @@ import {
 export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = ({ initialLinks }) => {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const confirm = useAdminConfirm();
   const [links, setLinks] = useState<SocialLinkDocument[]>(initialLinks);
   const [editingItem, setEditingItem] = useState<Partial<SocialLinkDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
 
   // Sync state if server props change
   useEffect(() => {
@@ -84,7 +88,15 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
   };
 
   const handleDelete = async (id: string, platform: string) => {
-    if (!confirm(`Delete social link for "${platform}"?`)) return;
+    const confirmed = await confirm({
+      title: `Delete Social Link "${platform}"?`,
+      description: `This will permanently remove the social profile link for "${platform}" from the live portfolio navigation and footer.`,
+      variant: "danger",
+      confirmLabel: "Delete Social Link",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
     setIsPending(true);
 
     const res = await deleteSocialLinkAction(id);
@@ -101,6 +113,7 @@ export const SocialManager: React.FC<{ initialLinks: SocialLinkDocument[] }> = (
       setStatusMessage({ type: "error", text: res.error || "Failed to delete." });
     }
   };
+
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -7,6 +7,8 @@ import { updateCardAction, resetCardAction } from "@/lib/actions/cms.actions";
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+import { useAdminConfirm } from "@/components/admin/context";
+
 
 import {
   FaCheck,
@@ -50,10 +52,12 @@ const SUGGESTED_TECH_SKILLS = [
 export const CardsEditor: React.FC<{ initialCards: BentoCardDocument[] }> = ({ initialCards }) => {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const confirm = useAdminConfirm();
   const [cards, setCards] = useState<BentoCardDocument[]>(initialCards);
   const [activeSlot, setActiveSlot] = useState<number>(1);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
 
   // Sync state if server props change
   useEffect(() => {
@@ -154,7 +158,16 @@ export const CardsEditor: React.FC<{ initialCards: BentoCardDocument[] }> = ({ i
   };
 
   const handleResetCard = async () => {
-    if (!confirm(`Reset Slot 0${activeSlot} to baseline default settings?`)) return;
+    const slotLabel = SLOT_METADATA[activeSlot]?.label || currentCard.cardType;
+    const confirmed = await confirm({
+      title: `Reset Slot 0${activeSlot} to Defaults?`,
+      description: `Are you sure you want to reset Slot 0${activeSlot} (${slotLabel}) to its baseline default configuration? All custom settings and skills for this slot will be restored.`,
+      variant: "warning",
+      confirmLabel: "Reset to Defaults",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
     setIsPending(true);
     setStatusMessage(null);
 
@@ -172,6 +185,7 @@ export const CardsEditor: React.FC<{ initialCards: BentoCardDocument[] }> = ({ i
       setStatusMessage({ type: "error", text: res.error || "Failed to reset card." });
     }
   };
+
 
   return (
     <div className="space-y-6 w-full">

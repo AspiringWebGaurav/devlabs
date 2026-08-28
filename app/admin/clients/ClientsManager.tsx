@@ -12,6 +12,8 @@ import {
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+import { useAdminConfirm } from "@/components/admin/context";
+
 
 import {
   FaPlus,
@@ -28,11 +30,13 @@ import {
 export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({ initialClients }) => {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const confirm = useAdminConfirm();
   const [clients, setClients] = useState<ClientDocument[]>(initialClients);
   const [editingItem, setEditingItem] = useState<Partial<ClientDocument> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
 
   // Sync state if server props change
   useEffect(() => {
@@ -84,7 +88,15 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete client logo "${name}"?`)) return;
+    const confirmed = await confirm({
+      title: `Delete Client Logo "${name}"?`,
+      description: `This will permanently remove "${name}" from the client logo showcase on the public homepage.`,
+      variant: "danger",
+      confirmLabel: "Delete Client Logo",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
     setIsPending(true);
 
     const res = await deleteClientAction(id);
@@ -101,6 +113,7 @@ export const ClientsManager: React.FC<{ initialClients: ClientDocument[] }> = ({
       setStatusMessage({ type: "error", text: res.error || "Failed to delete." });
     }
   };
+
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

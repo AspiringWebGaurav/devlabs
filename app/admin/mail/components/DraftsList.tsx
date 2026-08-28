@@ -15,6 +15,8 @@ import { formatRelativeTime } from "@/lib/admin/utils";
 import { deleteMailDraftAction } from "../actions";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+import { useAdminConfirm } from "@/components/admin/context";
+
 
 interface DraftsListProps {
   drafts: MailDraftDocument[];
@@ -27,6 +29,7 @@ export const DraftsList: React.FC<DraftsListProps> = ({
   onResumeDraft,
   onDraftDeleted,
 }) => {
+  const confirm = useAdminConfirm();
   const [drafts, setDrafts] = useState<MailDraftDocument[]>(initialDrafts);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -34,20 +37,33 @@ export const DraftsList: React.FC<DraftsListProps> = ({
     setDrafts(initialDrafts);
   }, [initialDrafts]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (draft: MailDraftDocument) => {
     if (deletingId) return;
-    setDeletingId(id);
+
+    const confirmed = await confirm({
+      title: "Delete Saved Draft?",
+      description: `Are you sure you want to permanently delete the email draft${
+        draft.subject ? ` "${draft.subject}"` : ""
+      }? This action cannot be undone.`,
+      variant: "danger",
+      confirmLabel: "Delete Draft",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
+    setDeletingId(draft.id);
 
     try {
-      const res = await deleteMailDraftAction(id);
+      const res = await deleteMailDraftAction(draft.id);
       if (res.success) {
-        setDrafts((prev) => prev.filter((d) => d.id !== id));
-        if (onDraftDeleted) onDraftDeleted(id);
+        setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
+        if (onDraftDeleted) onDraftDeleted(draft.id);
       }
     } finally {
       setDeletingId(null);
     }
   };
+
 
   return (
     <div className="space-y-4 font-admin-sans">
@@ -123,8 +139,9 @@ export const DraftsList: React.FC<DraftsListProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => handleDelete(draft.id)}
+                  onClick={() => handleDelete(draft)}
                   disabled={deletingId === draft.id}
+
                   className="p-1.5 px-2.5 text-xs font-admin-mono text-[#DC2626] hover:text-white bg-[#FEF2F2] hover:bg-[#DC2626] border border-[#FECACA] hover:border-[#DC2626] rounded-sm transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
                 >
                   {deletingId === draft.id ? (

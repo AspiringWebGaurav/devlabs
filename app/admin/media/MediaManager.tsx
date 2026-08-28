@@ -8,6 +8,8 @@ import { uploadMediaAction, sweepOrphansAction } from "@/lib/actions/cms.actions
 import { broadcastClientCmsChange } from "@/lib/public-data/client-broadcast";
 import { ButtonHelpBadge } from "@/components/admin/ui/ButtonHelpTooltip";
 import { BUTTON_HELP } from "@/lib/admin/constants/button-help";
+import { useAdminConfirm } from "@/components/admin/context";
+
 
 import {
   FaCloudArrowUp,
@@ -23,12 +25,14 @@ export const MediaManager: React.FC<{
 }> = ({ initialAssets, initialAudit }) => {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const confirm = useAdminConfirm();
   const [assets, setAssets] = useState<StorageAssetLedgerDocument[]>(initialAssets);
   const [audit, setAudit] = useState<MediaAuditReport | null>(initialAudit);
   const [isUploading, setIsUploading] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
   const [folder, setFolder] = useState("uploads");
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
 
   // Sync state if server props change
   useEffect(() => {
@@ -85,7 +89,16 @@ export const MediaManager: React.FC<{
   };
 
   const handleSweepOrphans = async () => {
-    if (!confirm("Run safe orphan sweeper? This permanently deletes unmanaged objects and unattached assets older than 24 hours.")) return;
+    const confirmed = await confirm({
+      title: "Run Safe Orphan Sweeper?",
+      description:
+        "This will audit Firebase Storage and permanently delete unmanaged objects, orphan uploads, and unattached assets older than 24 hours. Active portfolio assets will be preserved.",
+      variant: "warning",
+      confirmLabel: "Run Orphan Sweeper",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
     setIsSweeping(true);
     setStatusMessage(null);
 
@@ -103,6 +116,7 @@ export const MediaManager: React.FC<{
       setStatusMessage({ type: "error", text: res.error || "Failed to sweep orphans." });
     }
   };
+
 
   return (
     <div className="space-y-6 w-full">
