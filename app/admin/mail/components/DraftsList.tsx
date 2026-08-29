@@ -54,7 +54,7 @@ export const DraftsList: React.FC<DraftsListProps> = ({
     setDeletingId(draft.id);
 
     try {
-      const res = await deleteMailDraftAction(draft.id);
+      const res = await deleteMailDraftAction(draft.id, draft.revision);
       if (res.success) {
         setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
         if (onDraftDeleted) onDraftDeleted(draft.id);

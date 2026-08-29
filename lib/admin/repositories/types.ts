@@ -42,9 +42,27 @@ export interface InquiryItem {
   replyMessage?: string;
   replyMessageId?: string;
   senderIdentity?: string;
+  replyLockUntil?: number | null;
+  activeReplyKey?: string;
 }
 
-export type MailSenderKey = "SECURITY" | "HELP" | "HELLO" | "NO_REPLY";
+export interface AcquireReplyLockResult {
+  acquired: boolean;
+  alreadyReplied?: boolean;
+  inProgress?: boolean;
+  existingMessageId?: string;
+  error?: string;
+}
+
+export type MailSenderKey =
+  | "SECURITY"
+  | "HELP"
+  | "HELLO"
+  | "NO_REPLY"
+  | "LEGACY_SECURITY"
+  | "LEGACY_HELP"
+  | "LEGACY_HELLO"
+  | "LEGACY_NO_REPLY";
 
 export type MailSendStatus = "DRAFT" | "PENDING" | "SENDING" | "SENT" | "FAILED" | "DELIVERY_UNCERTAIN";
 

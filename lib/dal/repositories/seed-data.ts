@@ -106,7 +106,7 @@ export const SEED_CARDS: BentoCardDocument[] = [
     visualLayout: "centered_text",
     title: "Do you want to start a project together?",
     description: "",
-    ctaEmail: "gauravpatil@example.com",
+    ctaEmail: "hello@gauravpatil.online",
     isPublished: true,
     updatedAt: new Date().toISOString(),
     version: 1,

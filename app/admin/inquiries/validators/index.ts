@@ -14,6 +14,7 @@ export const InquiryStatusUpdateSchema = z.object({
 
 export const ReplyInquirySchema = z.object({
   id: z.string().optional(),
+  idempotencyKey: z.string().min(8).max(128).optional(),
   toEmail: z.string().email("Valid recipient email address is required"),
   toName: z.string().optional(),
   subject: z.string().min(1, "Email subject is required").max(200, "Subject must be under 200 characters"),

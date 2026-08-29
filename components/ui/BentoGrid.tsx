@@ -63,7 +63,7 @@ export const BentoGridItem = ({
   spareImg,
   techStackLeft = ["ReactJS", "Express", "Typescript"],
   techStackRight = ["VueJS", "NuxtJS", "GraphQL"],
-  ctaEmail = "hello@gauravservices.eu.cc",
+  ctaEmail = "hello@gauravpatil.online",
 }: BentoGridItemProps) => {
   const numericId = typeof id === "number" ? id : slotIndex || parseInt(String(id).replace(/\D/g, ""), 10) || 1;
   const isType = (type: BentoCardType, fallbackId: number) => cardType === type || numericId === fallbackId;
@@ -72,7 +72,7 @@ export const BentoGridItem = ({
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleCopy = async () => {
-    const text = ctaEmail || "hello@gauravservices.eu.cc";
+    const text = ctaEmail || "hello@gauravpatil.online";
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { isDraftEmpty } from "@/lib/mail/draft-normalizer";
+import { countMeaningfulWords } from "@/lib/mail/send-validator";
 
 export const BLOCKED_ATTACHMENT_EXTENSIONS = new Set([
   ".exe", ".bat", ".cmd", ".sh", ".vbs", ".msi", ".dll", ".scr",
@@ -101,6 +103,7 @@ export const MailAttachmentPayloadSchema = z
   );
 
 export const MailAttachmentMetaSchema = z.object({
+  id: z.string().max(120).optional(),
   name: z
     .string()
     .trim()
@@ -120,7 +123,17 @@ export const SendMailSchema = z
   .object({
     idempotencyKey: z.string().min(10, "Invalid idempotency key format.").max(64),
     draftId: z.string().max(64).optional(),
-    senderKey: z.enum(["SECURITY", "HELP", "HELLO", "NO_REPLY"]),
+    expectedRevision: z.number().int().min(1).optional(),
+    senderKey: z.enum([
+      "SECURITY",
+      "HELP",
+      "HELLO",
+      "NO_REPLY",
+      "LEGACY_SECURITY",
+      "LEGACY_HELP",
+      "LEGACY_HELLO",
+      "LEGACY_NO_REPLY",
+    ]),
     to: z
       .array(MailRecipientSchema)
       .min(1, "At least one 'To' recipient is required.")
@@ -137,7 +150,10 @@ export const SendMailSchema = z
       .string()
       .trim()
       .min(1, "Message content is required.")
-      .max(10000, "Message content must be under 10,000 characters."),
+      .max(10000, "Message content must be under 10,000 characters.")
+      .refine((val) => countMeaningfulWords(val) >= 3, {
+        message: "Message must contain at least 3 meaningful words.",
+      }),
     attachments: z.array(MailAttachmentPayloadSchema).max(5, "Maximum 5 attachments allowed.").optional(),
   })
   .refine(
@@ -173,16 +189,37 @@ export const SendMailSchema = z
     }
   );
 
-export const SaveDraftSchema = z.object({
-  id: z.string().max(64).optional(),
-  senderKey: z.enum(["SECURITY", "HELP", "HELLO", "NO_REPLY"]).default("HELLO"),
-  to: z.array(MailRecipientSchema).default([]),
-  cc: z.array(MailRecipientSchema).default([]),
-  bcc: z.array(MailRecipientSchema).default([]),
-  subject: z.string().trim().max(200).default(""),
-  body: z.string().max(10000).default(""),
-  attachments: z.array(MailAttachmentMetaSchema).max(5).default([]),
-});
+export const SaveDraftSchema = z
+  .object({
+    id: z.string().max(64).optional(),
+    createOperationId: z.string().max(120).optional(),
+    expectedRevision: z.number().int().min(1).optional(),
+    senderKey: z
+      .enum([
+        "SECURITY",
+        "HELP",
+        "HELLO",
+        "NO_REPLY",
+        "LEGACY_SECURITY",
+        "LEGACY_HELP",
+        "LEGACY_HELLO",
+        "LEGACY_NO_REPLY",
+      ])
+      .default("HELLO"),
+    to: z.array(MailRecipientSchema).default([]),
+    cc: z.array(MailRecipientSchema).default([]),
+    bcc: z.array(MailRecipientSchema).default([]),
+    subject: z.string().max(200).default(""),
+    body: z.string().max(10000).default(""),
+    attachments: z.array(MailAttachmentMetaSchema).max(5).default([]),
+  })
+  .refine(
+    (data) => !isDraftEmpty(data),
+    {
+      message: "EMPTY_DRAFT: Draft must contain at least one recipient, subject, body text, or attachment.",
+      path: ["body"],
+    }
+  );
 
 export const MailQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

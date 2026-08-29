@@ -42,9 +42,27 @@ export interface InquiryItem {
   replyMessage?: string;
   replyMessageId?: string;
   senderIdentity?: string;
+  replyLockUntil?: number | null;
+  activeReplyKey?: string;
 }
 
-export type MailSenderKey = "SECURITY" | "HELP" | "HELLO" | "NO_REPLY";
+export interface AcquireReplyLockResult {
+  acquired: boolean;
+  alreadyReplied?: boolean;
+  inProgress?: boolean;
+  existingMessageId?: string;
+  error?: string;
+}
+
+export type MailSenderKey =
+  | "SECURITY"
+  | "HELP"
+  | "HELLO"
+  | "NO_REPLY"
+  | "LEGACY_SECURITY"
+  | "LEGACY_HELP"
+  | "LEGACY_HELLO"
+  | "LEGACY_NO_REPLY";
 
 export type MailSendStatus = "DRAFT" | "PENDING" | "SENDING" | "SENT" | "FAILED" | "DELIVERY_UNCERTAIN";
 
@@ -54,6 +72,7 @@ export interface MailRecipient {
 }
 
 export interface MailAttachmentMeta {
+  id?: string;
   name: string;
   sizeBytes: number;
   contentType?: string;
@@ -64,7 +83,8 @@ export interface MailAttachmentPayload extends MailAttachmentMeta {
 }
 
 export interface MailDocument {
-  id: string; // idempotencyKey
+  id: string; // idempotencyKey (application operation ID)
+  brevoIdempotencyKey?: string; // Provider-level UUID
   senderKey: MailSenderKey;
   senderEmail: string;
   senderName: string;
@@ -87,6 +107,7 @@ export interface MailDocument {
 
 export interface MailDraftDocument {
   id: string;
+  createOperationId?: string; // Stable idempotency key for new draft creation retries
   senderKey: MailSenderKey;
   to: MailRecipient[];
   cc?: MailRecipient[];
@@ -98,6 +119,7 @@ export interface MailDraftDocument {
   createdAt: string;
   updatedAt: string;
   expiresAt: string; // ISO 8601 (createdAt + 30 days) for Firestore TTL
+  revision?: number; // Backward-compatible integer incremented on each update
 }
 
 

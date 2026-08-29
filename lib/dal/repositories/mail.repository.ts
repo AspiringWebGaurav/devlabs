@@ -170,7 +170,7 @@ export class MailRepository extends BaseRepository {
 
   /**
    * Finalizes the state of a send operation after Brevo HTTP resolution.
-   * Atomically commits status finalization and draft cleanup via an atomic batch.
+   * Atomically commits status finalization and revision-safe draft cleanup inside a transaction.
    */
   public async finalizeSendStatus(
     idempotencyKey: string,
@@ -179,6 +179,7 @@ export class MailRepository extends BaseRepository {
       brevoMessageId?: string;
       errorMessage?: string;
       draftIdToDelete?: string;
+      expectedRevision?: number;
     }
   ): Promise<RepositoryResult<void>> {
     return this.executeMutation("finalizeSendStatus", async () => {
@@ -191,16 +192,28 @@ export class MailRepository extends BaseRepository {
         ...(params.status === "SENT" && { sentAt: new Date(now).toISOString() }),
       };
 
-      // Atomic batch: commit sent status AND delete draft simultaneously to prevent orphaned drafts
-      if (params.status === "SENT" && params.draftIdToDelete) {
-        await firestoreDataSource.executeBatch([
-          { type: "set", collection: "admin_mails", id: idempotencyKey, data: updatePayload, merge: true },
-          { type: "delete", collection: "admin_mail_drafts", id: params.draftIdToDelete },
-        ]);
-      } else {
-        await firestoreDataSource.setDocument("admin_mails", idempotencyKey, updatePayload, true);
-      }
-    }, { idempotencyKey, finalStatus: params.status, messageId: params.brevoMessageId });
+      await firestoreDataSource.runTransaction(async (transaction, db) => {
+        const mailDocRef = db.collection("admin_mails").doc(idempotencyKey);
+        transaction.set(mailDocRef, updatePayload, { merge: true });
+
+        // Revision-safe draft cleanup: only delete if draft in Firestore matches expectedRevision
+        if (params.status === "SENT" && params.draftIdToDelete) {
+          const draftDocRef = db.collection("admin_mail_drafts").doc(params.draftIdToDelete);
+          const draftSnap = await transaction.get(draftDocRef);
+
+          if (draftSnap.exists) {
+            const existingDraft = draftSnap.data() as MailDraftDocument;
+            const currentDraftRev = existingDraft.revision ?? 1;
+
+            // If expectedRevision was specified, ensure it still matches
+            if (params.expectedRevision === undefined || currentDraftRev === params.expectedRevision) {
+              transaction.delete(draftDocRef);
+            }
+            // If revision changed (e.g. edited to 6 in another tab), deletion is skipped to preserve newer work
+          }
+        }
+      });
+    }, { idempotencyKey, finalStatus: params.status, messageId: params.brevoMessageId, draftIdToDelete: params.draftIdToDelete, expectedRevision: params.expectedRevision });
   }
 
   /**
@@ -241,43 +254,106 @@ export class MailRepository extends BaseRepository {
   }
 
   /**
-   * Creates or updates a draft in admin_mail_drafts with 30-day TTL.
+   * Creates or updates a draft in admin_mail_drafts with atomic revision checking,
+   * create-operation idempotency, and 30-day TTL.
    */
   public async saveDraft(
-    draftData: Omit<MailDraftDocument, "id" | "createdAt" | "updatedAt" | "expiresAt"> & { id?: string }
+    draftData: Omit<MailDraftDocument, "id" | "createdAt" | "updatedAt" | "expiresAt" | "revision"> & {
+      id?: string;
+      createOperationId?: string;
+      expectedRevision?: number;
+    }
   ): Promise<RepositoryResult<MailDraftDocument>> {
-    const id = draftData.id || `draft_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = draftData.id || draftData.createOperationId || `draft_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date();
     const expiresDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days TTL
 
-    const record: MailDraftDocument = {
-      id,
-      senderKey: draftData.senderKey,
-      to: draftData.to,
-      cc: draftData.cc || [],
-      bcc: draftData.bcc || [],
-      subject: draftData.subject,
-      body: draftData.body,
-      attachments: draftData.attachments || [],
-      savedByAdminEmail: draftData.savedByAdminEmail,
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-      expiresAt: expiresDate.toISOString(),
-    };
-
     return this.executeMutation("saveDraft", async () => {
-      await firestoreDataSource.setDocument("admin_mail_drafts", id, record, false);
-      return record;
-    }, { id, admin: record.savedByAdminEmail });
+      return await firestoreDataSource.runTransaction(async (transaction, db) => {
+        const docRef = db.collection("admin_mail_drafts").doc(id);
+        const snapshot = await transaction.get(docRef);
+
+        let finalRevision = 1;
+        let createdAt = now.toISOString();
+
+        if (snapshot.exists) {
+          const existing = snapshot.data() as MailDraftDocument;
+          const currentRevision = existing.revision ?? 1;
+
+          // Idempotent retry check: if creating a new draft with the same createOperationId,
+          // return existing created record idempotently without duplicate writes
+          if (
+            !draftData.id &&
+            draftData.createOperationId &&
+            existing.createOperationId === draftData.createOperationId &&
+            draftData.expectedRevision === undefined
+          ) {
+            return existing;
+          }
+
+          if (draftData.expectedRevision !== undefined && currentRevision !== draftData.expectedRevision) {
+            const conflictErr = new Error(
+              `DRAFT_CONFLICT: Draft revision mismatch (expected ${draftData.expectedRevision}, found ${currentRevision})`
+            );
+            (conflictErr as unknown as { code: string; currentRevision: number; serverDraft: MailDraftDocument }).code = "DRAFT_CONFLICT";
+            (conflictErr as unknown as { code: string; currentRevision: number; serverDraft: MailDraftDocument }).currentRevision = currentRevision;
+            (conflictErr as unknown as { code: string; currentRevision: number; serverDraft: MailDraftDocument }).serverDraft = existing;
+            throw conflictErr;
+          }
+
+          finalRevision = currentRevision + 1;
+          createdAt = existing.createdAt || createdAt;
+        }
+
+        const record: MailDraftDocument = {
+          id,
+          createOperationId: draftData.createOperationId || (snapshot.exists ? (snapshot.data() as MailDraftDocument).createOperationId : undefined),
+          senderKey: draftData.senderKey,
+          to: draftData.to,
+          cc: draftData.cc || [],
+          bcc: draftData.bcc || [],
+          subject: draftData.subject,
+          body: draftData.body,
+          attachments: draftData.attachments || [],
+          savedByAdminEmail: draftData.savedByAdminEmail,
+          createdAt,
+          updatedAt: now.toISOString(),
+          expiresAt: expiresDate.toISOString(),
+          revision: finalRevision,
+        };
+
+        transaction.set(docRef, record);
+        return record;
+      });
+    }, { id, admin: draftData.savedByAdminEmail, expectedRevision: draftData.expectedRevision, createOperationId: draftData.createOperationId });
   }
 
   /**
-   * Deletes a draft from admin_mail_drafts.
+   * Deletes a draft from admin_mail_drafts inside an atomic transaction.
    */
-  public async deleteDraft(id: string): Promise<RepositoryResult<void>> {
+  public async deleteDraft(id: string, expectedRevision?: number): Promise<RepositoryResult<void>> {
     return this.executeMutation("deleteDraft", async () => {
-      await firestoreDataSource.deleteDocument("admin_mail_drafts", id);
-    }, { id });
+      return await firestoreDataSource.runTransaction(async (transaction, db) => {
+        const docRef = db.collection("admin_mail_drafts").doc(id);
+        const snapshot = await transaction.get(docRef);
+
+        if (!snapshot.exists) {
+          return;
+        }
+
+        const existing = snapshot.data() as MailDraftDocument;
+        if (expectedRevision !== undefined && existing.revision !== undefined && existing.revision !== expectedRevision) {
+          const conflictErr = new Error(
+            `DRAFT_CONFLICT: Cannot delete draft; revision mismatch (expected ${expectedRevision}, found ${existing.revision})`
+          );
+          (conflictErr as unknown as { code: string; currentRevision: number }).code = "DRAFT_CONFLICT";
+          (conflictErr as unknown as { code: string; currentRevision: number }).currentRevision = existing.revision;
+          throw conflictErr;
+        }
+
+        transaction.delete(docRef);
+      });
+    }, { id, expectedRevision });
   }
 }
 

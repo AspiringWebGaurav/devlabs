@@ -15,7 +15,7 @@ interface ReplyInquiryModalProps {
   defaultToName?: string;
   defaultSubject?: string;
   defaultMessage?: string;
-  onSuccess?: (messageId: string) => void;
+  onSuccess?: (messageId: string, note?: string) => void;
 }
 
 export const ReplyInquiryModal: React.FC<ReplyInquiryModalProps> = ({
@@ -35,7 +35,12 @@ export const ReplyInquiryModal: React.FC<ReplyInquiryModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Reset form when modal opens with new props
+  // Stable client-generated idempotency key preserved across retries of the same reply session
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() =>
+    `inq_reply_${inquiryId || "outreach"}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+  );
+
+  // Reset form and generate fresh idempotency key when modal opens with new props
   React.useEffect(() => {
     if (isOpen) {
       setToEmail(defaultToEmail);
@@ -43,8 +48,11 @@ export const ReplyInquiryModal: React.FC<ReplyInquiryModalProps> = ({
       setSubject(defaultSubject);
       setMessage(defaultMessage);
       setError(null);
+      setIdempotencyKey(
+        `inq_reply_${inquiryId || "outreach"}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+      );
     }
-  }, [isOpen, defaultToEmail, defaultToName, defaultSubject, defaultMessage]);
+  }, [isOpen, defaultToEmail, defaultToName, defaultSubject, defaultMessage, inquiryId]);
 
   if (!isOpen) return null;
 
@@ -75,6 +83,7 @@ export const ReplyInquiryModal: React.FC<ReplyInquiryModalProps> = ({
       try {
         const res = await replyToInquiryAction({
           id: inquiryId,
+          idempotencyKey,
           toEmail: trimmedEmail,
           toName: toName.trim() || undefined,
           subject: trimmedSubject,
@@ -82,14 +91,22 @@ export const ReplyInquiryModal: React.FC<ReplyInquiryModalProps> = ({
         });
 
         if (res.success) {
-          // On confirmed Brevo dispatch success: Dismiss UI and clear state
+          // On confirmed Brevo dispatch success / existing record: Dismiss UI and clear state
           setError(null);
           if (onSuccess && res.messageId) {
-            onSuccess(res.messageId);
+            let note: string | undefined;
+            if (res.status === "PERSISTENCE_PENDING") {
+              note = res.warning || "Email accepted by Brevo; inquiry history sync is pending.";
+            } else if (res.status === "ALREADY_REPLIED") {
+              note = res.warning || "This inquiry was already replied to and marked as read.";
+            } else {
+              note = `Email reply successfully dispatched via Brevo (ID: ${res.messageId.substring(0, 16)}...)`;
+            }
+            onSuccess(res.messageId, note);
           }
           onClose();
         } else {
-          // If dispatch failed: keep UI open and show real error safely
+          // If dispatch failed: keep UI open and show real error safely without regenerating idempotencyKey
           setError(res.error || "Failed to dispatch email reply via Brevo.");
         }
       } catch (err: unknown) {
@@ -117,7 +134,7 @@ export const ReplyInquiryModal: React.FC<ReplyInquiryModalProps> = ({
               <h3 className="font-bold text-sm text-black">Dispatch Email Reply</h3>
               <p className="font-admin-mono text-[11px] text-[#64748B] flex items-center gap-1.5 mt-0.5">
                 <FaLock className="w-2.5 h-2.5 text-[#10B981]" />
-                <span>From: security@gauravservices.eu.cc (Brevo Gateway)</span>
+                <span>From: security@gauravpatil.online (Brevo Gateway)</span>
               </p>
             </div>
           </div>

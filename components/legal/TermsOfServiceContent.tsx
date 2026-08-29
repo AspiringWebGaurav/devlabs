@@ -242,7 +242,7 @@ function TermsContentInner() {
               )}
             </div>
             <p>
-              All transactional emails, contact receipts, and security alerts are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravservices.eu.cc</span> via Brevo API. Official sender identities include <code className="text-purple font-mono">hello@gauravservices.eu.cc</code> (inquiries and auto-replies), <code className="text-purple font-mono">security@gauravservices.eu.cc</code> (authentication alerts), and <code className="text-purple font-mono">no-reply@gauravservices.eu.cc</code> (system OTPs). We maintain a strict zero-spam guarantee: submitted contact emails are never enrolled in marketing sequences.
+              All transactional emails, contact receipts, and security alerts are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono">gauravservices.eu.cc</span> preserved) via Brevo API. Official sender identities include <code className="text-purple font-mono">hello@gauravpatil.online</code> (inquiries and auto-replies), <code className="text-purple font-mono">security@gauravpatil.online</code> (authentication alerts), and <code className="text-purple font-mono">no-reply@gauravpatil.online</code> (system OTPs). We maintain a strict zero-spam guarantee: submitted contact emails are never enrolled in marketing sequences.
             </p>
           </section>
 
@@ -281,10 +281,10 @@ function TermsContentInner() {
             <p className="text-purple font-medium">
               Email:{" "}
               <a
-                href="mailto:hello@gauravservices.eu.cc"
+                href="mailto:hello@gauravpatil.online"
                 className="hover:underline"
               >
-                hello@gauravservices.eu.cc
+                hello@gauravpatil.online
               </a>
             </p>
           </section>

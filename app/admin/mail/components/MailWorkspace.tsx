@@ -165,11 +165,14 @@ export const MailWorkspace: React.FC<MailWorkspaceProps> = ({
                 return [newDraft, ...prev];
               });
               broadcastClientCmsChange("mail");
-              startTransition(() => {
-                router.refresh();
-              });
             }}
-            onDiscard={() => setActiveDraft(null)}
+            onDiscard={() => {
+              if (activeDraft) {
+                setDrafts((prev) => prev.filter((d) => d.id !== activeDraft.id));
+                broadcastClientCmsChange("mail");
+              }
+              setActiveDraft(null);
+            }}
           />
         )}
 
@@ -183,10 +186,10 @@ export const MailWorkspace: React.FC<MailWorkspaceProps> = ({
             onResumeDraft={handleResumeDraft}
             onDraftDeleted={(id) => {
               setDrafts((prev) => prev.filter((d) => d.id !== id));
+              if (activeDraft?.id === id) {
+                setActiveDraft(null);
+              }
               broadcastClientCmsChange("mail");
-              startTransition(() => {
-                router.refresh();
-              });
             }}
           />
         )}

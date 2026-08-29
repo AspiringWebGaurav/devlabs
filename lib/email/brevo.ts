@@ -26,6 +26,28 @@ export interface EmailAttachment {
   url?: string;
 }
 
+import crypto from "crypto";
+
+/**
+ * Normalizes an idempotency key into a standard RFC 4122 compliant UUID v4 string
+ * suitable for Brevo's provider-level idempotency mechanism.
+ * Deterministic for identical input strings (reties reuse the same UUID).
+ */
+export function formatBrevoIdempotencyKey(key: string): string {
+  if (!key || typeof key !== "string") {
+    return crypto.randomUUID();
+  }
+  const trimmed = key.trim();
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+
+  // Deterministically hash to standard RFC 4122 format
+  const hash = crypto.createHash("sha256").update(trimmed).digest("hex");
+  return `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-a${hash.substring(17, 20)}-${hash.substring(20, 32)}`;
+}
+
 export interface SendTransactionalEmailOptions {
   purpose?: EmailPurpose;
   identity?: EmailIdentity;
@@ -39,6 +61,7 @@ export interface SendTransactionalEmailOptions {
   attachments?: EmailAttachment[];
   tags?: string[];
   headers?: Record<string, string>;
+  idempotencyKey?: string;
 }
 
 export interface SendEmailResult {
@@ -206,14 +229,20 @@ export async function sendTransactionalEmail(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
+  const requestHeaders: Record<string, string> = {
+    accept: "application/json",
+    "api-key": apiKey,
+    "content-type": "application/json",
+  };
+
+  if (options.idempotencyKey) {
+    requestHeaders["Idempotency-Key"] = formatBrevoIdempotencyKey(options.idempotencyKey);
+  }
+
   try {
     const res = await fetch(BREVO_API_ENDPOINT, {
       method: "POST",
-      headers: {
-        accept: "application/json",
-        "api-key": apiKey,
-        "content-type": "application/json",
-      },
+      headers: requestHeaders,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -296,7 +325,7 @@ function generateInternalNotificationHtml(
 /**
  * Contact Form Workflow Dispatcher:
  * 1. Dispatches Internal Notification Email (Lead alert to owner with Reply-To set to visitor).
- * 2. Dispatches Visitor Auto-Reply Email (Using Brevo Template #1 with Reply-To: hello@gauravservices.eu.cc).
+ * 2. Dispatches Visitor Auto-Reply Email (Using Brevo Template #1 with Reply-To: hello@gauravpatil.online).
  */
 export async function dispatchContactFormWorkflow(
   params: ContactFormWorkflowParams
@@ -416,7 +445,7 @@ export interface OtpEmailParams {
 }
 
 /**
- * Dispatches a 6-digit OTP code to the Superadmin inbox via security@gauravservices.eu.cc
+ * Dispatches a 6-digit OTP code to the Superadmin inbox via no-reply@gauravpatil.online
  * Styled in minimal, spam-free Wasmer Pro aesthetic with dynamic admin panel URLs.
  */
 export async function dispatchOtpEmail(
@@ -487,7 +516,7 @@ export interface NewIpAlertParams {
 }
 
 /**
- * Dispatches an untrusted IP authorization alert with 1-click approval link via security@gauravservices.eu.cc
+ * Dispatches an untrusted IP authorization alert with 1-click approval link via security@gauravpatil.online
  * Styled in minimal, spam-free Wasmer Pro aesthetic with dynamic admin panel URLs.
  */
 export async function dispatchNewIpSecurityAlert(
@@ -563,10 +592,11 @@ export interface ReplyInquiryEmailParams {
   subject: string;
   message: string;
   inquiryId?: string;
+  idempotencyKey?: string;
 }
 
 /**
- * Dispatches a direct reply to an inbound inquiry or outreach contact via security@gauravservices.eu.cc.
+ * Dispatches a direct reply to an inbound inquiry or outreach contact via security@gauravpatil.online.
  * Uses Brevo REST API v3 with clean HTML and plain text formatting.
  */
 export async function dispatchInquiryReplyEmail(
@@ -606,6 +636,7 @@ export async function dispatchInquiryReplyEmail(
     htmlContent,
     textContent: trimmedMessage,
     tags: ["portfolio_reply", "outreach_response"],
+    idempotencyKey: params.idempotencyKey,
   });
 }
 

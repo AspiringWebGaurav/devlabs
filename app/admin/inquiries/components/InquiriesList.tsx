@@ -102,7 +102,7 @@ export const InquiriesList: React.FC<InquiriesListProps> = ({ inquiries: initial
     setIsModalOpen(true);
   };
 
-  const handleSendSuccess = async (messageId: string) => {
+  const handleSendSuccess = async (messageId: string, note?: string) => {
     if (selectedInquiry?.id) {
       setInquiries((prev) =>
         prev.map((item) =>
@@ -117,7 +117,7 @@ export const InquiriesList: React.FC<InquiriesListProps> = ({ inquiries: initial
         )
       );
     }
-    setNotification(`Email reply successfully dispatched via Brevo (ID: ${messageId.substring(0, 16)}...)`);
+    setNotification(note || `Email reply successfully dispatched via Brevo (ID: ${messageId.substring(0, 16)}...)`);
     setTimeout(() => setNotification(null), 6000);
 
     // Auto-refresh from server and broadcast
@@ -231,7 +231,7 @@ export const InquiriesList: React.FC<InquiriesListProps> = ({ inquiries: initial
               {item.repliedAt && item.replyMessage && (
                 <div className="p-3 bg-[#F8FAFC] border-l-2 border-[#7C3AED] rounded-xs space-y-1">
                   <div className="flex items-center justify-between font-admin-mono text-[10px] text-[#64748B]">
-                    <span>Sent Reply via security@gauravservices.eu.cc</span>
+                    <span>Sent Reply via {item.senderIdentity ? item.senderIdentity : "Legacy / Unrecorded Sender"}</span>
                     <span>{formatRelativeTime(item.repliedAt)}</span>
                   </div>
                   <p className="font-admin-sans text-xs text-[#475569] italic line-clamp-2">

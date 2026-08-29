@@ -7,57 +7,123 @@
  */
 
 import { adminLogger } from "@/lib/admin/logger";
-import { escapeHtml } from "./brevo";
+import { escapeHtml, formatBrevoIdempotencyKey } from "./brevo";
+import {
+  EMAIL_IDENTITIES,
+  EmailIdentityType,
+  PRIMARY_EMAIL_DOMAIN,
+  LEGACY_EMAIL_DOMAIN,
+} from "./identities";
 import type { MailRecipient, MailSenderKey } from "@/lib/dal/repositories/types";
 
 const BREVO_API_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 
 export interface MailSenderIdentity {
   key: MailSenderKey;
+  logicalKey: EmailIdentityType;
   email: string;
   displayName: string;
   purpose: string;
   defaultReplyTo: string;
   isNoReply: boolean;
-  brevoSenderId: number;
+  isLegacy: boolean;
+  domain: string;
+  legacyEmail?: string;
+  brevoSenderId?: number;
 }
 
 export const ADMIN_MAIL_SENDERS: Record<MailSenderKey, MailSenderIdentity> = {
+  HELLO: {
+    key: "HELLO",
+    logicalKey: "HELLO",
+    email: EMAIL_IDENTITIES.HELLO.primary.email,
+    displayName: EMAIL_IDENTITIES.HELLO.primary.name,
+    purpose: EMAIL_IDENTITIES.HELLO.primary.purpose,
+    defaultReplyTo: EMAIL_IDENTITIES.HELLO.primary.defaultReplyTo,
+    isNoReply: EMAIL_IDENTITIES.HELLO.primary.isNoReply,
+    isLegacy: false,
+    domain: PRIMARY_EMAIL_DOMAIN,
+    legacyEmail: EMAIL_IDENTITIES.HELLO.legacy.email,
+  },
   SECURITY: {
     key: "SECURITY",
-    email: "security@gauravservices.eu.cc",
-    displayName: "Gaurav Services Security",
-    purpose: "Administrative alerts, access notifications, and security correspondence.",
-    defaultReplyTo: "security@gauravservices.eu.cc",
-    isNoReply: false,
-    brevoSenderId: 2,
+    logicalKey: "SECURITY",
+    email: EMAIL_IDENTITIES.SECURITY.primary.email,
+    displayName: EMAIL_IDENTITIES.SECURITY.primary.name,
+    purpose: EMAIL_IDENTITIES.SECURITY.primary.purpose,
+    defaultReplyTo: EMAIL_IDENTITIES.SECURITY.primary.defaultReplyTo,
+    isNoReply: EMAIL_IDENTITIES.SECURITY.primary.isNoReply,
+    isLegacy: false,
+    domain: PRIMARY_EMAIL_DOMAIN,
+    legacyEmail: EMAIL_IDENTITIES.SECURITY.legacy.email,
   },
   HELP: {
     key: "HELP",
-    email: "help@gauravservices.eu.cc",
-    displayName: "Gaurav Support",
-    purpose: "Support assistance, technical inquiries, and client communications.",
-    defaultReplyTo: "help@gauravservices.eu.cc",
-    isNoReply: false,
-    brevoSenderId: 3,
-  },
-  HELLO: {
-    key: "HELLO",
-    email: "hello@gauravservices.eu.cc",
-    displayName: "Gaurav Patil",
-    purpose: "General professional correspondence and portfolio outreach.",
-    defaultReplyTo: "hello@gauravservices.eu.cc",
-    isNoReply: false,
-    brevoSenderId: 4,
+    logicalKey: "HELP",
+    email: EMAIL_IDENTITIES.HELP.primary.email,
+    displayName: EMAIL_IDENTITIES.HELP.primary.name,
+    purpose: EMAIL_IDENTITIES.HELP.primary.purpose,
+    defaultReplyTo: EMAIL_IDENTITIES.HELP.primary.defaultReplyTo,
+    isNoReply: EMAIL_IDENTITIES.HELP.primary.isNoReply,
+    isLegacy: false,
+    domain: PRIMARY_EMAIL_DOMAIN,
+    legacyEmail: EMAIL_IDENTITIES.HELP.legacy.email,
   },
   NO_REPLY: {
     key: "NO_REPLY",
-    email: "no-reply@gauravservices.eu.cc",
-    displayName: "Gaurav Automated Systems",
-    purpose: "Automated receipts and system broadcasts (unmonitored).",
-    defaultReplyTo: "no-reply@gauravservices.eu.cc",
-    isNoReply: true,
-    brevoSenderId: 5,
+    logicalKey: "NO_REPLY",
+    email: EMAIL_IDENTITIES.NO_REPLY.primary.email,
+    displayName: EMAIL_IDENTITIES.NO_REPLY.primary.name,
+    purpose: EMAIL_IDENTITIES.NO_REPLY.primary.purpose,
+    defaultReplyTo: EMAIL_IDENTITIES.NO_REPLY.primary.defaultReplyTo,
+    isNoReply: EMAIL_IDENTITIES.NO_REPLY.primary.isNoReply,
+    isLegacy: false,
+    domain: PRIMARY_EMAIL_DOMAIN,
+    legacyEmail: EMAIL_IDENTITIES.NO_REPLY.legacy.email,
+  },
+  LEGACY_HELLO: {
+    key: "LEGACY_HELLO",
+    logicalKey: "HELLO",
+    email: EMAIL_IDENTITIES.HELLO.legacy.email,
+    displayName: EMAIL_IDENTITIES.HELLO.legacy.name,
+    purpose: EMAIL_IDENTITIES.HELLO.legacy.purpose,
+    defaultReplyTo: EMAIL_IDENTITIES.HELLO.legacy.defaultReplyTo,
+    isNoReply: EMAIL_IDENTITIES.HELLO.legacy.isNoReply,
+    isLegacy: true,
+    domain: LEGACY_EMAIL_DOMAIN,
+  },
+  LEGACY_SECURITY: {
+    key: "LEGACY_SECURITY",
+    logicalKey: "SECURITY",
+    email: EMAIL_IDENTITIES.SECURITY.legacy.email,
+    displayName: EMAIL_IDENTITIES.SECURITY.legacy.name,
+    purpose: EMAIL_IDENTITIES.SECURITY.legacy.purpose,
+    defaultReplyTo: EMAIL_IDENTITIES.SECURITY.legacy.defaultReplyTo,
+    isNoReply: EMAIL_IDENTITIES.SECURITY.legacy.isNoReply,
+    isLegacy: true,
+    domain: LEGACY_EMAIL_DOMAIN,
+  },
+  LEGACY_HELP: {
+    key: "LEGACY_HELP",
+    logicalKey: "HELP",
+    email: EMAIL_IDENTITIES.HELP.legacy.email,
+    displayName: EMAIL_IDENTITIES.HELP.legacy.name,
+    purpose: EMAIL_IDENTITIES.HELP.legacy.purpose,
+    defaultReplyTo: EMAIL_IDENTITIES.HELP.legacy.defaultReplyTo,
+    isNoReply: EMAIL_IDENTITIES.HELP.legacy.isNoReply,
+    isLegacy: true,
+    domain: LEGACY_EMAIL_DOMAIN,
+  },
+  LEGACY_NO_REPLY: {
+    key: "LEGACY_NO_REPLY",
+    logicalKey: "NO_REPLY",
+    email: EMAIL_IDENTITIES.NO_REPLY.legacy.email,
+    displayName: EMAIL_IDENTITIES.NO_REPLY.legacy.name,
+    purpose: EMAIL_IDENTITIES.NO_REPLY.legacy.purpose,
+    defaultReplyTo: EMAIL_IDENTITIES.NO_REPLY.legacy.defaultReplyTo,
+    isNoReply: EMAIL_IDENTITIES.NO_REPLY.legacy.isNoReply,
+    isLegacy: true,
+    domain: LEGACY_EMAIL_DOMAIN,
   },
 };
 
@@ -325,7 +391,8 @@ export async function dispatchAdminMail(
   }
 
 
-  // 3. Dispatch with 10-Second Abort Controller
+  // 3. Dispatch with 10-Second Abort Controller & Provider UUID Idempotency Key
+  const brevoIdempotencyKey = formatBrevoIdempotencyKey(params.idempotencyKey);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
   const startTime = Date.now();
@@ -337,6 +404,7 @@ export async function dispatchAdminMail(
         accept: "application/json",
         "api-key": apiKey,
         "content-type": "application/json",
+        "Idempotency-Key": brevoIdempotencyKey,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,

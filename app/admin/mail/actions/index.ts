@@ -11,21 +11,22 @@ import {
   dispatchAdminMail,
   recordAdminMailSend,
 } from "@/lib/email/mail-service";
+import { formatBrevoIdempotencyKey } from "@/lib/email/brevo";
 import {
   MailQuerySchema,
   SaveDraftSchema,
   SendMailSchema,
   sanitizeAttachmentFilename,
 } from "../validators";
-import type { MailRecipient, MailSendStatus } from "@/lib/dal/repositories/types";
+import type { MailDraftDocument, MailRecipient, MailSendStatus } from "@/lib/dal/repositories/types";
 
 export interface SendMailActionResponse {
   success: boolean;
   status: MailSendStatus;
+  code?: string;
   messageId?: string;
   error?: string;
 }
-
 
 /**
  * Server Action to dispatch outbound emails from the Admin Mail Center.
@@ -37,25 +38,27 @@ export async function sendAdminMailAction(
 ): Promise<SendMailActionResponse> {
   const session = await assertSuperadminSession();
 
-  // 1. Zod Schema Validation
+  // 1. Zod Schema & Semantic Validation
   const parsed = SendMailSchema.safeParse(formData);
   if (!parsed.success) {
     const errorMsg = parsed.error.issues[0]?.message || "Validation failed.";
     return {
       success: false,
       status: "FAILED",
+      code: "SEND_VALIDATION_FAILED",
       error: errorMsg,
     };
   }
 
-  const { idempotencyKey, draftId, senderKey, to, cc, bcc, subject, body, attachments } = parsed.data;
+  const { idempotencyKey, draftId, expectedRevision, senderKey, to, cc, bcc, subject, body, attachments } = parsed.data;
 
-  // 2. Resolve Verified Sender Identity
+  // 2. Resolve Verified Sender Identity from Authoritative Server Registry
   const identity = ADMIN_MAIL_SENDERS[senderKey];
   if (!identity) {
     return {
       success: false,
       status: "FAILED",
+      code: "SENDER_NOT_ALLOWED",
       error: `SENDER_NOT_ALLOWED: Identity "${senderKey}" is not authorized.`,
     };
   }
@@ -94,7 +97,9 @@ export async function sendAdminMailAction(
   }));
 
   // 5. Acquire Atomic Idempotency Lock in Firestore (Transactional)
+  const brevoUuid = formatBrevoIdempotencyKey(idempotencyKey);
   const lockResult = await mailRepository.initiateSendLock(idempotencyKey, {
+    brevoIdempotencyKey: brevoUuid,
     senderKey: identity.key,
     senderEmail: identity.email,
     senderName: identity.displayName,
@@ -141,12 +146,13 @@ export async function sendAdminMailAction(
     adminEmail: session.email,
   });
 
-  // 7. Finalize State in Firestore (Atomic Batch Commit with Draft Cleanup)
+  // 7. Finalize State in Firestore (Atomic Transaction with Revision-Safe Draft Cleanup)
   await mailRepository.finalizeSendStatus(idempotencyKey, {
     status: dispatchResult.status,
     brevoMessageId: dispatchResult.messageId,
     errorMessage: dispatchResult.error,
     draftIdToDelete: draftId,
+    expectedRevision,
   });
 
   // 8. Record Rate Limit & Revalidate Paths
@@ -164,21 +170,41 @@ export async function sendAdminMailAction(
   };
 }
 
+export interface SaveDraftActionResponse {
+  success: boolean;
+  code?: "EMPTY_DRAFT" | "DRAFT_CONFLICT" | "DRAFT_SAVE_FAILED" | "VALIDATION_FAILED";
+  data?: MailDraftDocument | null;
+  serverRevision?: number;
+  serverDraft?: MailDraftDocument;
+  error?: string;
+}
+
+export interface DeleteDraftActionResponse {
+  success: boolean;
+  code?: "DRAFT_CONFLICT" | "DRAFT_NOT_FOUND" | "DRAFT_DELETE_FAILED" | "INVALID_DRAFT_ID";
+  error?: string;
+}
+
 /**
  * Server Action to save or update a draft in admin_mail_drafts.
  */
-export async function saveMailDraftAction(formData: unknown) {
+export async function saveMailDraftAction(formData: unknown): Promise<SaveDraftActionResponse> {
   const session = await assertSuperadminSession();
 
   const parsed = SaveDraftSchema.safeParse(formData);
   if (!parsed.success) {
+    const isEmp = parsed.error.issues.some((issue) => issue.message.includes("EMPTY_DRAFT"));
     return {
       success: false,
-      error: parsed.error.issues[0]?.message || "Draft validation failed.",
+      code: isEmp ? "EMPTY_DRAFT" : "VALIDATION_FAILED",
+      error: isEmp
+        ? "Draft cannot be empty. Please specify a recipient, subject, body text, or attachment."
+        : parsed.error.issues[0]?.message || "Draft validation failed.",
     };
   }
 
   const sanitizedDraftAttachments = parsed.data.attachments.map((att) => ({
+    id: att.id,
     name: sanitizeAttachmentFilename(att.name),
     sizeBytes: att.sizeBytes,
     contentType: att.contentType ? att.contentType.replace(/[\r\n\x00-\x1F]/g, "").substring(0, 100) : undefined,
@@ -186,6 +212,8 @@ export async function saveMailDraftAction(formData: unknown) {
 
   const result = await mailRepository.saveDraft({
     id: parsed.data.id,
+    createOperationId: parsed.data.createOperationId,
+    expectedRevision: parsed.data.expectedRevision,
     senderKey: parsed.data.senderKey,
     to: parsed.data.to as MailRecipient[],
     cc: parsed.data.cc as MailRecipient[],
@@ -197,7 +225,14 @@ export async function saveMailDraftAction(formData: unknown) {
   });
 
   if (!result.success) {
-    return { success: false, error: result.error || "Failed to save draft." };
+    const isConflict = result.error?.includes("DRAFT_CONFLICT");
+    return {
+      success: false,
+      code: isConflict ? "DRAFT_CONFLICT" : "DRAFT_SAVE_FAILED",
+      error: isConflict
+        ? "Draft was modified in another session. Please reload or review changes."
+        : result.error || "Failed to save draft.",
+    };
   }
 
   revalidatePath("/admin/mail");
@@ -207,16 +242,24 @@ export async function saveMailDraftAction(formData: unknown) {
 /**
  * Server Action to delete a draft from admin_mail_drafts.
  */
-export async function deleteMailDraftAction(draftId: string) {
+export async function deleteMailDraftAction(
+  draftId: string,
+  expectedRevision?: number
+): Promise<DeleteDraftActionResponse> {
   await assertSuperadminSession();
 
   if (!draftId || typeof draftId !== "string") {
-    return { success: false, error: "Invalid draft ID." };
+    return { success: false, code: "INVALID_DRAFT_ID", error: "Invalid draft ID." };
   }
 
-  const result = await mailRepository.deleteDraft(draftId);
+  const result = await mailRepository.deleteDraft(draftId, expectedRevision);
   if (!result.success) {
-    return { success: false, error: result.error || "Failed to delete draft." };
+    const isConflict = result.error?.includes("DRAFT_CONFLICT");
+    return {
+      success: false,
+      code: isConflict ? "DRAFT_CONFLICT" : "DRAFT_DELETE_FAILED",
+      error: result.error || "Failed to delete draft.",
+    };
   }
 
   revalidatePath("/admin/mail");

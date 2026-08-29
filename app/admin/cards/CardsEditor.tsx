@@ -564,7 +564,7 @@ export const CardsEditor: React.FC<{ initialCards: BentoCardDocument[] }> = ({ i
                 value={currentCard.ctaEmail || ""}
                 onChange={(e) => handleUpdateField("ctaEmail", e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm border border-[#CBD5E1] rounded-sm bg-[#FFFFFF]"
-                placeholder="hello@gauravservices.eu.cc"
+                placeholder="hello@gauravpatil.online"
               />
             </div>
           )}

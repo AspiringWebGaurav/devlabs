@@ -12,7 +12,7 @@
 
 An enterprise-grade, high-performance developer portfolio platform and unified administrative command console engineered with **Next.js 15 (App Router)**, **React 19**, **Three.js WebGL**, **Tailwind CSS**, and **Firebase Admin SDK**. Designed with dual-subsystem UI/UX isolation, a rigorous 4-Tier Data Access Architecture, and an immutable 11-Article Database Constitution.
 
-> 📬 **Direct Inquiries & Approach**: Want to get in touch or discuss an engagement? Reach out directly via [`hello@gauravservices.eu.cc`](mailto:hello@gauravservices.eu.cc) or submit the live contact form at [gauravpatil.online/contact](https://gauravpatil.online/contact).
+> 📬 **Direct Inquiries & Approach**: Want to get in touch or discuss an engagement? Reach out directly via [`hello@gauravpatil.online`](mailto:hello@gauravpatil.online) or submit the live contact form at [gauravpatil.online/contact](https://gauravpatil.online/contact).
 
 ---
 
@@ -156,7 +156,7 @@ Administrative security is governed by a single-source configuration with zero c
 * **Google OAuth 2.0 PKCE Handshake**: Compliant with RFC 7636. Authentication occurs via direct in-tab browser redirects without intrusive secondary popup windows.
 * **Salted HMAC-SHA256 One-Time Passcodes (OTP)**: Following OAuth completion, the system transitions to `/admin/otp` and dispatches a 6-digit code. Passcodes are hashed with unique cryptographic salts (`AdminOtpChallengeRecord`) and verified in constant time.
 * **Authoritative 3-Attempt Budget & 5-Minute Ceiling**: A unified global budget of 3 attempts protects against brute-force attacks across both primary OTP and fallback passcodes. Resends generate a fresh HMAC with a 60-second cooldown but **never reset the attempt counter** and **never extend the immutable 5-minute expiration ceiling**.
-* **Zero-Lockout Security IP Authorization**: Sign-ins from unrecognized IP locations generate an automated security approval link dispatched via `security@gauravservices.eu.cc` with a 15-minute token TTL. An on-screen fallback passcode pathway (`/api/admin/auth/otp/fallback`) ensures guaranteed access if email authorization links are delayed or inaccessible.
+* **Zero-Lockout Security IP Authorization**: Sign-ins from unrecognized IP locations generate an automated security approval link dispatched via `security@gauravpatil.online` with a 15-minute token TTL. An on-screen fallback passcode pathway (`/api/admin/auth/otp/fallback`) ensures guaranteed access if email authorization links are delayed or inaccessible.
 
 ### 4.2 Web Crypto Session Signing & Clean Detach
 * **Single-Source Session Security**: Configured via `ADMIN_SESSION_TTL_HOURS = 5` in `lib/admin/constants.ts`. Derived seconds (`18,000s`) and milliseconds (`18,000,000ms`) are computed automatically to prevent configuration drift.
@@ -183,7 +183,7 @@ The administration lifecycle enforces 3 purpose-built, calibrated loading system
 
 ## 5. Communications, Custom Domain Emails & Contact Gateway
 
-The platform features an enterprise-grade communications infrastructure supporting direct web submissions and an authenticated custom domain email gateway (`gauravservices.eu.cc`) routed through Brevo REST API v3:
+The platform features an enterprise-grade communications infrastructure supporting direct web submissions and an authenticated custom domain email gateway (`gauravpatil.online`, with legacy `gauravservices.eu.cc` supported) routed through Brevo REST API v3:
 
 ### 5.1 Direct Web Inquiries (`gauravpatil.online/contact`)
 Visitors and prospective clients can reach out directly using the production web contact form:
@@ -192,19 +192,28 @@ Visitors and prospective clients can reach out directly using the production web
 * **Atomic Processing Pipeline**: Submissions execute server-side Zod payload schema validation, automated profanity scrubbing, atomic Firebase Firestore lead ingestion (`inquiries/`), and immediate dispatch of two distinct transactional emails in `<1.2s`.
 * **Lead Tracking**: Visitors receive an immediate confirmation with an official inquiry tracking reference (e.g. `#104`).
 
-### 5.2 Official Custom Domain Email Directory (`gauravservices.eu.cc`)
-For direct email correspondence, security disclosures, or support requests, the project operates four dedicated, role-segregated custom domain mailboxes:
+### 5.2 Official Custom Domain Email Directory (`gauravpatil.online`)
+For direct email correspondence, security disclosures, or support requests, the project operates four dedicated, role-segregated custom domain mailboxes on primary domain `gauravpatil.online` (legacy `gauravservices.eu.cc` preserved):
 
-| Mailbox / Address | Display Identity | Purpose & Scope | Turnaround & SLA |
-| :--- | :--- | :--- | :--- |
-| [`hello@gauravservices.eu.cc`](mailto:hello@gauravservices.eu.cc) | **Gaurav Patil** | **Client & Visitor Inquiries**: Project proposals, consulting requests, collaboration inquiries, architectural audits, and public contact form routing. | Instant auto-acknowledgement; personal response typically within 24 hours. |
-| [`security@gauravservices.eu.cc`](mailto:security@gauravservices.eu.cc) | **Device Auth & Security** | **Security Operations**: Multi-factor authentication notices, recognized device IP verification alerts, login telemetry, and confidential vulnerability reports (Responsible Disclosure). | 15-minute 1-click IP verification links; urgent security disclosures triaged immediately. |
-| [`help@gauravservices.eu.cc`](mailto:help@gauravservices.eu.cc) | **Gaurav Support** | **Technical Support**: Troubleshooting assistance, platform issue reports, client dispute resolution, and operational support workflows. | Prioritized ticket triage; initial response within 12–24 business hours. |
-| [`no-reply@gauravservices.eu.cc`](mailto:no-reply@gauravservices.eu.cc) | **Gaurav Services** | **System Notifications (Do Not Reply)**: Ephemeral 2FA One-Time Passcodes (OTP), fallback authorization codes, automated error alerts, and non-monitored system broadcasts. | Instantaneous automated dispatch; inbound replies are unmonitored. |
+| Mailbox / Address (Primary) | Legacy Address | Display Identity | Purpose & Scope | Turnaround & SLA |
+| :--- | :--- | :--- | :--- | :--- |
+| [`hello@gauravpatil.online`](mailto:hello@gauravpatil.online) | `hello@gauravservices.eu.cc` | **Gaurav Patil** | **Client & Visitor Inquiries**: Project proposals, consulting requests, collaboration inquiries, architectural audits, and public contact form routing. | Instant auto-acknowledgement; personal response typically within 24 hours. |
+| [`security@gauravpatil.online`](mailto:security@gauravpatil.online) | `security@gauravservices.eu.cc` | **Device Auth & Security** | **Security Operations**: Multi-factor authentication notices, recognized device IP verification alerts, login telemetry, and confidential vulnerability reports (Responsible Disclosure). | 15-minute 1-click IP verification links; urgent security disclosures triaged immediately. |
+| [`help@gauravpatil.online`](mailto:help@gauravpatil.online) | `help@gauravservices.eu.cc` | **Gaurav Support** | **Technical Support**: Troubleshooting assistance, platform issue reports, client dispute resolution, and operational support workflows. | Prioritized ticket triage; initial response within 12–24 business hours. |
+| [`no-reply@gauravpatil.online`](mailto:no-reply@gauravpatil.online) | `no-reply@gauravservices.eu.cc` | **Gaurav Services** | **System Notifications (Do Not Reply)**: Ephemeral 2FA One-Time Passcodes (OTP), fallback authorization codes, automated error alerts, and non-monitored system broadcasts. | Instantaneous automated dispatch; inbound replies are unmonitored. |
 
 > 🛡️ **Privacy & Anti-Abuse Guarantee**: All custom domain emails are authenticated with industry-standard SPF, DKIM, and DMARC protocols. Inbound submissions are never enrolled in marketing lists, promotional sequences, or third-party newsletters.
 
-### 5.3 Dynamic Environment Link Resolution in Email Footers
+### 5.3 Admin Mail Center & Outbound Lifecycle Engine (`/admin/mail`)
+The superadmin console features a dedicated, enterprise-grade outbound communication engine and draft workspace:
+* **Role-Based Verified Senders**: Dropdown selection of authenticated primary identities (`hello@`, `security@`, `help@`, `no-reply@gauravpatil.online`) and legacy addresses.
+* **Canonical Send Eligibility & Minimum 3-Word Rule**: Isomorphic validator (`lib/mail/send-validator.ts`) enforces non-empty recipients, subject constraints, and HTML-safe visible word counting ($\ge 3$ meaningful words) across UI and server actions.
+* **Provider-Level UUID Idempotency**: Application operation IDs map deterministically to RFC 4122 UUIDs injected into the Brevo `Idempotency-Key` header, guaranteeing zero duplicate deliveries on retry.
+* **Atomic Firestore Send Locks & `DELIVERY_UNCERTAIN` Resilience**: Concurrency serialization via 30s lock leases. Expired or ambiguous network outcomes are marked `DELIVERY_UNCERTAIN` to block automated resends while keeping user drafts safe.
+* **Revision-Safe Draft Cleanup on Send**: Transactional draft deletion compares `expectedRevision`, ensuring an email sent at revision 5 never deletes newer draft edits (revision 6) from another session.
+* **Send-While-Typing Snapshot Isolation**: Send actions capture immutable click-time snapshots. If the user continues typing during dispatch, live edits are preserved in the composer and remain unsent and dirty.
+
+### 5.4 Dynamic Environment Link Resolution in Email Footers
 Transactional email footers (`Terms | Privacy`) evaluate runtime request headers and environment variables via `resolveAppUrl()` to dynamically generate links matching the exact active environment:
 * **Local Development**: [`http://localhost:3000/admin/terms`](http://localhost:3000/admin/terms) & [`http://localhost:3000/admin/privacy`](http://localhost:3000/admin/privacy)
 * **Staging / Preview**: [`https://devlabs.eu.cc/admin/terms`](https://devlabs.eu.cc/admin/terms) & [`https://devlabs.eu.cc/admin/privacy`](https://devlabs.eu.cc/admin/privacy)
@@ -301,7 +310,7 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 | **Authentication & 2FA** | Google OAuth 2.0 PKCE, Salted HMAC-SHA256 OTP, Web Crypto API | Multi-factor cryptographic security & session management |
 | **Bot Detection** | [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) | Invisible, privacy-preserving CAPTCHA verification |
 | **Validation Layer** | [Zod 4](https://zod.dev/) | Strict runtime payload and environment validation schemas |
-| **Email Gateway** | [Brevo REST API v3](https://www.brevo.com/) via `@/lib/email` | Multi-sender identity pipeline (`hello@`, `security@`, `no-reply@`) |
+| **Email Gateway** | [Brevo REST API v3](https://www.brevo.com/) via `@/lib/email` | Multi-sender identity pipeline (`hello@`, `security@`, `help@`, `no-reply@`) & Outbound Mail Center |
 | **Typography & Icons** | Inter / Outfit / Geist, [React Icons 5](https://react-icons.github.io/react-icons/) | High-density typography and vector iconography |
 
 ---
@@ -324,6 +333,11 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 │   │   ├── authenticating/page.tsx # Transient OAuth Handshake Transition Screen
 │   │   ├── profile/page.tsx        # Superadmin Identity & Security Workspace
 │   │   ├── inquiries/page.tsx      # Inbound Lead Processing & Communications
+│   │   ├── mail/                   # Admin Mail Center (Outbound Composer & Drafts)
+│   │   │   ├── page.tsx            # Mail Center coordinate view & initial fetch
+│   │   │   ├── components/         # ComposeMailForm, DraftsList, MailWorkspace
+│   │   │   ├── actions/            # Server actions for send, draft save, and discard
+│   │   │   └── validators/         # Zod schemas for send & draft payloads
 │   │   ├── privacy/page.tsx        # Administrative Privacy Policy
 │   │   └── terms/page.tsx          # Administrative Terms of Service
 │   ├── api/                        # Serverless API routes
@@ -354,17 +368,22 @@ A feature is **INCOMPLETE** and cannot be merged or pushed until every gate pass
 ├── lib/
 │   ├── admin/                      # Core Admin Infrastructure
 │   │   ├── datasource/             # Firestore & RTDB SDK isolation layer (sole SDK boundary)
-│   │   ├── repositories/           # BaseRepository, services, inquiries, auth-challenges
+│   │   ├── repositories/           # BaseRepository, services, inquiries, mail, auth-challenges
 │   │   ├── services/               # otp.service, ip-security.service, inquiries.service
 │   │   ├── schemas/                # Shared Zod validation schemas
 │   │   ├── utils/                  # Date, string, and error utilities
 │   │   ├── constants.ts            # Single-source constants (ADMIN_SESSION_TTL_HOURS = 5)
 │   │   ├── auth.ts                 # Web Crypto HMAC-SHA256 token signing & verification
 │   │   └── logger.ts               # Structured system logger
-│   └── email/                      # Centralized Transactional Email Engine
-│       ├── identities.ts           # Central sender identities (hello@, security@, no-reply@)
-│       ├── templates.ts            # High-deliverability transactional email templates
-│       └── brevo.ts                # Brevo REST API dispatcher & resolveAppUrl()
+│   ├── dal/repositories/           # Shared Data Access Repositories (inquiries, mail, seed)
+│   ├── email/                      # Centralized Transactional Email Engine
+│   │   ├── identities.ts           # Central sender identities (hello@, security@, help@, no-reply@)
+│   │   ├── templates.ts            # High-deliverability transactional email templates
+│   │   ├── mail-service.ts         # Outbound Brevo engine, rate-limiting & safe HTML compiler
+│   │   └── brevo.ts                # Brevo REST API dispatcher & resolveAppUrl()
+│   └── mail/                       # Isomorphic Mail Utilities
+│       ├── send-validator.ts       # Canonical send eligibility & HTML-safe word counting
+│       └── draft-normalizer.ts     # Canonical empty-draft rules & snapshot comparator
 └── middleware.ts                   # Edge middleware for admin route protection
 ```
 
@@ -453,8 +472,8 @@ npm run build
 
 * **Zero Hardcoded Secrets**: Secrets and service account keys are stored exclusively in environment variables and are permanently ignored via `.gitignore`.
 * **Rate-Limited Endpoints**: API mutation endpoints are protected by Cloudflare Turnstile bot challenges and server-side request throttling.
-* **Central Email Integrity**: Automated security alerts and OTP challenges are dispatched exclusively from authenticated senders ([`security@gauravservices.eu.cc`](mailto:security@gauravservices.eu.cc), [`no-reply@gauravservices.eu.cc`](mailto:no-reply@gauravservices.eu.cc)).
-* **Responsible Disclosure**: If you discover a security vulnerability, please submit a confidential report to [`security@gauravservices.eu.cc`](mailto:security@gauravservices.eu.cc).
+* **Central Email Integrity**: Automated security alerts and OTP challenges are dispatched exclusively from authenticated senders ([`security@gauravpatil.online`](mailto:security@gauravpatil.online), [`no-reply@gauravpatil.online`](mailto:no-reply@gauravpatil.online)).
+* **Responsible Disclosure**: If you discover a security vulnerability, please submit a confidential report to [`security@gauravpatil.online`](mailto:security@gauravpatil.online).
 
 ---
 

@@ -246,15 +246,15 @@ function PrivacyContentInner() {
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
               <li>
-                <strong className="text-white">Authenticated Domain:</strong> Official communications originate strictly from the verified identity <span className="text-purple font-mono">gauravservices.eu.cc</span>.
+                <strong className="text-white">Authenticated Domain:</strong> Official communications originate strictly from the verified primary identity <span className="text-purple font-mono">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono">gauravservices.eu.cc</span> supported).
               </li>
               <li>
                 <strong className="text-white">Official Senders:</strong>
                 <ul className="list-disc list-inside pl-5 mt-1 space-y-1 text-neutral-400 font-mono text-xs sm:text-sm">
-                  <li>hello@gauravservices.eu.cc (Direct contact &amp; automated receipts)</li>
-                  <li>security@gauravservices.eu.cc (Security alerts &amp; authentication verification)</li>
-                  <li>help@gauravservices.eu.cc (Support &amp; assistance)</li>
-                  <li>no-reply@gauravservices.eu.cc (System notifications)</li>
+                  <li>hello@gauravpatil.online (Direct contact &amp; automated receipts)</li>
+                  <li>security@gauravpatil.online (Security alerts &amp; authentication verification)</li>
+                  <li>help@gauravpatil.online (Support &amp; assistance)</li>
+                  <li>no-reply@gauravpatil.online (System notifications)</li>
                 </ul>
               </li>
               <li>
@@ -302,10 +302,10 @@ function PrivacyContentInner() {
             <p className="text-purple font-medium">
               Email:{" "}
               <a
-                href="mailto:hello@gauravservices.eu.cc"
+                href="mailto:hello@gauravpatil.online"
                 className="hover:underline"
               >
-                hello@gauravservices.eu.cc
+                hello@gauravpatil.online
               </a>
             </p>
           </section>
