@@ -13,23 +13,34 @@ import {
   FaEye,
   FaBullseye,
 } from "react-icons/fa6";
+import { IoChatbubbleEllipses } from "react-icons/io5";
 
 function PrivacyContentInner() {
   const searchParams = useSearchParams();
   const focusParam = searchParams.get("focus");
 
-  const [filterMode, setFilterMode] = useState<"all" | "contact">(
-    focusParam === "contact" ? "contact" : "all"
+  const [filterMode, setFilterMode] = useState<"all" | "contact" | "assistant">(
+    focusParam === "assistant" ? "assistant" : focusParam === "contact" ? "contact" : "all"
   );
   const [highlightedSection, setHighlightedSection] = useState<string | null>(
-    focusParam === "contact" ? "anonymity" : null
+    focusParam === "assistant"
+      ? "assistant-privacy"
+      : focusParam === "contact"
+      ? "anonymity"
+      : null
   );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const hash = window.location.hash.replace("#", "");
-    const targetId = hash || (focusParam === "contact" ? "anonymity" : null);
+    const targetId =
+      hash ||
+      (focusParam === "assistant"
+        ? "assistant-privacy"
+        : focusParam === "contact"
+        ? "anonymity"
+        : null);
 
     if (targetId) {
       setHighlightedSection(targetId);
@@ -62,7 +73,7 @@ function PrivacyContentInner() {
           </Link>
 
           {/* Dynamic View Mode Tabs */}
-          <div className="inline-flex items-center bg-white/[0.04] border border-white/[0.1] rounded-xl p-1 text-xs">
+          <div className="inline-flex items-center bg-white/[0.04] border border-white/[0.1] rounded-xl p-1 text-xs gap-1">
             <button
               type="button"
               onClick={() => setFilterMode("all")}
@@ -90,7 +101,24 @@ function PrivacyContentInner() {
               }`}
             >
               <FaBullseye className="w-3 h-3 text-[#CBACF9]" />
-              <span>Contact Form &amp; Anonymity Only</span>
+              <span>Contact Form Only</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterMode("assistant");
+                setHighlightedSection("assistant-privacy");
+                const el = document.getElementById("assistant-privacy");
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                filterMode === "assistant"
+                  ? "bg-[#7C3AED] text-white font-semibold shadow-sm shadow-[#7C3AED]/40"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <IoChatbubbleEllipses className="w-3 h-3 text-[#CBACF9]" />
+              <span>Personal Assistant &amp; AI Safety (Learn More)</span>
             </button>
           </div>
         </div>
@@ -106,7 +134,7 @@ function PrivacyContentInner() {
           <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400 font-mono">
             <span>Original Effective: January 1, 2026</span>
             <span>•</span>
-            <span className="text-purple font-semibold">Last Updated: August 27, 2026</span>
+            <span className="text-purple font-semibold">Last Updated: August 29, 2026</span>
             <span>•</span>
             <span className="text-emerald-400 font-semibold">Standard: Privacy-First</span>
           </div>
@@ -117,6 +145,24 @@ function PrivacyContentInner() {
                 <FaBullseye className="w-4 h-4 text-[#CBACF9] shrink-0" />
                 <span>
                   Filtering active: Spotlighting terms specifically governing the Contact Form, Anonymity Rights, and Data Protection.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFilterMode("all")}
+                className="text-purple hover:text-white underline text-xs font-semibold whitespace-nowrap cursor-pointer"
+              >
+                View full policy
+              </button>
+            </div>
+          )}
+
+          {filterMode === "assistant" && (
+            <div className="mt-4 p-3 rounded-xl bg-[#7C3AED]/15 border border-[#7C3AED]/30 text-xs text-neutral-200 flex items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <IoChatbubbleEllipses className="w-4 h-4 text-[#CBACF9] shrink-0" />
+                <span>
+                  Filtering active: Spotlighting privacy architecture, ephemeral interaction safety, and data governance for Gaurav Portfolio Assistant (Beta).
                 </span>
               </div>
               <button
@@ -278,12 +324,134 @@ function PrivacyContentInner() {
             </ul>
           </section>
 
-          {/* Section 6: Administrative Subsystem Privacy Governance */}
+          {/* Section: Personal Assistant & AI Safety (Spotlighted for Assistant / Learn More) */}
+          <section
+            id="assistant-privacy"
+            className={`space-y-6 p-4 sm:p-7 rounded-2xl transition-all duration-300 ${
+              highlightedSection === "assistant-privacy" || filterMode === "assistant"
+                ? "bg-[#7C3AED]/10 border border-[#7C3AED]/50 shadow-[0_0_35px_rgba(124,58,237,0.18)] ring-1 ring-[#7C3AED]/50"
+                : "border border-transparent"
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2.5">
+                <IoChatbubbleEllipses className="w-5 h-5 text-purple" />
+                <span>6. Personal Assistant (Beta) &amp; AI Safety Architecture</span>
+              </h2>
+              {(highlightedSection === "assistant-privacy" || filterMode === "assistant") && (
+                <span className="px-3 py-1 rounded-full text-[10.5px] font-mono font-bold bg-[#7C3AED]/30 text-[#CBACF9] border border-[#7C3AED]/50">
+                  Assistant Deep-Dive &amp; Learn More
+                </span>
+              )}
+            </div>
+
+            {/* Subsection 1: Why Gaurav Assistant Was Created */}
+            <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple" />
+                Why Gaurav Assistant Was Created
+              </h3>
+              <p className="text-sm text-neutral-300 leading-relaxed">
+                The Personal Assistant was conceived and engineered as an <strong className="text-white">intelligent interactive portfolio navigator</strong> designed to elevate how recruiters, hiring managers, engineering leaders, and potential clients explore Gaurav Patil&apos;s work. Instead of manually parsing static resume bullets, visitors can receive real-time answers concerning:
+              </p>
+              <ul className="list-disc list-inside space-y-1.5 pl-2 text-sm text-neutral-300">
+                <li>
+                  <strong className="text-white">Deep Case Study Breakdown:</strong> Architectural design patterns, performance benchmarks, and problem-solving methodologies used across highlighted projects.
+                </li>
+                <li>
+                  <strong className="text-white">Technical Stack &amp; Specializations:</strong> Contextual inquiries regarding Next.js 15 App Router, React 19, TypeScript, Tailwind CSS, Three.js 3D visualization, and cloud database implementations.
+                </li>
+                <li>
+                  <strong className="text-white">Engineering Philosophy &amp; Experience:</strong> Insights into development practices, responsive UI/UX standards, and accessibility paradigms.
+                </li>
+                <li>
+                  <strong className="text-white">Live Architectural Demonstration:</strong> Serves as a live showcase of clean Next.js architecture, featuring an isolated 4-Tier Data Access Layer (`UI → Repository → DataSource → Cloud DB`), strict modal accessibility, and single-window layout stability.
+                </li>
+              </ul>
+            </div>
+
+            {/* Subsection 2: Custom Mail Domain Support */}
+            <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple" />
+                Custom Mail Domain Support &amp; Verified Communication Channels
+              </h3>
+              <p className="text-sm text-neutral-300 leading-relaxed">
+                All visitor interactions, assistant support inquiries, and transactional communications are backed by a dedicated, enterprise-grade Brevo email delivery pipeline configured with strict <strong className="text-white">SPF, DKIM, and DMARC</strong> authentication records. Official communication originating from this portfolio is bound to the primary authenticated domain <span className="text-purple font-mono font-semibold">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono font-semibold">gauravservices.eu.cc</span> supported for backward compatibility):
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">hello@gauravpatil.online</code>
+                  </div>
+                  <p className="text-xs text-neutral-400 pl-3.5">
+                    Direct portfolio contact, visitor inquiries, developer collaboration, and automated inquiry receipts.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple" />
+                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">help@gauravpatil.online</code>
+                  </div>
+                  <p className="text-xs text-neutral-400 pl-3.5">
+                    Assistant technical assistance, bug reports, user feedback, and portfolio navigation support.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">security@gauravpatil.online</code>
+                  </div>
+                  <p className="text-xs text-neutral-400 pl-3.5">
+                    Security disclosures, vulnerability reports, 2FA OTP codes, and authentication alerts.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
+                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">no-reply@gauravpatil.online</code>
+                  </div>
+                  <p className="text-xs text-neutral-400 pl-3.5">
+                    Non-interactive automated notifications, system passcodes, and security verifications only.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Subsection 3: Privacy, Anonymity & Data Minimization */}
+            <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple" />
+                Data Protection, Ephemeral Processing &amp; Anonymity
+              </h3>
+              <ul className="list-disc list-inside space-y-2 pl-2 text-sm text-neutral-300">
+                <li>
+                  <strong className="text-white">Ephemeral Session Processing:</strong> Assistant interactions are evaluated in-memory strictly for real-time guidance during your active session.
+                </li>
+                <li>
+                  <strong className="text-white">Zero Third-Party Training or Data Selling:</strong> We guarantee 100% data integrity: your queries are never sold, rented, monetized, or fed into public generative model training pools.
+                </li>
+                <li>
+                  <strong className="text-white">No Persistent Tracking:</strong> The assistant functions completely without tracking cookies, behavioral tracking scripts, or persistent fingerprinting.
+                </li>
+                <li>
+                  <strong className="text-white">Active Beta Guardrails:</strong> Automated rate-limiting and input sanitization protect against malicious exploitation while maintaining zero layout shift (`CLS = 0`) across desktop and mobile devices.
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          {/* Section 7: Administrative Subsystem Privacy Governance */}
           {filterMode === "all" && (
             <section id="admin-privacy" className="space-y-3">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaShieldHalved className="w-4 h-4 text-purple" />
-                <span>6. Administrative Subsystem Privacy Governance</span>
+                <span>7. Administrative Subsystem Privacy Governance</span>
               </h2>
               <p>
                 The administrative panel (<code className="text-purple font-mono">/admin/*</code>) maintains a strictly isolated data governance architecture. Administrative authentication is restricted to authorized Superadmins via Google OAuth 2.0 PKCE. 2FA One-Time Passcodes are stored in salted HMAC-SHA256 hashed representations, and security IP verification challenges operate under an immutable 15-minute TTL. Sign-out triggers a complete 5-step detachment that clears all cookies, tokens, and browser session storage. Detailed administrative privacy protocols are documented in the <Link href="/admin/privacy" className="text-purple hover:underline font-semibold">Administrator Privacy Policy</Link>.
@@ -291,10 +459,10 @@ function PrivacyContentInner() {
             </section>
           )}
 
-          {/* Section 7: Contact */}
+          {/* Section 8: Contact */}
           <section id="contact-requests" className="space-y-3">
             <h2 className="text-xl font-semibold text-white">
-              7. Contact &amp; Data Requests
+              8. Contact &amp; Data Requests
             </h2>
             <p>
               For any privacy inquiries, data deletion requests, or security disclosures, reach out directly to:

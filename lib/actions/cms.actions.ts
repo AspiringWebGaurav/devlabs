@@ -15,6 +15,7 @@ import {
   ctaRepository,
   footerRepository,
   seoRepository,
+  assistantRepository,
   mediaRepository,
   publicPortfolioRepository,
 } from "@/lib/dal/repositories";
@@ -32,6 +33,7 @@ import {
   CtaUpdateSchema,
   FooterUpdateSchema,
   SeoUpdateSchema,
+  AssistantUpdateSchema,
   ReorderSchema,
 } from "@/lib/admin/schemas/cms.schema";
 import { storageDataSource } from "@/lib/dal/datasource/storage";
@@ -669,6 +671,27 @@ export interface GlobalRefreshResult {
   signalStatus: "full" | "degraded" | "failed";
   rtdbDispatched: boolean;
   firestoreDispatched: boolean;
+}
+
+// ============================================================================
+// 13. ASSISTANT ACTIONS
+// ============================================================================
+export async function updateAssistantAction(formData: unknown): Promise<ActionResult> {
+  try {
+    await assertSuperadminSession();
+    const validated = AssistantUpdateSchema.parse(formData);
+    const result = await assistantRepository.updateAssistant(validated);
+    if (!result.success || !result.data) throw new Error(result.error || "Failed to update Assistant settings");
+
+    revalidateTag("portfolio-cms");
+    revalidateTag("portfolio-assistant");
+    revalidatePath("/");
+    revalidatePath("/admin/assistant");
+    await emitCmsChangeSignal("assistant", result.data.version);
+    return { success: true, data: result.data };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to update Assistant settings" };
+  }
 }
 
 /**

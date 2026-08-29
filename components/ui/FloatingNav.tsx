@@ -34,7 +34,7 @@ export const FloatingNav = ({
   const isNavigatingRef = useRef(false);
   const navigationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Listen for Contact Modal open/close state to dynamically hide navbar
+  // Listen for Contact and Assistant Modal open/close state to dynamically hide navbar
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -44,7 +44,12 @@ export const FloatingNav = ({
     };
 
     window.addEventListener("contact-modal-state", handleModalState);
-    return () => window.removeEventListener("contact-modal-state", handleModalState);
+    window.addEventListener("assistant-modal-state", handleModalState);
+
+    return () => {
+      window.removeEventListener("contact-modal-state", handleModalState);
+      window.removeEventListener("assistant-modal-state", handleModalState);
+    };
   }, []);
 
   // =========================================================================

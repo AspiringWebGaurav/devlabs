@@ -13,6 +13,7 @@ import {
   ApproachSectionSkeleton,
   FooterSectionSkeleton,
 } from "@/components/portfolio/skeletons";
+import { AssistantBubbleSkeleton, AssistantErrorBoundary } from "@/components/assistant";
 
 // Dynamically chunk and defer below-the-fold modules with dedicated skeletons
 const GridSection = dynamic(
@@ -38,6 +39,10 @@ const ApproachSection = dynamic(
 const FooterSection = dynamic(
   () => import("@/components/portfolio/FooterSection").then((m) => m.FooterSection),
   { loading: () => <FooterSectionSkeleton /> }
+);
+const AssistantBubble = dynamic(
+  () => import("@/components/assistant").then((m) => m.AssistantBubble),
+  { loading: () => <AssistantBubbleSkeleton /> }
 );
 
 export default async function Home() {
@@ -90,6 +95,9 @@ export default async function Home() {
         </div>
 
         <ScrollToTop />
+        <AssistantErrorBoundary>
+          <AssistantBubble config={data.assistant} />
+        </AssistantErrorBoundary>
       </div>
     </main>
   );

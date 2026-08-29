@@ -202,6 +202,19 @@ export const SeoUpdateSchema = z.object({
 export type SeoUpdateInput = z.infer<typeof SeoUpdateSchema>;
 
 // ============================================================================
+// 13. ASSISTANT SCHEMA
+// ============================================================================
+export const AssistantUpdateSchema = z.object({
+  isEnabled: z.boolean().default(true),
+  assistantName: z.string().min(1).max(100).default("Gaurav Assistant"),
+  avatarUrl: z.string().optional().or(z.literal("")),
+  positionMode: z.enum(["fixed", "draggable"]).default("fixed"),
+  expectedVersion: z.number().int().optional(),
+});
+
+export type AssistantUpdateInput = z.infer<typeof AssistantUpdateSchema>;
+
+// ============================================================================
 // REORDER & BATCH REORDER SCHEMA
 // ============================================================================
 export const ReorderSchema = z.object({

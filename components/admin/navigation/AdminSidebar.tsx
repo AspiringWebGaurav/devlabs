@@ -20,6 +20,7 @@ import {
   FaImages,
   FaEnvelope,
   FaPaperPlane,
+  FaCommentDots,
   FaRightFromBracket,
 } from "react-icons/fa6";
 
@@ -136,12 +137,13 @@ export const AdminSidebar: React.FC = () => {
     { id: "10", label: "Call to Action", href: "/admin/cta", icon: FaBullhorn },
     { id: "11", label: "Footer", href: "/admin/footer", icon: FaCopyright },
     { id: "12", label: "SEO & Metadata", href: "/admin/seo", icon: FaMagnifyingGlass },
+    { id: "13", label: "Assistant", href: "/admin/assistant", icon: FaCommentDots },
   ];
 
   const opsItems = [
-    { id: "13", label: "Media Assets", href: "/admin/media", icon: FaImages },
-    { id: "14", label: "Inquiries & Leads", href: "/admin/inquiries", icon: FaEnvelope },
-    { id: "15", label: "Mail Center", href: "/admin/mail", icon: FaPaperPlane },
+    { id: "14", label: "Media Assets", href: "/admin/media", icon: FaImages },
+    { id: "15", label: "Inquiries & Leads", href: "/admin/inquiries", icon: FaEnvelope },
+    { id: "16", label: "Mail Center", href: "/admin/mail", icon: FaPaperPlane },
   ];
 
   const isProfileActive = pathname === "/admin/profile";

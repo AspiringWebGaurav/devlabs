@@ -16,6 +16,7 @@ import {
   FaBullhorn,
   FaCopyright,
   FaMagnifyingGlass,
+  FaCommentDots,
   FaArrowRight,
   FaSeedling,
   FaRotateRight,
@@ -38,8 +39,6 @@ export const OverviewCanvas: React.FC = () => {
   const confirm = useAdminConfirm();
   const [isSeeding, setIsSeeding] = useState(false);
   const [seedMessage, setSeedMessage] = useState<string | null>(null);
-
-
 
   const domains = [
     {
@@ -138,6 +137,14 @@ export const OverviewCanvas: React.FC = () => {
       icon: FaMagnifyingGlass,
       badge: "Singleton",
     },
+    {
+      id: "13",
+      title: "Personal Assistant",
+      desc: "Floating assistant bubble visibility, display name, and Fixed/Draggable position mode.",
+      href: "/admin/assistant",
+      icon: FaCommentDots,
+      badge: "Singleton",
+    },
   ];
 
   const handleSeed = async () => {
@@ -162,12 +169,11 @@ export const OverviewCanvas: React.FC = () => {
       startTransition(() => {
         router.refresh();
       });
-      setSeedMessage("All 12 CMS domain collections initialized with baseline seed data.");
+      setSeedMessage("All 13 CMS domain collections initialized with baseline seed data.");
     } else {
       setSeedMessage("Failed to seed database: " + res.error);
     }
   };
-
 
   return (
     <div className="space-y-8 w-full">
@@ -178,7 +184,7 @@ export const OverviewCanvas: React.FC = () => {
             PORTFOLIO CMS CONTROL CENTER
           </span>
           <h2 className="text-2xl sm:text-3xl font-bold font-admin-sans text-black mt-1">
-            12 Granular Public CMS Content Domains
+            13 Granular Public CMS Content Domains
           </h2>
           <p className="text-sm text-[#475569] mt-1.5 max-w-3xl font-admin-sans leading-relaxed">
             Every section on the public portfolio is driven dynamically from the database.

@@ -28,6 +28,7 @@ export const BUTTON_HELP = {
 
   // Universal CMS Actions
   SAVE_AND_PUBLISH: "Saves your changes to Firebase and immediately revalidates the live website so visitors see the update instantly.",
+  RESET_CHANGES: "Discards any unsaved modifications in this editor and restores the form back to the current saved database state.",
   CREATE_ITEM: "Opens a form to create and publish a new item in this section.",
   EDIT_ITEM: "Opens the editing form to modify this item's details.",
   DELETE_ITEM: "Permanently deletes this item and removes its associated image files from storage.",

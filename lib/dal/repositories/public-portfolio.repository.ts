@@ -15,6 +15,7 @@ import {
   ctaRepository,
   footerRepository,
   seoRepository,
+  assistantRepository,
 } from "./cms";
 import { SEED_PORTFOLIO_PROJECTION } from "./seed-data";
 
@@ -27,7 +28,7 @@ export class PublicPortfolioRepository extends BaseRepository {
   }
 
   /**
-   * Fetches published portfolio data across all 12 CMS domains concurrently.
+   * Fetches published portfolio data across all CMS domains concurrently.
    * Enforces aggregate last-known-good fallback on transient errors.
    */
   public async getPublishedPortfolioData(): Promise<RepositoryResult<PublicPortfolioProjection>> {
@@ -56,6 +57,7 @@ export class PublicPortfolioRepository extends BaseRepository {
           footerRes,
           socialRes,
           seoRes,
+          assistantRes,
         ] = await Promise.all([
           navigationRepository.getNavigation(),
           heroRepository.getHero(),
@@ -69,6 +71,7 @@ export class PublicPortfolioRepository extends BaseRepository {
           footerRepository.getFooter(),
           socialRepository.getSocialLinks(),
           seoRepository.getSeo(),
+          assistantRepository.getAssistant(),
         ]);
 
         // Filter published items where applicable
@@ -100,6 +103,7 @@ export class PublicPortfolioRepository extends BaseRepository {
           (s) => s.isPublished !== false
         );
         const publishedSeo = seoRes.data || SEED_PORTFOLIO_PROJECTION.seo;
+        const publishedAssistant = assistantRes.data || SEED_PORTFOLIO_PROJECTION.assistant;
 
         const projection: PublicPortfolioProjection = {
           navigation: publishedNav,
@@ -114,6 +118,7 @@ export class PublicPortfolioRepository extends BaseRepository {
           footer: publishedFooter,
           socialLinks: publishedSocial,
           seo: publishedSeo,
+          assistant: publishedAssistant,
         };
 
         // Cache in process memory as last-known-good
@@ -135,7 +140,7 @@ export class PublicPortfolioRepository extends BaseRepository {
   }
 
   /**
-   * Initializes all 12 collections with seed documents if they are empty (non-destructive).
+   * Initializes all collections with seed documents if they are empty (non-destructive).
    */
   public async seedAllIfEmpty(): Promise<void> {
     await Promise.all([
@@ -151,6 +156,7 @@ export class PublicPortfolioRepository extends BaseRepository {
       footerRepository.seedIfEmpty(),
       socialRepository.seedIfEmpty(),
       seoRepository.seedIfEmpty(),
+      assistantRepository.seedIfEmpty(),
     ]);
   }
 }

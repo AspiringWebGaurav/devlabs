@@ -14,23 +14,34 @@ import {
   FaEye,
   FaBullseye,
 } from "react-icons/fa6";
+import { IoChatbubbleEllipses } from "react-icons/io5";
 
 function TermsContentInner() {
   const searchParams = useSearchParams();
   const focusParam = searchParams.get("focus");
 
-  const [filterMode, setFilterMode] = useState<"all" | "contact">(
-    focusParam === "contact" ? "contact" : "all"
+  const [filterMode, setFilterMode] = useState<"all" | "contact" | "assistant">(
+    focusParam === "assistant" ? "assistant" : focusParam === "contact" ? "contact" : "all"
   );
   const [highlightedSection, setHighlightedSection] = useState<string | null>(
-    focusParam === "contact" ? "anonymity" : null
+    focusParam === "assistant"
+      ? "assistant-terms"
+      : focusParam === "contact"
+      ? "anonymity"
+      : null
   );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const hash = window.location.hash.replace("#", "");
-    const targetId = hash || (focusParam === "contact" ? "anonymity" : null);
+    const targetId =
+      hash ||
+      (focusParam === "assistant"
+        ? "assistant-terms"
+        : focusParam === "contact"
+        ? "anonymity"
+        : null);
 
     if (targetId) {
       setHighlightedSection(targetId);
@@ -63,7 +74,7 @@ function TermsContentInner() {
           </Link>
 
           {/* Dynamic View Mode Tabs */}
-          <div className="inline-flex items-center bg-white/[0.04] border border-white/[0.1] rounded-xl p-1 text-xs">
+          <div className="inline-flex items-center bg-white/[0.04] border border-white/[0.1] rounded-xl p-1 text-xs gap-1">
             <button
               type="button"
               onClick={() => setFilterMode("all")}
@@ -91,7 +102,24 @@ function TermsContentInner() {
               }`}
             >
               <FaBullseye className="w-3 h-3 text-[#CBACF9]" />
-              <span>Contact Form &amp; Confidentiality Only</span>
+              <span>Contact Form Only</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterMode("assistant");
+                setHighlightedSection("assistant-terms");
+                const el = document.getElementById("assistant-terms");
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                filterMode === "assistant"
+                  ? "bg-[#7C3AED] text-white font-semibold shadow-sm shadow-[#7C3AED]/40"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <IoChatbubbleEllipses className="w-3 h-3 text-[#CBACF9]" />
+              <span>Personal Assistant &amp; AI Safety (Learn More)</span>
             </button>
           </div>
         </div>
@@ -107,7 +135,7 @@ function TermsContentInner() {
           <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400 font-mono">
             <span>Original Effective: January 1, 2026</span>
             <span>•</span>
-            <span className="text-purple font-semibold">Last Updated: August 27, 2026</span>
+            <span className="text-purple font-semibold">Last Updated: August 29, 2026</span>
             <span>•</span>
             <span className="text-emerald-400 font-semibold">Jurisdiction: Standard Global</span>
           </div>
@@ -118,6 +146,24 @@ function TermsContentInner() {
                 <FaBullseye className="w-4 h-4 text-[#CBACF9] shrink-0" />
                 <span>
                   Filtering active: Spotlighting terms governing Contact Form submissions, Confidentiality Rights, and Communication Standards.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFilterMode("all")}
+                className="text-purple hover:text-white underline text-xs font-semibold whitespace-nowrap cursor-pointer"
+              >
+                View full terms
+              </button>
+            </div>
+          )}
+
+          {filterMode === "assistant" && (
+            <div className="mt-4 p-3 rounded-xl bg-[#7C3AED]/15 border border-[#7C3AED]/30 text-xs text-neutral-200 flex items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <IoChatbubbleEllipses className="w-4 h-4 text-[#CBACF9] shrink-0" />
+                <span>
+                  Filtering active: Spotlighting terms of service, AI accuracy disclaimer, and acceptable use standards for Gaurav Personal Assistant (Beta).
                 </span>
               </div>
               <button
@@ -246,12 +292,93 @@ function TermsContentInner() {
             </p>
           </section>
 
-          {/* Section 6: Administrative Subsystem Governance */}
+          {/* Section: Personal Assistant Terms (Spotlighted for Assistant / Learn More) */}
+          <section
+            id="assistant-terms"
+            className={`space-y-6 p-4 sm:p-7 rounded-2xl transition-all duration-300 ${
+              highlightedSection === "assistant-terms" || filterMode === "assistant"
+                ? "bg-[#7C3AED]/10 border border-[#7C3AED]/50 shadow-[0_0_35px_rgba(124,58,237,0.18)] ring-1 ring-[#7C3AED]/50"
+                : "border border-transparent"
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2.5">
+                <IoChatbubbleEllipses className="w-5 h-5 text-purple" />
+                <span>6. Personal Assistant (Beta) Operational Terms &amp; AI Disclaimer</span>
+              </h2>
+              {(highlightedSection === "assistant-terms" || filterMode === "assistant") && (
+                <span className="px-3 py-1 rounded-full text-[10.5px] font-mono font-bold bg-[#7C3AED]/30 text-[#CBACF9] border border-[#7C3AED]/50">
+                  Assistant Deep-Dive &amp; Learn More
+                </span>
+              )}
+            </div>
+
+            {/* Subsection 1: Purpose & Interactive Capabilities */}
+            <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple" />
+                Purpose &amp; Scope of Gaurav Assistant
+              </h3>
+              <p className="text-sm text-neutral-300 leading-relaxed">
+                The Personal Assistant is designed as an interactive guide to assist recruiters, clients, and developers in exploring Gaurav Patil&apos;s full-stack projects, design systems, and engineering benchmarks. It provides direct, automated insights into architecture patterns, GitHub code repositories, and developer specializations.
+              </p>
+            </div>
+
+            {/* Subsection 2: Custom Mail Domain Support */}
+            <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple" />
+                Official Verified Senders &amp; Support Pipeline
+              </h3>
+              <p className="text-sm text-neutral-300 leading-relaxed">
+                All communications, support tickets, and contact verification flows originate exclusively from the authenticated domain <span className="text-purple font-mono font-semibold">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono font-semibold">gauravservices.eu.cc</span> supported for backward compatibility):
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
+                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">hello@gauravpatil.online</span>
+                  <p className="text-xs text-neutral-400">General portfolio inquiries, recruiter outreach, and direct developer contact.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
+                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">help@gauravpatil.online</span>
+                  <p className="text-xs text-neutral-400">Assistant technical support, bug reports, and portfolio navigation guidance.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
+                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">security@gauravpatil.online</span>
+                  <p className="text-xs text-neutral-400">Security notifications, 2FA OTP codes, and vulnerability disclosure reports.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
+                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">no-reply@gauravpatil.online</span>
+                  <p className="text-xs text-neutral-400">Automated system receipts, transaction verification, and non-interactive alerts.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Subsection 3: AI Disclaimer & Acceptable Use */}
+            <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple" />
+                AI Accuracy Disclaimer &amp; Acceptable Use
+              </h3>
+              <ul className="list-disc list-inside space-y-2 pl-2 text-sm text-neutral-300">
+                <li>
+                  <strong className="text-white">Generative Limitations:</strong> While tuned for accuracy, generative AI models may occasionally produce incomplete, speculative, or outdated responses. Official GitHub commits and verified documentation remain the authoritative benchmark.
+                </li>
+                <li>
+                  <strong className="text-white">Acceptable Use:</strong> Visitors agree not to attempt prompt-injections, reverse-engineer underlying system prompts, extract internal configuration, or send abusive payloads.
+                </li>
+                <li>
+                  <strong className="text-white">Continuous Beta Evolution:</strong> The assistant is under active development and may undergo live feature updates or brief maintenance windows without notice.
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          {/* Section 7: Administrative Subsystem Governance */}
           {filterMode === "all" && (
             <section id="admin-governance" className="space-y-3">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaShieldHalved className="w-4 h-4 text-purple" />
-                <span>6. Administrative Subsystem Isolation &amp; 2FA Governance</span>
+                <span>7. Administrative Subsystem Isolation &amp; 2FA Governance</span>
               </h2>
               <p>
                 The administrative panel (<code className="text-purple font-mono">/admin/*</code>) is an isolated workspace strictly restricted to authorized Superadmins. Administrative access requires Google OAuth 2.0 PKCE, salted HMAC-SHA256 Two-Factor Authentication (OTP), and zero-lockout IP security verification. Administrative access and data operations are governed separately under the <Link href="/admin/terms" className="text-purple hover:underline font-semibold">Administrator Terms of Service</Link>.
@@ -259,11 +386,11 @@ function TermsContentInner() {
             </section>
           )}
 
-          {/* Section 7: Limitation of Liability */}
+          {/* Section 8: Limitation of Liability */}
           <section id="liability" className="space-y-3">
             <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
               <FaScaleBalanced className="w-4 h-4 text-purple" />
-              <span>7. Limitation of Liability &amp; Disclaimers</span>
+              <span>8. Limitation of Liability &amp; Disclaimers</span>
             </h2>
             <p>
               This website and its demonstrative artifacts are provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis. In no event shall Gaurav Patil be liable for indirect, incidental, or consequential damages resulting from the use of this website.

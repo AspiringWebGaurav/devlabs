@@ -603,7 +603,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 md:p-8 bg-black/65 backdrop-blur-xl sm:backdrop-blur-2xl transition-all duration-300 overscroll-contain animate-in fade-in"
+      className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-6 md:p-8 bg-black/65 backdrop-blur-xl sm:backdrop-blur-2xl transition-all duration-300 overscroll-contain animate-in fade-in"
       onClick={handleClose}
       role="dialog"
       aria-modal="true"

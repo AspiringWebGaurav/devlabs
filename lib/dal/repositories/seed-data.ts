@@ -11,6 +11,7 @@ import type {
   FooterDocument,
   SocialLinkDocument,
   SeoDocument,
+  AssistantDocument,
   PublicPortfolioProjection,
 } from "@/types/portfolio";
 
@@ -515,6 +516,16 @@ export const SEED_SEO: SeoDocument = {
   version: 1,
 };
 
+export const SEED_ASSISTANT: AssistantDocument = {
+  id: "assistant_main",
+  isEnabled: true,
+  assistantName: "Gaurav Assistant",
+  avatarUrl: "",
+  positionMode: "fixed",
+  updatedAt: new Date().toISOString(),
+  version: 1,
+};
+
 export const SEED_PORTFOLIO_PROJECTION: PublicPortfolioProjection = {
   navigation: SEED_NAVIGATION.items,
   hero: SEED_HERO,
@@ -528,4 +539,5 @@ export const SEED_PORTFOLIO_PROJECTION: PublicPortfolioProjection = {
   footer: SEED_FOOTER,
   socialLinks: SEED_SOCIAL_LINKS,
   seo: SEED_SEO,
+  assistant: SEED_ASSISTANT,
 };

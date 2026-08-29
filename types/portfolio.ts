@@ -262,6 +262,19 @@ export interface SeoDocument {
   version: number;
 }
 
+// 13. Assistant Configuration (Collection: portfolio_assistant, Doc: assistant_main)
+export type AssistantPositionMode = "fixed" | "draggable";
+
+export interface AssistantDocument {
+  id: "assistant_main";
+  isEnabled: boolean;
+  assistantName: string;
+  avatarUrl?: string;
+  positionMode: AssistantPositionMode;
+  updatedAt: string;
+  version: number;
+}
+
 // ============================================================================
 // 3. SUPPORTING INFRASTRUCTURE: STORAGE ASSET LEDGER
 // ============================================================================
@@ -308,4 +321,5 @@ export interface PublicPortfolioProjection {
   footer: FooterDocument;
   socialLinks: SocialLinkDocument[];
   seo: SeoDocument;
+  assistant?: AssistantDocument;
 }
