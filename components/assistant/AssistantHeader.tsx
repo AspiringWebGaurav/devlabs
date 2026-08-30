@@ -51,7 +51,7 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
               {currentView === "questions"
                 ? "Predefined Questions"
                 : currentView === "chat"
-                ? "Live Chat"
+                ? "Live Chat with Gaurav"
                 : assistantName}
             </span>
             {!isChildView && (

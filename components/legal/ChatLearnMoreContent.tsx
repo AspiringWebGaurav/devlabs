@@ -183,17 +183,17 @@ export const ChatLearnMoreContent: React.FC = () => {
                   </span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                  What is &ldquo;Live Chat&rdquo;?
+                  What is &ldquo;Live Chat with Gaurav&rdquo;?
                 </h2>
                 <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-                  <strong>Current Status:</strong> The Live Chat view inside the bubble is currently a placeholder for a planned interactive messaging experience. It states: <em>&ldquo;Real-time interactive assistant messaging is coming soon.&rdquo;</em>
+                  <strong>Current Status:</strong> The Live Chat with Gaurav view inside the bubble is configured as a direct communication channel. When connected, the system will notify Gaurav live so he can respond directly.
                 </p>
                 <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-2">
                   <h3 className="text-xs font-mono uppercase tracking-wider font-semibold text-amber-400">
                     Important Clarification on Live Chat
                   </h3>
                   <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
-                    Live Chat is designed as an interactive automated assistant experience. <strong>It does not establish an active 24/7 human support center or outsourced chat operator team.</strong> All human correspondence and collaboration are conducted directly by Gaurav Patil through verified communication channels.
+                    Live Chat with Gaurav is designed to dispatch real-time alerts to Gaurav. <strong>It does not establish an outsourced chat operator team.</strong> All human correspondence and collaboration are conducted directly by Gaurav Patil.
                   </p>
                 </div>
               </div>
