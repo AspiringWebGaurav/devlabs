@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { IoClose, IoChatbubbleEllipses, IoChevronBack } from "react-icons/io5";
 import type { AssistantHeaderProps } from "./types";
 
@@ -59,9 +60,18 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
               </span>
             )}
           </div>
-          <span className="text-[11px] font-medium text-neutral-500 leading-tight mt-0.5">
-            {isChildView ? assistantName : "Portfolio Guide"}
-          </span>
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 leading-tight mt-0.5">
+            <span>{isChildView ? assistantName : "Portfolio Guide"}</span>
+            <span className="text-neutral-300">·</span>
+            <Link
+              href="/chat"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#7C3AED] hover:text-[#5B21B6] hover:underline font-medium transition-colors"
+            >
+              Learn more
+            </Link>
+          </div>
         </div>
       </div>
 

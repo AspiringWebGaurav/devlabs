@@ -102,6 +102,33 @@ export const FooterSection = ({
           >
             Privacy
           </Link>
+          <span className="text-neutral-600">·</span>
+          <Link
+            href="/chat"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-purple transition-colors duration-200"
+          >
+            Chat Guide
+          </Link>
+          <span className="text-neutral-600">·</span>
+          <Link
+            href="/security"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-purple transition-colors duration-200"
+          >
+            Security
+          </Link>
+          <span className="text-neutral-600">·</span>
+          <Link
+            href="/accessibility"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-purple transition-colors duration-200"
+          >
+            Accessibility
+          </Link>
         </div>
 
         {/* Right: Social Media Links */}

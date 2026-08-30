@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { AssistantHeader } from "./AssistantHeader";
 import { AssistantHomeView } from "./AssistantHomeView";
@@ -287,15 +288,15 @@ export const AssistantWindow: React.FC<AssistantWindowProps> = ({
             </div>
 
             {/* 3. Fixed Footer: Policy Disclaimer */}
-            <div className="p-3 sm:p-4 pt-2 bg-white shrink-0 select-none border-t border-neutral-100/80">
-              <div className="text-[11px] sm:text-[12px] leading-relaxed text-[#70707b] text-center px-1 max-w-[96%] mx-auto">
+            <div className="p-3 sm:p-4 pt-2.5 bg-white shrink-0 select-none border-t border-neutral-100">
+              <div className="text-[11px] sm:text-[12px] leading-relaxed text-neutral-500 text-center px-1 max-w-[96%] mx-auto">
                 <p>
-                  AI assistant can make mistakes. Subject to our{" "}
+                  AI assistant can make mistakes. Conversations are informational and subject to our{" "}
                   <a
                     href="/terms?focus=assistant#assistant-terms"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#52525c] hover:text-black underline underline-offset-2 transition-colors font-medium"
+                    className="text-neutral-700 hover:text-[#7C3AED] font-medium transition-colors duration-150 hover:underline hover:underline-offset-2 hover:decoration-[#7C3AED]/40"
                   >
                     Terms of Service
                   </a>
@@ -304,10 +305,19 @@ export const AssistantWindow: React.FC<AssistantWindowProps> = ({
                     href="/privacy?focus=assistant#assistant-privacy"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#52525c] hover:text-black underline underline-offset-2 transition-colors font-medium"
+                    className="text-neutral-700 hover:text-[#7C3AED] font-medium transition-colors duration-150 hover:underline hover:underline-offset-2 hover:decoration-[#7C3AED]/40"
                   >
                     Privacy Policy
                   </a>
+                  .{" "}
+                  <Link
+                    href="/chat"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#7C3AED] hover:text-[#5B21B6] font-semibold transition-colors duration-150 hover:underline hover:underline-offset-2 hover:decoration-[#7C3AED]"
+                  >
+                    Learn more
+                  </Link>
                   .
                 </p>
               </div>

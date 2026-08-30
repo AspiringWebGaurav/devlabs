@@ -41,7 +41,7 @@ export const AssistantHomeView: React.FC<AssistantViewProps> = ({
                 Predefined Questions
               </span>
               <span className="block text-xs text-neutral-500 truncate mt-0.5 font-normal">
-                Browse quick topics, FAQs & common inquiries
+                Browse quick topics, FAQs &amp; common inquiries
               </span>
             </div>
           </div>
