@@ -11,7 +11,6 @@ import {
   EmailPurpose,
   getEmailIdentityForPurpose,
 } from "./identities";
-import { BREVO_TEMPLATES } from "./templates";
 import {
   renderCompactEmailLayout,
   EMAIL_SPACING,
@@ -303,14 +302,11 @@ export function generateInternalNotificationHtml(
 
   const bodyContentHtml = `
     <p style="${EMAIL_SPACING.greetingMargin}font-weight:600;color:${EMAIL_TYPOGRAPHY.colorHeading};">Hi Gaurav,</p>
-    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};">You received a new portfolio inquiry${leadTag ? ` (Lead ${leadTag})` : ""} from <strong>${safeName}</strong>.</p>
-    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Lead Number:</strong> ${params.leadNumber ? `#${params.leadNumber}` : "Direct"}</p>
-    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Sender:</strong> ${safeName}</p>
-    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Role:</strong> ${safeRole}</p>
-    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Email:</strong> <a href="mailto:${safeAttrEmail}" style="color:${EMAIL_TYPOGRAPHY.colorLink};text-decoration:none;">${safeTextEmail}</a></p>
-    <p style="${EMAIL_SPACING.paragraphMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Received:</strong> ${formattedTime}</p>
-    <p style="margin:10px 0 4px 0;font-weight:700;color:${EMAIL_TYPOGRAPHY.colorHeading};">Message:</p>
-    <p style="margin:0 0 12px 0;color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:1.5;">${safeMessage}</p>
+    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>From:</strong> ${safeName} <span style="color:${EMAIL_TYPOGRAPHY.colorMuted};">(${safeRole})</span></p>
+    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Email:</strong> <a href="mailto:${safeAttrEmail}" style="color:${EMAIL_TYPOGRAPHY.colorLink};text-decoration:none;">${safeTextEmail}</a></p>
+    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};"><strong>Received:</strong> ${formattedTime}${leadTag ? ` &nbsp;&bull;&nbsp; <strong>Lead ${leadTag}</strong>` : ""}</p>
+    <p style="margin:10px 0 3px 0;font-weight:700;font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorHeading};">Message:</p>
+    <p style="margin:0 0 10px 0;font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:${EMAIL_TYPOGRAPHY.lineHeightBody};">${safeMessage}</p>
   `;
 
   return renderCompactEmailLayout({
@@ -322,9 +318,35 @@ export function generateInternalNotificationHtml(
 }
 
 /**
+ * Generates the clean, modern confirmation HTML email sent to visitors.
+ */
+export function generateVisitorAutoReplyHtml(
+  params: { name: string; firstName?: string }
+): string {
+  const rawFirstName = params.firstName || params.name.split(" ")[0] || params.name;
+  const safeName = escapeHtml(rawFirstName.trim());
+
+  const bodyContentHtml = `
+    <p style="${EMAIL_SPACING.greetingMargin}font-weight:600;color:${EMAIL_TYPOGRAPHY.colorHeading};">Hi ${safeName},</p>
+    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};">Thanks for reaching out through my portfolio. I've received your message and will get back to you as soon as possible.</p>
+    <p style="${EMAIL_SPACING.paragraphMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};">If your inquiry is urgent, you can reply directly to this email.</p>
+    <p style="${EMAIL_SPACING.signoffMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorBody};">
+      <strong>Gaurav Patil</strong><br />
+      <span style="color:${EMAIL_TYPOGRAPHY.colorMuted};">Developer &amp; Backend Services</span>
+    </p>
+  `;
+
+  return renderCompactEmailLayout({
+    title: "Thanks for reaching out",
+    bodyContentHtml,
+    footerType: "STANDARD",
+  });
+}
+
+/**
  * Contact Form Workflow Dispatcher:
  * 1. Dispatches Internal Notification Email (Lead alert to owner with Reply-To set to visitor).
- * 2. Dispatches Visitor Auto-Reply Email (Using Brevo Template #1 with Reply-To: hello@gauravpatil.online).
+ * 2. Dispatches Visitor Auto-Reply Email (Local code-generated layout with Reply-To: hello@gauravpatil.online).
  */
 export async function dispatchContactFormWorkflow(
   params: ContactFormWorkflowParams
@@ -360,15 +382,12 @@ export async function dispatchContactFormWorkflow(
     formattedTime
   );
 
+  const leadTag = leadNo ? ` • Lead #${leadNo}` : "";
   const internalPlainText = `Hi Gaurav,
 
-You received a new portfolio inquiry${leadNo ? ` (Lead #${leadNo})` : ""} from ${trimmedName}.
-
-Lead Number: ${leadNo ? `#${leadNo}` : "Direct"}
-Sender: ${trimmedName}
-Role: ${trimmedRole}
+From: ${trimmedName} (${trimmedRole})
 Email: ${trimmedEmail}
-Received: ${formattedTime}
+Received: ${formattedTime}${leadTag}
 
 Message:
 ${trimmedMessage}
@@ -381,11 +400,26 @@ To reply directly, hit "Reply" in your email client to message ${trimmedEmail}.`
     : `New Contact Inquiry: ${trimmedName} [${trimmedRole}]`;
 
   // =========================================================================
+  // STEP 2: Visitor Auto-Reply (Local code-generated compact layout)
+  // =========================================================================
+  const autoReplyHtml = generateVisitorAutoReplyHtml({
+    name: trimmedName,
+    firstName,
+  });
+
+  const autoReplyPlainText = `Hi ${firstName || trimmedName},
+
+Thanks for reaching out through my portfolio. I've received your message and will get back to you as soon as possible.
+
+If your inquiry is urgent, you can reply directly to this email.
+
+Gaurav Patil
+Developer & Backend Services
+https://gauravpatil.online`;
+
+  // =========================================================================
   // Parallel Dual Dispatch (Lead Alert + Auto-Reply concurrently)
   // =========================================================================
-  const autoReplyTemplateId =
-    BREVO_TEMPLATES.CONTACT_FORM_AUTO_REPLY.id || 1;
-
   const [internalResult, autoReplyResult] = await Promise.all([
     sendTransactionalEmail({
       purpose: "CONTACT_FORM",
@@ -399,18 +433,13 @@ To reply directly, hit "Reply" in your email client to message ${trimmedEmail}.`
     sendTransactionalEmail({
       purpose: "CONTACT_FORM_AUTO_REPLY",
       to: [{ email: trimmedEmail, name: trimmedName }],
-      templateId: autoReplyTemplateId,
+      replyTo: { email: EMAIL_IDENTITIES.HELLO.primary.email, name: "Gaurav Patil" },
+      subject: "Thanks for contacting Gaurav Patil",
+      htmlContent: autoReplyHtml,
+      textContent: autoReplyPlainText,
       headers: {
         "X-Auto-Response-Suppress": "OOF, AutoReply",
         "Auto-Submitted": "auto-replied",
-      },
-      params: {
-        name: trimmedName,
-        NAME: trimmedName,
-        FNAME: firstName,
-        category: trimmedRole,
-        message: trimmedMessage,
-        date: formattedTime,
       },
       tags: ["portfolio_auto_reply", "visitor_confirmation"],
     }),

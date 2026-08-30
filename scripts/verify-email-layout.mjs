@@ -28,6 +28,7 @@ import {
   dispatchOtpEmail,
   dispatchNewIpSecurityAlert,
   generateInternalNotificationHtml,
+  generateVisitorAutoReplyHtml,
   dispatchInquiryReplyEmail,
   dispatchContactFormWorkflow,
   escapeHtml,
@@ -154,7 +155,7 @@ async function runSuite() {
     assert.equal(/<[a-z][\s\S]*>/i.test(text), false, "Plain text has 0 HTML tags");
   });
 
-  await runTest("A3. generateInternalNotificationHtml() preserves lead data with single escaping", () => {
+  await runTest("A3. generateInternalNotificationHtml() produces compact 3-line metadata hierarchy & single escaping", () => {
     const rawEmail = "alice+investor&founder@venture.com";
     const rawName = "Alice & Bob <Partners>";
     const rawRole = "Managing Partner & CEO";
@@ -172,15 +173,34 @@ async function runSuite() {
     );
 
     assert.equal((html.match(/<!DOCTYPE html>/gi) || []).length, 1, "Exactly 1 <!DOCTYPE html>");
-    assert.match(html, /Alice &amp; Bob &lt;Partners&gt;/, "Name is safely escaped");
-    assert.match(html, /Managing Partner &amp; CEO/, "Role is safely escaped");
-    assert.match(html, /Line 1: Interested in collaboration\.<br \/>Line 2: Budget: \$50k\+\.<br \/>Line 3: Please reach out!/, "Message newlines converted to br");
-    assert.match(html, /href="mailto:alice\+investor&amp;founder@venture\.com"/, "mailto attribute escaped once");
+    assert.match(html, /<strong>From:<\/strong> Alice &amp; Bob &lt;Partners&gt;/, "Name safely escaped in From line");
+    assert.match(html, /\(Managing Partner &amp; CEO\)/, "Role safely escaped in parenthesis");
+    assert.match(html, /<strong>Email:<\/strong> <a href="mailto:alice\+investor&amp;founder@venture\.com"/, "mailto attribute escaped once");
     assert.match(html, />alice\+investor&amp;founder@venture\.com<\/a>/, "Visible text email escaped once");
-    assert.equal(html.includes("&amp;amp;"), false, "No double escaping in email or message");
+    assert.match(html, /<strong>Received:<\/strong> Aug 30, 2026, 10:00 AM &nbsp;&bull;&nbsp; <strong>Lead #777<\/strong>/, "Received timestamp and Lead tag formatted compactly");
+    assert.match(html, /Line 1: Interested in collaboration\.<br \/>Line 2: Budget: \$50k\+\.<br \/>Line 3: Please reach out!/, "Message newlines converted to br");
+    assert.equal(html.includes("You received a new portfolio inquiry"), false, "Redundant narrative intro removed");
+    assert.equal(html.includes("&amp;amp;"), false, "No double escaping anywhere in email");
   });
 
-  await runTest("A4. dispatchInquiryReplyEmail() produces direct reply format with standard signature", async () => {
+  await runTest("A4. generateVisitorAutoReplyHtml() produces clean acknowledgement & standard footer", () => {
+    const html = generateVisitorAutoReplyHtml({
+      name: "Alice Smith & Associates",
+      firstName: "Alice",
+    });
+
+    assert.equal((html.match(/<!DOCTYPE html>/gi) || []).length, 1, "Exactly 1 <!DOCTYPE html>");
+    assert.match(html, /Hi Alice,/, "Personalized greeting with first name");
+    assert.match(html, /Thanks for reaching out through my portfolio/, "Acknowledgement sentence present");
+    assert.match(html, /If your inquiry is urgent, you can reply directly to this email\./, "Direct reply instructions present");
+    assert.match(html, /<strong>Gaurav Patil<\/strong>/, "Signature name present");
+    assert.match(html, /Developer &amp; Backend Services/, "Signature role escaped");
+    assert.match(html, /Sent via Gaurav Services/, "Standard footer present");
+    assert.equal(html.includes("<h1>"), false, "No oversized H1 banner");
+    assert.equal(html.includes("&amp;amp;"), false, "No double escaping");
+  });
+
+  await runTest("A5. dispatchInquiryReplyEmail() produces direct reply format with standard signature", async () => {
     capturedDispatches = [];
     const replySubject = "Re: Project Inquiry — Next.js Portfolio";
     const replyMessage = "Hello Alice,\n\nThank you for reaching out! I'd be glad to discuss your project.\n\nBest regards,\nGaurav";
@@ -209,7 +229,7 @@ async function runSuite() {
     assert.match(html, /Sent via Gaurav Services/, "Standard footer present");
   });
 
-  await runTest("A5. resolveAppUrl() & dispatchOtpEmail() resolve 100% dynamic URLs (localhost, staging/devlabs, prod)", async () => {
+  await runTest("A6. resolveAppUrl() & dispatchOtpEmail() resolve 100% dynamic URLs (localhost, staging/devlabs, prod)", async () => {
     // 1. Localhost runtime environment
     const localHeaders = new Headers({ host: "localhost:3000" });
     assert.equal(resolveAppUrl(localHeaders), "http://localhost:3000", "Localhost resolves to http://localhost:3000");
@@ -364,11 +384,73 @@ async function runSuite() {
   });
 
   // ---------------------------------------------------------------------------
-  // SECTION D: Admin Mail Transport Immutability (CC / BCC / Attachments)
+  // SECTION D: Contact Form Dual Dispatch Workflow Integration
   // ---------------------------------------------------------------------------
-  console.log("\n--- SECTION D: Admin Mail Transport Immutability ---");
+  console.log("\n--- SECTION D: Contact Form Dual Dispatch Workflow Integration ---");
 
-  await runTest("D1. Transport payload immutability across CC, BCC, and Attachments", () => {
+  await runTest("D1. dispatchContactFormWorkflow() dispatches exactly 1 Lead Alert and 1 Auto-Reply concurrently", async () => {
+    capturedDispatches = [];
+    
+    const visitorName = "Rohan Kamble";
+    const visitorEmail = "rohan@example.com";
+    const visitorRole = "Lead Developer";
+    const visitorMessage = "Hello Gaurav,\n\nI am interested in your architecture consulting services.\n\nBest,\nRohan";
+    const leadNo = "888";
+
+    const expectedAdminRecipient =
+      process.env.BREVO_NOTIFICATION_RECIPIENT ||
+      process.env.ADMIN_EMAIL ||
+      "gauravpatil5737@gmail.com";
+
+    const result = await dispatchContactFormWorkflow({
+      name: visitorName,
+      email: visitorEmail,
+      role: visitorRole,
+      category: visitorRole,
+      message: visitorMessage,
+      leadNumber: leadNo,
+    });
+
+    assert.equal(result.internalEmailSent, true, "Internal lead alert sent");
+    assert.equal(result.autoReplySent, true, "Visitor auto-reply sent");
+    assert.equal(capturedDispatches.length, 2, "Exactly 2 payloads dispatched");
+
+    // Payload 1: Internal Lead Alert
+    const leadPayload = capturedDispatches[0].body;
+    assert.equal(leadPayload.to[0].email, expectedAdminRecipient, "Lead Alert sent to dynamic admin recipient");
+    assert.equal(leadPayload.replyTo.email, visitorEmail, "Lead Alert Reply-To set to visitor raw email");
+    assert.equal(leadPayload.sender.email, "hello@gauravpatil.online", "Lead Alert From is hello@gauravpatil.online");
+    assert.match(leadPayload.subject, /New Contact Inquiry \(Lead #888\): Rohan Kamble/, "Lead Alert subject formatted");
+    assert.match(leadPayload.htmlContent, /<strong>From:<\/strong> Rohan Kamble <span style="color:#6b7280;">\(Lead Developer\)<\/span>/, "Compact metadata From line present");
+    assert.match(leadPayload.htmlContent, /<strong>Email:<\/strong> <a href="mailto:rohan@example\.com"/, "Clickable visitor email present");
+    assert.match(leadPayload.htmlContent, /<strong>Lead #888<\/strong>/, "Lead number in compact received row");
+    assert.match(leadPayload.htmlContent, /To reply directly, hit "Reply"/, "LEAD_ALERT footer present");
+    assert.match(leadPayload.textContent, /Lead #888/, "Plain text contains lead tag");
+
+    // Payload 2: Visitor Auto-Reply
+    const autoReplyPayload = capturedDispatches[1].body;
+    assert.equal(autoReplyPayload.to[0].email, visitorEmail, "Auto-reply sent to visitor");
+    assert.equal(autoReplyPayload.replyTo.email, "hello@gauravpatil.online", "Auto-reply Reply-To is hello@gauravpatil.online");
+    assert.equal(autoReplyPayload.sender.email, "hello@gauravpatil.online", "Auto-reply From is hello@gauravpatil.online");
+    assert.equal(autoReplyPayload.subject, "Thanks for contacting Gaurav Patil", "Auto-reply subject is accurate");
+    assert.match(autoReplyPayload.htmlContent, /Hi Rohan,/, "Auto-reply greeting personalized with first name");
+    assert.match(autoReplyPayload.htmlContent, /Thanks for reaching out through my portfolio/, "Auto-reply acknowledgement present");
+    assert.match(autoReplyPayload.htmlContent, /Sent via Gaurav Services/, "Standard footer present in auto-reply");
+    assert.match(autoReplyPayload.textContent, /Hi Rohan,/, "Plain text auto-reply has first name greeting");
+    assert.equal(autoReplyPayload.headers["X-Auto-Response-Suppress"], "OOF, AutoReply", "Auto-response suppression header preserved");
+    assert.equal(autoReplyPayload.headers["Auto-Submitted"], "auto-replied", "Auto-submitted header preserved");
+
+    // Exclusivity Check: ZERO calls to Brevo Template #1
+    const templateDispatches = capturedDispatches.filter(d => d.body.templateId !== undefined);
+    assert.equal(templateDispatches.length, 0, "Zero runtime calls to external Brevo template IDs");
+  });
+
+  // ---------------------------------------------------------------------------
+  // SECTION E: Admin Mail Transport Immutability (CC / BCC / Attachments)
+  // ---------------------------------------------------------------------------
+  console.log("\n--- SECTION E: Admin Mail Transport Immutability ---");
+
+  await runTest("E1. Transport payload immutability across CC, BCC, and Attachments", () => {
     const rawMessage = "Please find the **Quarterly Financial Report** attached.\n\nBest regards,\nGaurav";
     const subject = "Q3 Financial Statement";
     
@@ -400,11 +482,11 @@ async function runSuite() {
   });
 
   // ---------------------------------------------------------------------------
-  // SECTION E: Repository Migration & Legacy Footer Ripgrep Audit
+  // SECTION F: Repository Migration & Legacy Footer Ripgrep Audit
   // ---------------------------------------------------------------------------
-  console.log("\n--- SECTION E: Repository Migration & Legacy Code Audit ---");
+  console.log("\n--- SECTION F: Repository Migration & Legacy Code Audit ---");
 
-  await runTest("E1. Verify zero obsolete document shells or legacy footers remain in lib/email/", () => {
+  await runTest("F1. Verify zero obsolete document shells or legacy footers remain in lib/email/", () => {
     const emailDir = path.resolve(process.cwd(), "lib/email");
     const files = fs.readdirSync(emailDir).filter(f => f.endsWith(".ts"));
 

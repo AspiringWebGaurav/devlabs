@@ -173,18 +173,27 @@
   }
 }
 
-@keyframes scroll {
-  to {
-    transform: translate(calc(-50% - 0.5rem));
+@keyframes checkmarkStroke {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
   }
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
+@keyframes successPop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
   }
-  to {
-    transform: rotate(360deg);
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
