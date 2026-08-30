@@ -44,15 +44,37 @@ function PrivacyContentInner() {
 
     if (targetId) {
       setHighlightedSection(targetId);
-      const timer = setTimeout(() => {
+
+      const scrollToTarget = () => {
         const el = document.getElementById(targetId);
         if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
         }
-      }, 150);
-      return () => clearTimeout(timer);
+      };
+
+      // Multi-stage timers ensure exact positioning across mobile and desktop layout hydrations
+      const t1 = setTimeout(scrollToTarget, 80);
+      const t2 = setTimeout(scrollToTarget, 300);
+      const t3 = setTimeout(scrollToTarget, 650);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     }
   }, [focusParam]);
+
+  const handleTabSelect = (mode: "all" | "contact" | "assistant", targetId?: string) => {
+    setFilterMode(mode);
+    if (targetId) {
+      setHighlightedSection(targetId);
+      setTimeout(() => {
+        const el = document.getElementById(targetId);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-black-100 text-white relative overflow-hidden py-10 sm:py-16 px-5 sm:px-10 lg:px-16 xl:px-24 w-full">
@@ -76,7 +98,7 @@ function PrivacyContentInner() {
           <div className="inline-flex items-center bg-white/[0.04] border border-white/[0.1] rounded-xl p-1 text-xs gap-1">
             <button
               type="button"
-              onClick={() => setFilterMode("all")}
+              onClick={() => handleTabSelect("all")}
               className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 filterMode === "all"
                   ? "bg-purple text-black font-semibold shadow-sm"
@@ -88,12 +110,7 @@ function PrivacyContentInner() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setFilterMode("contact");
-                setHighlightedSection("anonymity");
-                const el = document.getElementById("anonymity");
-                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
+              onClick={() => handleTabSelect("contact", "anonymity")}
               className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 filterMode === "contact"
                   ? "bg-[#7C3AED] text-white font-semibold shadow-sm shadow-[#7C3AED]/40"
@@ -105,12 +122,7 @@ function PrivacyContentInner() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setFilterMode("assistant");
-                setHighlightedSection("assistant-privacy");
-                const el = document.getElementById("assistant-privacy");
-                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
+              onClick={() => handleTabSelect("assistant", "assistant-privacy")}
               className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 filterMode === "assistant"
                   ? "bg-[#7C3AED] text-white font-semibold shadow-sm shadow-[#7C3AED]/40"
@@ -180,7 +192,7 @@ function PrivacyContentInner() {
         <div className="w-full rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl p-6 sm:p-10 lg:p-12 space-y-8 text-neutral-300 leading-relaxed text-sm sm:text-base">
           {/* Section 1: Overview */}
           {filterMode === "all" && (
-            <section id="overview" className="space-y-3">
+            <section id="overview" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaShieldHalved className="w-4 h-4 text-purple" />
                 <span>1. Overview &amp; Privacy-First Philosophy</span>
@@ -198,7 +210,7 @@ function PrivacyContentInner() {
           {/* Section 2: Anonymity (Spotlighted for Contact Form) */}
           <section
             id="anonymity"
-            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 ${
+            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
               highlightedSection === "anonymity" || filterMode === "contact"
                 ? "bg-[#7C3AED]/10 border border-[#7C3AED]/50 shadow-[0_0_30px_rgba(124,58,237,0.15)] ring-1 ring-[#7C3AED]/50"
                 : "border border-transparent"
@@ -236,7 +248,7 @@ function PrivacyContentInner() {
           {/* Section 3: Cloudflare Turnstile */}
           <section
             id="turnstile"
-            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 ${
+            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
               highlightedSection === "turnstile" || filterMode === "contact"
                 ? "bg-white/[0.04] border border-white/[0.15]"
                 : "border border-transparent"
@@ -270,7 +282,7 @@ function PrivacyContentInner() {
           {/* Section 4: Brevo Email Gateway */}
           <section
             id="brevo"
-            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 ${
+            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
               highlightedSection === "brevo" || filterMode === "contact"
                 ? "bg-white/[0.04] border border-white/[0.15]"
                 : "border border-transparent"
@@ -310,7 +322,7 @@ function PrivacyContentInner() {
           </section>
 
           {/* Section 5: Data Rights */}
-          <section id="data-rights" className="space-y-3">
+          <section id="data-rights" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
             <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
               <FaLock className="w-4 h-4 text-purple" />
               <span>5. Data Security, Storage &amp; Deletion Rights</span>
@@ -327,7 +339,7 @@ function PrivacyContentInner() {
           {/* Section: Personal Assistant & AI Safety (Spotlighted for Assistant / Learn More) */}
           <section
             id="assistant-privacy"
-            className={`space-y-6 p-4 sm:p-7 rounded-2xl transition-all duration-300 ${
+            className={`space-y-6 p-4 sm:p-7 rounded-2xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
               highlightedSection === "assistant-privacy" || filterMode === "assistant"
                 ? "bg-[#7C3AED]/10 border border-[#7C3AED]/50 shadow-[0_0_35px_rgba(124,58,237,0.18)] ring-1 ring-[#7C3AED]/50"
                 : "border border-transparent"
@@ -448,7 +460,7 @@ function PrivacyContentInner() {
 
           {/* Section 7: Administrative Subsystem Privacy Governance */}
           {filterMode === "all" && (
-            <section id="admin-privacy" className="space-y-3">
+            <section id="admin-privacy" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaShieldHalved className="w-4 h-4 text-purple" />
                 <span>7. Administrative Subsystem Privacy Governance</span>
@@ -460,7 +472,7 @@ function PrivacyContentInner() {
           )}
 
           {/* Section 8: Contact */}
-          <section id="contact-requests" className="space-y-3">
+          <section id="contact-requests" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
             <h2 className="text-xl font-semibold text-white">
               8. Contact &amp; Data Requests
             </h2>

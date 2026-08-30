@@ -45,15 +45,37 @@ function TermsContentInner() {
 
     if (targetId) {
       setHighlightedSection(targetId);
-      const timer = setTimeout(() => {
+
+      const scrollToTarget = () => {
         const el = document.getElementById(targetId);
         if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
         }
-      }, 150);
-      return () => clearTimeout(timer);
+      };
+
+      // Multi-stage timers ensure exact positioning across mobile and desktop layout hydrations
+      const t1 = setTimeout(scrollToTarget, 80);
+      const t2 = setTimeout(scrollToTarget, 300);
+      const t3 = setTimeout(scrollToTarget, 650);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     }
   }, [focusParam]);
+
+  const handleTabSelect = (mode: "all" | "contact" | "assistant", targetId?: string) => {
+    setFilterMode(mode);
+    if (targetId) {
+      setHighlightedSection(targetId);
+      setTimeout(() => {
+        const el = document.getElementById(targetId);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-black-100 text-white relative overflow-hidden py-10 sm:py-16 px-5 sm:px-10 lg:px-16 xl:px-24 w-full">
@@ -77,7 +99,7 @@ function TermsContentInner() {
           <div className="inline-flex items-center bg-white/[0.04] border border-white/[0.1] rounded-xl p-1 text-xs gap-1">
             <button
               type="button"
-              onClick={() => setFilterMode("all")}
+              onClick={() => handleTabSelect("all")}
               className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 filterMode === "all"
                   ? "bg-purple text-black font-semibold shadow-sm"
@@ -89,12 +111,7 @@ function TermsContentInner() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setFilterMode("contact");
-                setHighlightedSection("anonymity");
-                const el = document.getElementById("anonymity");
-                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
+              onClick={() => handleTabSelect("contact", "anonymity")}
               className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 filterMode === "contact"
                   ? "bg-[#7C3AED] text-white font-semibold shadow-sm shadow-[#7C3AED]/40"
@@ -106,12 +123,7 @@ function TermsContentInner() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setFilterMode("assistant");
-                setHighlightedSection("assistant-terms");
-                const el = document.getElementById("assistant-terms");
-                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
+              onClick={() => handleTabSelect("assistant", "assistant-terms")}
               className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 filterMode === "assistant"
                   ? "bg-[#7C3AED] text-white font-semibold shadow-sm shadow-[#7C3AED]/40"
@@ -181,7 +193,7 @@ function TermsContentInner() {
         <div className="w-full rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl p-6 sm:p-10 lg:p-12 space-y-8 text-neutral-300 leading-relaxed text-sm sm:text-base">
           {/* Section 1: Acceptance */}
           {filterMode === "all" && (
-            <section id="acceptance" className="space-y-3">
+            <section id="acceptance" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaScaleBalanced className="w-4 h-4 text-purple" />
                 <span>1. Acceptance of Terms &amp; Accessibility Commitment</span>
@@ -199,7 +211,7 @@ function TermsContentInner() {
           {/* Section 2: Anonymity & Confidentiality (Spotlighted) */}
           <section
             id="anonymity"
-            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 ${
+            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
               highlightedSection === "anonymity" || filterMode === "contact"
                 ? "bg-[#7C3AED]/10 border border-[#7C3AED]/50 shadow-[0_0_30px_rgba(124,58,237,0.15)] ring-1 ring-[#7C3AED]/50"
                 : "border border-transparent"
@@ -231,7 +243,7 @@ function TermsContentInner() {
 
           {/* Section 3: Intellectual Property */}
           {filterMode === "all" && (
-            <section id="ip" className="space-y-3">
+            <section id="ip" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaCode className="w-4 h-4 text-purple" />
                 <span>3. Intellectual Property &amp; Engineering Architecture</span>
@@ -245,7 +257,7 @@ function TermsContentInner() {
           {/* Section 4: Automated Abuse Mitigation */}
           <section
             id="abuse-mitigation"
-            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 ${
+            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
               highlightedSection === "abuse-mitigation" || filterMode === "contact"
                 ? "bg-white/[0.04] border border-white/[0.15]"
                 : "border border-transparent"
@@ -270,7 +282,7 @@ function TermsContentInner() {
           {/* Section 5: Transactional Emails */}
           <section
             id="email-standards"
-            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 ${
+            className={`space-y-3 p-4 sm:p-6 rounded-xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
               highlightedSection === "email-standards" || filterMode === "contact"
                 ? "bg-white/[0.04] border border-white/[0.15]"
                 : "border border-transparent"
@@ -295,7 +307,7 @@ function TermsContentInner() {
           {/* Section: Personal Assistant Terms (Spotlighted for Assistant / Learn More) */}
           <section
             id="assistant-terms"
-            className={`space-y-6 p-4 sm:p-7 rounded-2xl transition-all duration-300 ${
+            className={`space-y-6 p-4 sm:p-7 rounded-2xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
               highlightedSection === "assistant-terms" || filterMode === "assistant"
                 ? "bg-[#7C3AED]/10 border border-[#7C3AED]/50 shadow-[0_0_35px_rgba(124,58,237,0.18)] ring-1 ring-[#7C3AED]/50"
                 : "border border-transparent"
@@ -375,7 +387,7 @@ function TermsContentInner() {
 
           {/* Section 7: Administrative Subsystem Governance */}
           {filterMode === "all" && (
-            <section id="admin-governance" className="space-y-3">
+            <section id="admin-governance" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaShieldHalved className="w-4 h-4 text-purple" />
                 <span>7. Administrative Subsystem Isolation &amp; 2FA Governance</span>
@@ -387,7 +399,7 @@ function TermsContentInner() {
           )}
 
           {/* Section 8: Limitation of Liability */}
-          <section id="liability" className="space-y-3">
+          <section id="liability" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
             <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
               <FaScaleBalanced className="w-4 h-4 text-purple" />
               <span>8. Limitation of Liability &amp; Disclaimers</span>
@@ -398,7 +410,7 @@ function TermsContentInner() {
           </section>
 
           {/* Section 8: Legal Contact */}
-          <section id="legal-contact" className="space-y-3">
+          <section id="legal-contact" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
             <h2 className="text-xl font-semibold text-white">
               8. Inquiries &amp; Legal Notices
             </h2>
