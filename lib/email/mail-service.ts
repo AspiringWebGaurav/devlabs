@@ -14,6 +14,11 @@ import {
   PRIMARY_EMAIL_DOMAIN,
   LEGACY_EMAIL_DOMAIN,
 } from "./identities";
+import {
+  renderCompactEmailLayout,
+  EMAIL_SPACING,
+  EMAIL_TYPOGRAPHY,
+} from "./layout";
 import type { MailRecipient, MailSenderKey } from "@/lib/dal/repositories/types";
 
 const BREVO_API_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
@@ -272,31 +277,20 @@ export function compileSafeHtml(rawText: string, subject = ""): string {
       // Format *italic*
       formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>");
       // Format `code`
-      formatted = formatted.replace(/`(.*?)`/g, "<code style=\"background-color:#f1f5f9;padding:2px 4px;font-size:13px;border-radius:2px;\">$1</code>");
+      formatted = formatted.replace(
+        /`(.*?)`/g,
+        `<code style="background-color:#f1f5f9;padding:2px 4px;font-size:13px;border-radius:2px;font-family:${EMAIL_TYPOGRAPHY.fontMono};">$1</code>`
+      );
 
-      return `<p style="margin:0 0 16px 0;line-height:1.6;color:#1e293b;">${formatted}</p>`;
+      return `<p style="${EMAIL_SPACING.paragraphMargin}color:#1e293b;">${formatted}</p>`;
     })
     .join("\n");
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0;padding:28px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#1e293b;line-height:1.6;background-color:#ffffff;">
-  <div style="max-width:600px;margin:0 auto;">
-    <div style="margin-bottom:24px;">
-      ${paragraphs}
-    </div>
-    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 16px 0;" />
-    <p style="margin:0;font-size:12px;color:#64748b;">
-      Sent via Gaurav Services &bull; <a href="https://gauravpatil.online" style="color:#7c3aed;text-decoration:none;">gauravpatil.online</a>
-    </p>
-  </div>
-</body>
-</html>`;
+  return renderCompactEmailLayout({
+    title: subject,
+    bodyContentHtml: paragraphs,
+    footerType: "STANDARD",
+  });
 }
 
 // =============================================================================

@@ -12,6 +12,11 @@ import {
   getEmailIdentityForPurpose,
 } from "./identities";
 import { BREVO_TEMPLATES } from "./templates";
+import {
+  renderCompactEmailLayout,
+  EMAIL_SPACING,
+  EMAIL_TYPOGRAPHY,
+} from "./layout";
 
 const BREVO_API_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 
@@ -284,42 +289,36 @@ export async function sendTransactionalEmail(
 /**
  * Generates the clean, modern internal notification HTML email for the owner.
  */
-function generateInternalNotificationHtml(
+export function generateInternalNotificationHtml(
   params: ContactFormWorkflowParams,
   formattedTime: string
 ): string {
+  const rawEmail = params.email.trim();
   const safeName = escapeHtml(params.name.trim());
-  const safeEmail = escapeHtml(params.email.trim());
+  const safeAttrEmail = escapeHtml(rawEmail);
+  const safeTextEmail = escapeHtml(rawEmail);
   const safeRole = escapeHtml(params.role?.trim() || "Visitor / Other");
   const safeMessage = escapeHtml(params.message.trim()).replace(/\n/g, "<br />");
   const leadTag = params.leadNumber ? `#${params.leadNumber}` : "";
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Lead ${leadTag}</title>
-</head>
-<body style="margin:0;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#1e293b;line-height:1.6;background-color:#ffffff;">
-  <p style="margin:0 0 16px 0;">Hi Gaurav,</p>
-  <p style="margin:0 0 16px 0;">You received a new portfolio inquiry${leadTag ? ` (Lead ${leadTag})` : ""} from <strong>${safeName}</strong>.</p>
+  const bodyContentHtml = `
+    <p style="${EMAIL_SPACING.greetingMargin}font-weight:600;color:${EMAIL_TYPOGRAPHY.colorHeading};">Hi Gaurav,</p>
+    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};">You received a new portfolio inquiry${leadTag ? ` (Lead ${leadTag})` : ""} from <strong>${safeName}</strong>.</p>
+    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Lead Number:</strong> ${params.leadNumber ? `#${params.leadNumber}` : "Direct"}</p>
+    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Sender:</strong> ${safeName}</p>
+    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Role:</strong> ${safeRole}</p>
+    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Email:</strong> <a href="mailto:${safeAttrEmail}" style="color:${EMAIL_TYPOGRAPHY.colorLink};text-decoration:none;">${safeTextEmail}</a></p>
+    <p style="${EMAIL_SPACING.paragraphMargin}font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorBody};"><strong>Received:</strong> ${formattedTime}</p>
+    <p style="margin:10px 0 4px 0;font-weight:700;color:${EMAIL_TYPOGRAPHY.colorHeading};">Message:</p>
+    <p style="margin:0 0 12px 0;color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:1.5;">${safeMessage}</p>
+  `;
 
-  <p style="margin:0 0 4px 0;"><strong>Lead Number:</strong> ${params.leadNumber ? `#${params.leadNumber}` : "Direct"}</p>
-  <p style="margin:0 0 4px 0;"><strong>Sender:</strong> ${safeName}</p>
-  <p style="margin:0 0 4px 0;"><strong>Role:</strong> ${safeRole}</p>
-  <p style="margin:0 0 4px 0;"><strong>Email:</strong> <a href="mailto:${safeEmail}" style="color:#2563eb;text-decoration:none;">${safeEmail}</a></p>
-  <p style="margin:0 0 16px 0;"><strong>Received:</strong> ${formattedTime}</p>
-
-  <p style="margin:16px 0 6px 0;font-weight:700;color:#0f172a;">Message:</p>
-  <p style="margin:0 0 24px 0;color:#0f172a;line-height:1.6;">${safeMessage}</p>
-
-  <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
-  <p style="margin:0;font-size:13px;color:#64748b;">
-    To reply directly, hit "Reply" in your email client to message <a href="mailto:${safeEmail}" style="color:#2563eb;text-decoration:none;">${safeEmail}</a>.
-  </p>
-</body>
-</html>`;
+  return renderCompactEmailLayout({
+    title: `New Lead ${leadTag}`,
+    bodyContentHtml,
+    footerType: "LEAD_ALERT",
+    footerContext: { replyToEmail: rawEmail },
+  });
 }
 
 /**
@@ -454,45 +453,27 @@ export async function dispatchOtpEmail(
   const safeOtp = escapeHtml(params.otp);
   const expiresMin = params.expiresMinutes || 5;
   const baseUrl = resolveAppUrl(params.requestHeaders);
-  const termsUrl = `${baseUrl}/admin/terms`;
-  const privacyUrl = `${baseUrl}/admin/privacy`;
+  const rawTermsUrl = `${baseUrl}/admin/terms`;
+  const rawPrivacyUrl = `${baseUrl}/admin/privacy`;
 
-  const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Verification Code</title>
-</head>
-<body style="margin:0;padding:32px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#111827;line-height:1.6;background-color:#ffffff;">
-  <p style="margin:0 0 16px 0;">Hi Gaurav,</p>
-  <p style="margin:0 0 20px 0;">Here is your verification code to complete sign-in to the Admin Panel:</p>
+  const bodyContentHtml = `
+    <p style="${EMAIL_SPACING.greetingMargin}font-weight:600;color:${EMAIL_TYPOGRAPHY.colorHeading};">Hi Gaurav,</p>
+    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};">Here is your verification code to complete sign-in to the Admin Panel:</p>
+    <div style="${EMAIL_SPACING.codeBlockMargin}">
+      <span style="font-family:${EMAIL_TYPOGRAPHY.fontMono};font-size:${EMAIL_TYPOGRAPHY.sizeOtp};font-weight:700;letter-spacing:5px;color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:${EMAIL_TYPOGRAPHY.lineHeightCode};display:inline-block;">${safeOtp}</span>
+    </div>
+    <p style="${EMAIL_SPACING.helperTextMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};">This code is valid for ${expiresMin} minutes. If you did not request this code, you can safely ignore this email.</p>
+    <p style="${EMAIL_SPACING.signoffMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorBody};">Gaurav Services</p>
+  `;
 
-  <p style="margin:24px 0;font-family:-apple-system,BlinkMacSystemFont,'SFMono-Regular',Consolas,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:6px;color:#111827;">${safeOtp}</p>
+  const htmlContent = renderCompactEmailLayout({
+    title: "Your Verification Code",
+    bodyContentHtml,
+    footerType: "SECURITY",
+    footerContext: { termsUrl: rawTermsUrl, privacyUrl: rawPrivacyUrl, brandName: "Gaurav Services" },
+  });
 
-  <p style="margin:0 0 8px 0;font-size:14px;color:#6b7280;">This code is valid for ${expiresMin} minutes. If you did not request this code, you can safely ignore this email.</p>
-
-  <p style="margin:24px 0 0 0;font-size:14px;color:#374151;">Gaurav Services</p>
-
-  <div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
-    <span>Gaurav Services</span> &nbsp;&bull;&nbsp;
-    <a href="${termsUrl}" style="color:#6b7280;text-decoration:none;">Terms</a> &nbsp;|&nbsp;
-    <a href="${privacyUrl}" style="color:#6b7280;text-decoration:none;">Privacy</a>
-  </div>
-</body>
-</html>`;
-
-  const textContent = `Hi Gaurav,
-
-Here is your verification code to complete sign-in to the Admin Panel:
-
-${params.otp}
-
-This code is valid for ${expiresMin} minutes. If you did not request this code, you can safely ignore this email.
-
-Gaurav Services
-
-Terms: ${termsUrl} | Privacy: ${privacyUrl}`;
+  const textContent = `Hi Gaurav,\n\nHere is your verification code to complete sign-in to the Admin Panel:\n\n${params.otp}\n\nThis code is valid for ${expiresMin} minutes. If you did not request this code, you can safely ignore this email.\n\nGaurav Services\n\nTerms: ${rawTermsUrl} | Privacy: ${rawPrivacyUrl}`;
 
   return sendTransactionalEmail({
     purpose: "SECURITY_OTP",
@@ -522,58 +503,37 @@ export interface NewIpAlertParams {
 export async function dispatchNewIpSecurityAlert(
   params: NewIpAlertParams
 ): Promise<SendEmailResult> {
+  const rawVerifyUrl = params.verifyUrl;
   const safeIp = escapeHtml(params.clientIp);
-  const safeUrl = escapeHtml(params.verifyUrl);
+  const safeAttrUrl = escapeHtml(rawVerifyUrl);
+  const safeTextUrl = escapeHtml(rawVerifyUrl);
   const expiresMin = params.expiresMinutes || 15;
   const baseUrl = resolveAppUrl(params.requestHeaders);
-  const termsUrl = `${baseUrl}/admin/terms`;
-  const privacyUrl = `${baseUrl}/admin/privacy`;
+  const rawTermsUrl = `${baseUrl}/admin/terms`;
+  const rawPrivacyUrl = `${baseUrl}/admin/privacy`;
 
-  const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Authorize New IP Address</title>
-</head>
-<body style="margin:0;padding:32px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#111827;line-height:1.6;background-color:#ffffff;">
-  <p style="margin:0 0 16px 0;">Hi Gaurav,</p>
-  <p style="margin:0 0 16px 0;">A sign-in attempt was detected from an unrecognized IP address (<strong>${safeIp}</strong>).</p>
-  <p style="margin:0 0 24px 0;">Click below to authorize this IP address to access your Admin Panel:</p>
+  const bodyContentHtml = `
+    <p style="${EMAIL_SPACING.greetingMargin}font-weight:600;color:${EMAIL_TYPOGRAPHY.colorHeading};">Hi Gaurav,</p>
+    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};">A sign-in attempt was detected from an unrecognized IP address (<strong>${safeIp}</strong>).</p>
+    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};">Click below to authorize this IP address to access your Admin Panel:</p>
+    <div style="${EMAIL_SPACING.buttonBlockMargin}">
+      <a href="${safeAttrUrl}" style="background-color:#0f172a;color:#ffffff;padding:9px 18px;font-size:${EMAIL_TYPOGRAPHY.sizeSmall};font-weight:600;text-decoration:none;border-radius:4px;display:inline-block;">Authorize IP address &rarr;</a>
+    </div>
+    <p style="${EMAIL_SPACING.helperTextMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};">
+      Or open this link: <a href="${safeAttrUrl}" style="color:${EMAIL_TYPOGRAPHY.colorLink};word-break:break-all;">${safeTextUrl}</a>
+    </p>
+    <p style="${EMAIL_SPACING.helperTextMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};">This link is valid for ${expiresMin} minutes. If you did not make this request, no action is needed.</p>
+    <p style="${EMAIL_SPACING.signoffMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorBody};">Gaurav Services</p>
+  `;
 
-  <div style="margin:24px 0;">
-    <a href="${safeUrl}" style="background-color:#0f172a;color:#ffffff;padding:12px 24px;font-size:14px;font-weight:600;text-decoration:none;border-radius:4px;display:inline-block;">
-      Authorize IP address &rarr;
-    </a>
-  </div>
+  const htmlContent = renderCompactEmailLayout({
+    title: "Authorize New IP Address",
+    bodyContentHtml,
+    footerType: "SECURITY",
+    footerContext: { termsUrl: rawTermsUrl, privacyUrl: rawPrivacyUrl, brandName: "Gaurav Services" },
+  });
 
-  <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">
-    Or open this link: <a href="${safeUrl}" style="color:#2563eb;word-break:break-all;">${safeUrl}</a>
-  </p>
-  <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">This link is valid for ${expiresMin} minutes. If you did not make this request, no action is needed.</p>
-
-  <p style="margin:24px 0 0 0;font-size:14px;color:#374151;">Gaurav Services</p>
-
-  <div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
-    <span>Gaurav Services</span> &nbsp;&bull;&nbsp;
-    <a href="${termsUrl}" style="color:#6b7280;text-decoration:none;">Terms</a> &nbsp;|&nbsp;
-    <a href="${privacyUrl}" style="color:#6b7280;text-decoration:none;">Privacy</a>
-  </div>
-</body>
-</html>`;
-
-  const textContent = `Hi Gaurav,
-
-A sign-in attempt was detected from an unrecognized IP address (${params.clientIp}).
-
-Click below to authorize this IP address to access your Admin Panel:
-${params.verifyUrl}
-
-This link is valid for ${expiresMin} minutes. If you did not make this request, no action is needed.
-
-Gaurav Services
-
-Terms: ${termsUrl} | Privacy: ${privacyUrl}`;
+  const textContent = `Hi Gaurav,\n\nA sign-in attempt was detected from an unrecognized IP address (${params.clientIp}).\n\nClick below to authorize this IP address to access your Admin Panel:\n${rawVerifyUrl}\n\nThis link is valid for ${expiresMin} minutes. If you did not make this request, no action is needed.\n\nGaurav Services\n\nTerms: ${rawTermsUrl} | Privacy: ${rawPrivacyUrl}`;
 
   return sendTransactionalEmail({
     purpose: "SECURITY_ALERT",
@@ -609,21 +569,17 @@ export async function dispatchInquiryReplyEmail(
 
   const safeMessageHtml = escapeHtml(trimmedMessage).replace(/\n/g, "<br />");
 
-  const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(trimmedSubject)}</title>
-</head>
-<body style="margin:0;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#1e293b;line-height:1.6;background-color:#ffffff;">
-  <div style="margin:0 0 20px 0;color:#0f172a;line-height:1.6;white-space:pre-wrap;">${safeMessageHtml}</div>
-  <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 16px 0;" />
-  <p style="margin:0;font-size:12px;color:#64748b;">
-    Sent by Gaurav Patil &bull; <a href="https://gauravpatil.online" style="color:#2563eb;text-decoration:none;">gauravpatil.online</a>
-  </p>
-</body>
-</html>`;
+  const bodyContentHtml = `
+    <div style="margin:0 0 12px 0;color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:1.5;font-size:${EMAIL_TYPOGRAPHY.sizeBody};">
+      ${safeMessageHtml}
+    </div>
+  `;
+
+  const htmlContent = renderCompactEmailLayout({
+    title: trimmedSubject,
+    bodyContentHtml,
+    footerType: "STANDARD",
+  });
 
   return sendTransactionalEmail({
     identity: {
