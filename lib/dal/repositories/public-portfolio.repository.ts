@@ -16,6 +16,7 @@ import {
   footerRepository,
   seoRepository,
   assistantRepository,
+  cloudflareRepository,
 } from "./cms";
 import { SEED_PORTFOLIO_PROJECTION } from "./seed-data";
 
@@ -58,6 +59,7 @@ export class PublicPortfolioRepository extends BaseRepository {
           socialRes,
           seoRes,
           assistantRes,
+          cloudflareRes,
         ] = await Promise.all([
           navigationRepository.getNavigation(),
           heroRepository.getHero(),
@@ -72,6 +74,7 @@ export class PublicPortfolioRepository extends BaseRepository {
           socialRepository.getSocialLinks(),
           seoRepository.getSeo(),
           assistantRepository.getAssistant(),
+          cloudflareRepository.getCloudflareSettings(),
         ]);
 
         // Filter published items where applicable
@@ -104,6 +107,7 @@ export class PublicPortfolioRepository extends BaseRepository {
         );
         const publishedSeo = seoRes.data || SEED_PORTFOLIO_PROJECTION.seo;
         const publishedAssistant = assistantRes.data || SEED_PORTFOLIO_PROJECTION.assistant;
+        const publishedCloudflare = cloudflareRes.data || SEED_PORTFOLIO_PROJECTION.cloudflare;
 
         const projection: PublicPortfolioProjection = {
           navigation: publishedNav,
@@ -119,6 +123,7 @@ export class PublicPortfolioRepository extends BaseRepository {
           socialLinks: publishedSocial,
           seo: publishedSeo,
           assistant: publishedAssistant,
+          cloudflare: publishedCloudflare,
         };
 
         // Cache in process memory as last-known-good

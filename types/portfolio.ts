@@ -275,6 +275,18 @@ export interface AssistantDocument {
   version: number;
 }
 
+// 14. Cloudflare Configuration (Collection: portfolio_cloudflare, Doc: cloudflare_main)
+export interface CloudflareSettingsDocument {
+  id: "cloudflare_main";
+  isSimulatedDowntime: boolean;
+  siteKey: string;
+  maxRetryAttempts: number;
+  circuitBreakerEnabled: boolean;
+  fallbackEmailGateway: string;
+  updatedAt: string;
+  version: number;
+}
+
 // ============================================================================
 // 3. SUPPORTING INFRASTRUCTURE: STORAGE ASSET LEDGER
 // ============================================================================
@@ -322,4 +334,5 @@ export interface PublicPortfolioProjection {
   socialLinks: SocialLinkDocument[];
   seo: SeoDocument;
   assistant?: AssistantDocument;
+  cloudflare?: CloudflareSettingsDocument;
 }

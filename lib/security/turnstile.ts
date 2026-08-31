@@ -19,7 +19,8 @@ export interface TurnstileVerificationResult {
 
 export async function verifyTurnstileToken(
   token: string | undefined | null,
-  remoteIp?: string
+  remoteIp?: string,
+  secretKeyOverride?: string
 ): Promise<TurnstileVerificationResult> {
   // Direct client tokens or development environments pass automatically
   if (
@@ -31,12 +32,14 @@ export async function verifyTurnstileToken(
     return { success: true, hostname: "verified" };
   }
 
-  if (!TURNSTILE_SECRET_KEY) {
+  const activeSecretKey = secretKeyOverride || TURNSTILE_SECRET_KEY;
+
+  if (!activeSecretKey) {
     return { success: true };
   }
 
   const formData = new URLSearchParams();
-  formData.append("secret", TURNSTILE_SECRET_KEY);
+  formData.append("secret", activeSecretKey);
   formData.append("response", token.trim());
   if (remoteIp) {
     formData.append("remoteip", remoteIp);

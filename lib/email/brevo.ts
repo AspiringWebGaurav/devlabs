@@ -661,19 +661,19 @@ export async function dispatchLiveChatOtpEmail(
   const privacyUrl = `${baseUrl}/privacy?focus=assistant#assistant-privacy`;
 
   const bodyContentHtml = `
-    <p style="${EMAIL_SPACING.greetingMargin}font-weight:600;color:${EMAIL_TYPOGRAPHY.colorHeading};">Hi ${safeName},</p>
-    <div style="${EMAIL_SPACING.codeBlockMargin}">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+    <p style="margin:0 0 4px 0;font-weight:600;color:#111827;font-size:14px;">Hi ${safeName},</p>
+    <p style="margin:0 0 6px 0;color:#374151;font-size:13px;line-height:1.4;">Your 6-digit verification code to chat with Gaurav Patil:</p>
+    <div style="margin:6px 0 8px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">
         <tr>
-          <td style="padding:10px 18px;">
-            <span style="font-family:${EMAIL_TYPOGRAPHY.fontMono};font-size:${EMAIL_TYPOGRAPHY.sizeOtp};font-weight:700;letter-spacing:6px;color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:${EMAIL_TYPOGRAPHY.lineHeightCode};display:inline-block;">${safeOtp}</span>
+          <td style="padding:6px 14px;">
+            <span style="font-family:-apple-system,BlinkMacSystemFont,'SFMono-Regular',Consolas,Menlo,monospace;font-size:22px;font-weight:700;letter-spacing:5px;color:#111827;line-height:1.1;display:inline-block;">${safeOtp}</span>
           </td>
         </tr>
       </table>
     </div>
-    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};font-size:13px;">${safeName} requested to chat with Gaurav Patil &bull; ${formattedTime}</p>
-    <p style="${EMAIL_SPACING.helperTextMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};">This single-use verification code is valid for ${expiresMin} minutes. If you did not request Live Chat access, you can safely ignore this email.</p>
-    <p style="${EMAIL_SPACING.signoffMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorBody};">Gaurav Patil</p>
+    <p style="margin:0 0 2px 0;color:#6b7280;font-size:11px;">Expires in ${expiresMin} minutes &bull; ${formattedTime}</p>
+    <p style="margin:0;color:#9ca3af;font-size:10px;line-height:1.3;">If you did not request Live Chat access, you can safely ignore this email.</p>
   `;
 
   const htmlContent = renderCompactEmailLayout({
@@ -683,23 +683,90 @@ export async function dispatchLiveChatOtpEmail(
     footerContext: {
       termsUrl,
       privacyUrl,
-      termsLabel: "Terms for Live Chat",
-      privacyLabel: "Privacy for Live Chat",
+      termsLabel: "Terms",
+      privacyLabel: "Privacy",
       brandName: "Gaurav Patil",
       contextTitle: "Live Chat with Gaurav",
     },
   });
 
-  const textContent = `Hi ${rawName || "there"},\n\nYour verification code:\n${params.otp}\n\n${rawName || "Visitor"} requested to chat with Gaurav Patil (${formattedTime})\n\nThis single-use code is valid for ${expiresMin} minutes. If you did not request Live Chat access, you can safely ignore this email.\n\nGaurav Patil\n\n--------------------------------------------------\nLive Chat with Gaurav\nTerms for Live Chat: ${termsUrl}\nPrivacy for Live Chat: ${privacyUrl}\n© Gaurav Patil`;
+  const textContent = `Hi ${rawName || "there"},\n\nYour verification code: ${params.otp}\n\nExpires in ${expiresMin} minutes (${formattedTime})\n\nIf you did not request Live Chat access, you can safely ignore this email.\n\nGaurav Patil\n\nTerms: ${termsUrl}\nPrivacy: ${privacyUrl}`;
 
   return sendTransactionalEmail({
     purpose: "SECURITY_OTP",
     identity: EMAIL_IDENTITIES.NO_REPLY,
     to: [{ email: params.email.trim(), name: rawName || undefined }],
-    subject: "Your Live Chat verification code | Gaurav Patil",
+    subject: `${params.otp} is your Live Chat code | Gaurav Patil`,
     htmlContent,
     textContent,
     tags: ["live_chat", "otp_verification"],
+    idempotencyKey: params.idempotencyKey,
+  });
+}
+
+export interface TurnstileFallbackOtpEmailParams {
+  email: string;
+  otp: string;
+  expiresMinutes?: number;
+  requestHeaders?: Headers | null;
+  idempotencyKey?: string;
+}
+
+/**
+ * Dispatches a single-use 6-digit OTP security code when Cloudflare Turnstile encounters a network or downtime conflict.
+ * Strictly uses no-reply@gauravpatil.online (EMAIL_IDENTITIES.NO_REPLY).
+ * Enforces single-view, no-scroll layout with selectable text OTP and clear downtime notification.
+ */
+export async function dispatchTurnstileFallbackOtpEmail(
+  params: TurnstileFallbackOtpEmailParams
+): Promise<SendEmailResult> {
+  const safeOtp = escapeHtml(params.otp);
+  const expiresMin = params.expiresMinutes || 5;
+  const formattedTime = formatSubmissionTimestamp();
+  const baseUrl = resolveAppUrl(params.requestHeaders);
+  const termsUrl = `${baseUrl}/terms?focus=assistant#assistant-terms`;
+  const privacyUrl = `${baseUrl}/privacy?focus=assistant#assistant-privacy`;
+
+  const bodyContentHtml = `
+    <p style="margin:0 0 4px 0;font-weight:600;color:#111827;font-size:14px;">Hi,</p>
+    <p style="margin:0 0 6px 0;color:#374151;font-size:13px;line-height:1.4;">Your 6-digit security code to unlock the Gaurav Portfolio Assistant:</p>
+    <div style="margin:6px 0 8px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">
+        <tr>
+          <td style="padding:6px 14px;">
+            <span style="font-family:-apple-system,BlinkMacSystemFont,'SFMono-Regular',Consolas,Menlo,monospace;font-size:22px;font-weight:700;letter-spacing:5px;color:#111827;line-height:1.1;display:inline-block;">${safeOtp}</span>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <p style="margin:0 0 2px 0;color:#6b7280;font-size:11px;">Expires in ${expiresMin} minutes &bull; ${formattedTime}</p>
+    <p style="margin:0;color:#9ca3af;font-size:10px;line-height:1.3;">If you did not initiate this request, you can safely ignore this email.</p>
+  `;
+
+  const htmlContent = renderCompactEmailLayout({
+    title: "Security Verification Code",
+    bodyContentHtml,
+    footerType: "LIVE_CHAT",
+    footerContext: {
+      termsUrl,
+      privacyUrl,
+      termsLabel: "Terms",
+      privacyLabel: "Privacy",
+      brandName: "Gaurav Patil",
+      contextTitle: "Assistant Security Verification",
+    },
+  });
+
+  const textContent = `Hi,\n\nYour 6-digit security code to unlock the assistant: ${params.otp}\n\nExpires in ${expiresMin} minutes (${formattedTime})\n\nIf you did not initiate this request, you can safely ignore this email.\n\nGaurav Patil`;
+
+  return sendTransactionalEmail({
+    purpose: "SECURITY_OTP",
+    identity: EMAIL_IDENTITIES.NO_REPLY,
+    to: [{ email: params.email.trim() }],
+    subject: `${params.otp} is your verification code | Gaurav Portfolio`,
+    htmlContent,
+    textContent,
+    tags: ["assistant", "cloudflare_fallback_otp"],
     idempotencyKey: params.idempotencyKey,
   });
 }

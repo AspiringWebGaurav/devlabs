@@ -215,6 +215,20 @@ export const AssistantUpdateSchema = z.object({
 export type AssistantUpdateInput = z.infer<typeof AssistantUpdateSchema>;
 
 // ============================================================================
+// 14. CLOUDFLARE SCHEMA
+// ============================================================================
+export const CloudflareUpdateSchema = z.object({
+  isSimulatedDowntime: z.boolean().default(false),
+  siteKey: z.string().min(1).default("0x4AAAAAAEilFWDvwBZ3NPSK"),
+  maxRetryAttempts: z.number().int().min(1).max(5).default(2),
+  circuitBreakerEnabled: z.boolean().default(true),
+  fallbackEmailGateway: z.string().email().default("no-reply@gauravpatil.online"),
+  expectedVersion: z.number().int().optional(),
+});
+
+export type CloudflareUpdateInput = z.infer<typeof CloudflareUpdateSchema>;
+
+// ============================================================================
 // REORDER & BATCH REORDER SCHEMA
 // ============================================================================
 export const ReorderSchema = z.object({

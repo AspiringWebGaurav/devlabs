@@ -11,3 +11,4 @@ export * from "./cta.repository";
 export * from "./footer.repository";
 export * from "./seo.repository";
 export * from "./assistant.repository";
+export * from "./cloudflare.repository";

@@ -16,6 +16,7 @@ import {
   footerRepository,
   seoRepository,
   assistantRepository,
+  cloudflareRepository,
   mediaRepository,
   publicPortfolioRepository,
 } from "@/lib/dal/repositories";
@@ -34,6 +35,7 @@ import {
   FooterUpdateSchema,
   SeoUpdateSchema,
   AssistantUpdateSchema,
+  CloudflareUpdateSchema,
   ReorderSchema,
 } from "@/lib/admin/schemas/cms.schema";
 import { storageDataSource } from "@/lib/dal/datasource/storage";
@@ -691,6 +693,27 @@ export async function updateAssistantAction(formData: unknown): Promise<ActionRe
     return { success: true, data: result.data };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : "Failed to update Assistant settings" };
+  }
+}
+
+// ============================================================================
+// 14. CLOUDFLARE ACTIONS
+// ============================================================================
+export async function updateCloudflareAction(formData: unknown): Promise<ActionResult> {
+  try {
+    await assertSuperadminSession();
+    const validated = CloudflareUpdateSchema.parse(formData);
+    const result = await cloudflareRepository.updateCloudflareSettings(validated);
+    if (!result.success || !result.data) throw new Error(result.error || "Failed to update Cloudflare settings");
+
+    revalidateTag("portfolio-cms");
+    revalidateTag("portfolio-cloudflare");
+    revalidatePath("/");
+    revalidatePath("/admin/cloudflare");
+    await emitCmsChangeSignal("cloudflare", result.data.version);
+    return { success: true, data: result.data };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to update Cloudflare settings" };
   }
 }
 

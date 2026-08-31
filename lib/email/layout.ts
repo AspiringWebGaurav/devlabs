@@ -109,8 +109,8 @@ export function renderEmailFooter(
   }
 
   if (type === "LIVE_CHAT") {
-    const termsLabel = context?.termsLabel || "Terms for Live Chat";
-    const privacyLabel = context?.privacyLabel || "Privacy for Live Chat";
+    const termsLabel = context?.termsLabel || "Terms";
+    const privacyLabel = context?.privacyLabel || "Privacy";
     const terms = context?.termsUrl
       ? `<a href="${escapeAttributeOrText(context.termsUrl)}" style="color:#7C3AED;text-decoration:underline;text-underline-offset:2px;font-weight:500;">${escapeAttributeOrText(termsLabel)}</a>`
       : "";
@@ -119,14 +119,11 @@ export function renderEmailFooter(
       : "";
     const links = [terms, privacy].filter(Boolean).join(` &nbsp;&bull;&nbsp; `);
     const brand = escapeAttributeOrText(context?.brandName || "Gaurav Patil");
-    const title = escapeAttributeOrText(context?.contextTitle || "Live Chat with Gaurav");
 
     return `
       ${divider}
-      <div style="${EMAIL_SPACING.footerMargin}font-size:${EMAIL_TYPOGRAPHY.sizeFooter};color:${EMAIL_TYPOGRAPHY.colorFooter};line-height:${EMAIL_TYPOGRAPHY.lineHeightFooter};">
-        <p style="margin:0 0 4px 0;font-weight:600;color:#334155;font-size:12px;">${title}</p>
-        ${links ? `<p style="margin:0 0 4px 0;font-size:11px;color:#64748b;">${links}</p>` : ""}
-        <p style="margin:0;color:#94a3b8;font-size:11px;">&copy; ${brand}</p>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.3;margin:0;">
+        <span>&copy; ${brand}</span>${links ? ` &nbsp;&bull;&nbsp; ${links}` : ""}
       </div>
     `;
   }
@@ -152,7 +149,7 @@ export function renderCompactEmailLayout(options: CompactEmailLayoutOptions): st
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>${safeTitle}</title>
 </head>
-<body style="margin:0;padding:12px 16px;background-color:#ffffff;font-family:${EMAIL_TYPOGRAPHY.fontSans};font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:${EMAIL_TYPOGRAPHY.lineHeightBody};-webkit-font-smoothing:antialiased;">
+<body style="margin:0;padding:8px 12px;background-color:#ffffff;font-family:${EMAIL_TYPOGRAPHY.fontSans};font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:${EMAIL_TYPOGRAPHY.lineHeightBody};-webkit-font-smoothing:antialiased;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="left" style="border-collapse:collapse;margin:0;max-width:540px;width:100%;">
     <tr>
       <td align="left" style="padding:0;font-family:${EMAIL_TYPOGRAPHY.fontSans};font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:${EMAIL_TYPOGRAPHY.lineHeightBody};text-align:left;">

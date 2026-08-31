@@ -21,6 +21,7 @@ import {
   FaEnvelope,
   FaPaperPlane,
   FaCommentDots,
+  FaShieldHalved,
   FaRightFromBracket,
 } from "react-icons/fa6";
 
@@ -144,6 +145,7 @@ export const AdminSidebar: React.FC = () => {
     { id: "14", label: "Media Assets", href: "/admin/media", icon: FaImages },
     { id: "15", label: "Inquiries & Leads", href: "/admin/inquiries", icon: FaEnvelope },
     { id: "16", label: "Mail Center", href: "/admin/mail", icon: FaPaperPlane },
+    { id: "17", label: "Cloudflare Security", href: "/admin/cloudflare", icon: FaShieldHalved },
   ];
 
   const isProfileActive = pathname === "/admin/profile";

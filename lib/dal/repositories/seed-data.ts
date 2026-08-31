@@ -12,6 +12,7 @@ import type {
   SocialLinkDocument,
   SeoDocument,
   AssistantDocument,
+  CloudflareSettingsDocument,
   PublicPortfolioProjection,
 } from "@/types/portfolio";
 
@@ -526,6 +527,17 @@ export const SEED_ASSISTANT: AssistantDocument = {
   version: 1,
 };
 
+export const SEED_CLOUDFLARE: CloudflareSettingsDocument = {
+  id: "cloudflare_main",
+  isSimulatedDowntime: false,
+  siteKey: "0x4AAAAAAEilFWDvwBZ3NPSK",
+  maxRetryAttempts: 2,
+  circuitBreakerEnabled: true,
+  fallbackEmailGateway: "no-reply@gauravpatil.online",
+  updatedAt: new Date().toISOString(),
+  version: 1,
+};
+
 export const SEED_PORTFOLIO_PROJECTION: PublicPortfolioProjection = {
   navigation: SEED_NAVIGATION.items,
   hero: SEED_HERO,
@@ -540,4 +552,5 @@ export const SEED_PORTFOLIO_PROJECTION: PublicPortfolioProjection = {
   socialLinks: SEED_SOCIAL_LINKS,
   seo: SEED_SEO,
   assistant: SEED_ASSISTANT,
+  cloudflare: SEED_CLOUDFLARE,
 };

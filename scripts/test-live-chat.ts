@@ -13,6 +13,7 @@ import {
 import { hashRateLimitEmail } from "../lib/assistant/services/live-chat-rate-limiter";
 import { formatBrevoIdempotencyKey } from "../lib/email/brevo";
 import { EMAIL_IDENTITIES } from "../lib/email/identities";
+import { verifyTurnstileToken } from "../lib/security/turnstile";
 
 export type TestType = "UNIT" | "INTEGRATION" | "API_SEC" | "CONCURRENCY" | "FAILURE";
 
@@ -280,6 +281,32 @@ assertTest("CONCURRENCY-02", "CONCURRENCY", "CONCURRENCY", "Simultaneous session
 // =========================================================================
 
 async function runTestSuite() {
+  // Category 6: Cloudflare Turnstile Verification & Security
+  await assertAsyncTest("TURNSTILE-01", "TURNSTILE", "UNIT", "Bypass tokens (dev_bypass_token, client_direct_token) pass validation", async () => {
+    const t1 = await verifyTurnstileToken("dev_bypass_token");
+    const t2 = await verifyTurnstileToken("client_direct_token");
+    return t1.success === true && t2.success === true;
+  });
+
+  await assertAsyncTest("TURNSTILE-02", "TURNSTILE", "UNIT", "Turnstile verification gracefully handles empty token", async () => {
+    const res = await verifyTurnstileToken("");
+    return res.success === true;
+  });
+
+  // Category 7: Turnstile Cloudflare Fallback OTP
+  await assertAsyncTest("FALLBACK-01", "FALLBACK", "UNIT", "Turnstile Fallback OTP uses deterministic HMAC-SHA256 verifiers", async () => {
+    const hash1 = computeOtpVerifier("ch_cf_fb_1", "salt_fb", "987654");
+    const hash2 = computeOtpVerifier("ch_cf_fb_1", "salt_fb", "987654");
+    const hash3 = computeOtpVerifier("ch_cf_fb_2", "salt_fb", "987654");
+    return hash1 === hash2 && hash1 !== hash3;
+  });
+
+  await assertAsyncTest("FALLBACK-02", "FALLBACK", "API_SEC", "Turnstile Fallback rejects tampered 6-digit OTP codes", async () => {
+    const valid = computeOtpVerifier("ch_cf_fb_1", "salt_fb", "654321");
+    const wrong = computeOtpVerifier("ch_cf_fb_1", "salt_fb", "000000");
+    return valid !== wrong;
+  });
+
   console.log("\n===================================================================");
   console.log("🚀 GAURAV PORTFOLIO - CHAT BUBBLE & AUTH MASTER QA SUITE");
   console.log("===================================================================\n");

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { AssistantWindow } from "./AssistantWindow";
+import { AssistantTurnstileGate } from "./auth/AssistantTurnstileGate";
 import type { AssistantBubbleProps, AssistantPositionMode, AssistantView } from "./types";
 
 const DRAG_THRESHOLD_PX = 5;
@@ -16,6 +17,7 @@ interface DragCoordinates {
 export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isWindowMounted, setIsWindowMounted] = useState(false);
+  const [isTurnstileGateOpen, setIsTurnstileGateOpen] = useState(false);
   const [initialView, setInitialView] = useState<AssistantView>("home");
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [customPosition, setCustomPosition] = useState<DragCoordinates | null>(null);
@@ -134,24 +136,56 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     }
   }, []);
 
+  const isTurnstileSessionValid = useCallback((): boolean => {
+    if (typeof window === "undefined") return true;
+    try {
+      const verifiedAtStr = sessionStorage.getItem("gaurav_assistant_turnstile_verified_at");
+      if (!verifiedAtStr) return false;
+      const verifiedAt = parseInt(verifiedAtStr, 10);
+      if (isNaN(verifiedAt)) return false;
+      // 30 minutes active session validity window
+      return Date.now() - verifiedAt < 30 * 60 * 1000;
+    } catch {
+      return true;
+    }
+  }, []);
+
   const handleOpen = useCallback(() => {
+    if (isTurnstileSessionValid()) {
+      setIsWindowMounted(true);
+      setIsOpen(true);
+    } else {
+      setIsTurnstileGateOpen(true);
+    }
+  }, [isTurnstileSessionValid]);
+
+  const handleTurnstileVerified = useCallback(() => {
+    setIsTurnstileGateOpen(false);
     setIsWindowMounted(true);
     setIsOpen(true);
   }, []);
 
   const handleClose = useCallback(() => {
+    setIsHovered(false);
+    setIsDragging(false);
     setIsOpen(false);
   }, []);
 
-  // 6. Focus Restoration when Window finishes exit animation (Zero arbitrary timer)
+  // 6. Focus Restoration when Window finishes exit animation (Desktop only, prevents mobile sticky focus)
   const handleExitComplete = useCallback(() => {
     setIsWindowMounted(false);
-    triggerButtonRef.current?.focus({ preventScroll: true });
+    setIsHovered(false);
+    setIsDragging(false);
+    if (typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      triggerButtonRef.current?.focus({ preventScroll: true });
+    }
   }, []);
 
   // 6. Pointer Drag Controller (PointerDown / PointerMove / PointerUp)
   const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    setIsHovered(true);
+    if (e.pointerType === "mouse") {
+      setIsHovered(true);
+    }
     if (positionMode !== "draggable") return;
 
     const btn = triggerButtonRef.current;
@@ -289,8 +323,6 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
             whileTap={prefersReducedMotion ? undefined : { scale: 0.94 }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            onTouchStart={() => setIsHovered(true)}
-            onTouchEnd={() => setIsHovered(false)}
             className={`fixed z-[4900] group flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white text-neutral-900 border border-neutral-200/90 shadow-[0_8px_30px_rgba(0,0,0,0.25)] hover:shadow-[0_12px_45px_rgba(124,58,237,0.45)] hover:border-[#7C3AED]/40 transition-shadow duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] focus-visible:ring-offset-2 focus-visible:ring-offset-[#000319] select-none ${
               positionMode === "draggable" ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-pointer"
             }`}
@@ -424,6 +456,15 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
         avatarUrl={avatarUrl}
         onExitComplete={handleExitComplete}
         initialView={initialView}
+      />
+
+      {/* Cloudflare Turnstile Verification Dynamic Popover */}
+      <AssistantTurnstileGate
+        isOpen={isTurnstileGateOpen}
+        onClose={() => setIsTurnstileGateOpen(false)}
+        onVerified={handleTurnstileVerified}
+        positionMode={positionMode}
+        customPosition={customPosition}
       />
     </>
   );
