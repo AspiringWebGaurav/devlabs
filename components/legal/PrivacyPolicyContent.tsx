@@ -435,7 +435,29 @@ function PrivacyContentInner() {
               </div>
             </div>
 
-            {/* Subsection 3: Privacy, Anonymity & Data Minimization */}
+            {/* Subsection 3: Live Chat Notification Privacy & Session Security */}
+            <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                Live Chat Notification Privacy &amp; 4-Hour Session Security
+              </h3>
+              <ul className="list-disc list-inside space-y-2 pl-2 text-sm text-neutral-300">
+                <li>
+                  <strong className="text-white">Direct Message Routing:</strong> When you send a message in Live Chat, it is streamed immediately if Gaurav is connected. When away, our system triggers an instantaneous notification email to Gaurav&apos;s personal inbox with your message transcript and 1-click reply routing.
+                </li>
+                <li>
+                  <strong className="text-white">Zero Plaintext OTP Storage:</strong> 6-digit verification codes are hashed using salted HMAC-SHA256 before storage and destroyed immediately upon successful authentication or after 5 minutes.
+                </li>
+                <li>
+                  <strong className="text-white">Encrypted 4-Hour Session Token:</strong> Verified sessions are stored in an encrypted `httpOnly`, `SameSite=Lax` cookie valid for 4 hours. You can close and return to the portfolio anytime during this period without re-verifying.
+                </li>
+                <li>
+                  <strong className="text-white">1-Click Sign-Out &amp; Detachment:</strong> You may revoke your session token at any time by clicking <strong className="text-white">Sign out</strong> in the chat header, which atomically clears your session cookie and closes live streams across all browser tabs.
+                </li>
+              </ul>
+            </div>
+
+            {/* Subsection 4: Privacy, Anonymity & Data Minimization */}
             <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
               <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-purple" />
@@ -446,7 +468,7 @@ function PrivacyContentInner() {
                   <strong className="text-white">Ephemeral Session Processing:</strong> Assistant interactions are evaluated in-memory strictly for real-time guidance during your active session.
                 </li>
                 <li>
-                  <strong className="text-white">Zero Third-Party Training or Data Selling:</strong> We guarantee 100% data integrity: your queries are never sold, rented, monetized, or fed into public generative model training pools.
+                  <strong className="text-white">Zero Third-Party Training or Data Selling:</strong> We guarantee 100% data integrity: your queries and live messages are never sold, rented, monetized, or fed into public generative model training pools.
                 </li>
                 <li>
                   <strong className="text-white">No Persistent Tracking:</strong> The assistant functions completely without tracking cookies, behavioral tracking scripts, or persistent fingerprinting.

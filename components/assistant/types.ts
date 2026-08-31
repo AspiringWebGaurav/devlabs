@@ -16,6 +16,18 @@ export type AssistantLifecycleState =
 
 export type AssistantConfig = Partial<AssistantDocument>;
 
+export type LiveChatAuthState =
+  | "CHECKING"
+  | "UNAUTHENTICATED"
+  | "OTP_SENT"
+  | "AUTHENTICATED";
+
+export interface LiveChatSessionData {
+  email: string;
+  name: string;
+  expiresAt: number;
+}
+
 export interface AssistantBubbleProps {
   config?: AssistantConfig;
 }
@@ -26,6 +38,7 @@ export interface AssistantWindowProps {
   assistantName?: string;
   avatarUrl?: string;
   onExitComplete?: () => void;
+  initialView?: AssistantView;
 }
 
 export interface AssistantHeaderProps {
@@ -34,6 +47,8 @@ export interface AssistantHeaderProps {
   currentView?: AssistantView;
   assistantName?: string;
   avatarUrl?: string;
+  authState?: LiveChatAuthState;
+  onSignOut?: () => void;
 }
 
 export interface AssistantViewProps {
@@ -42,4 +57,3 @@ export interface AssistantViewProps {
   assistantName?: string;
   avatarUrl?: string;
 }
-

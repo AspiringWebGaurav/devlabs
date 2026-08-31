@@ -7,7 +7,11 @@ import { AssistantHeader } from "./AssistantHeader";
 import { AssistantHomeView } from "./AssistantHomeView";
 import { AssistantQuestionsView } from "./AssistantQuestionsView";
 import { AssistantChatView } from "./AssistantChatView";
-import type { AssistantWindowProps, AssistantView } from "./types";
+import type {
+  AssistantWindowProps,
+  AssistantView,
+  LiveChatAuthState,
+} from "./types";
 
 export const AssistantWindow: React.FC<AssistantWindowProps> = ({
   isOpen,
@@ -15,18 +19,34 @@ export const AssistantWindow: React.FC<AssistantWindowProps> = ({
   assistantName = "Gaurav Assistant",
   avatarUrl,
   onExitComplete,
+  initialView = "home",
 }) => {
   const windowRef = useRef<HTMLDivElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
-  const [currentView, setCurrentView] = useState<AssistantView>("home");
+  const [currentView, setCurrentView] = useState<AssistantView>(initialView);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
 
-  // Reset to Home view whenever the window closes
+  // Set view if initialView changes while open
+  useEffect(() => {
+    if (isOpen && initialView) {
+      setCurrentView(initialView);
+    }
+  }, [isOpen, initialView]);
+
+  // Reset to initialView whenever the window closes
   useEffect(() => {
     if (!isOpen) {
-      setCurrentView("home");
+      setCurrentView(initialView || "home");
     }
-  }, [isOpen]);
+  }, [isOpen, initialView]);
+
+  // Live Chat sync state for header
+  const [chatAuthState, setChatAuthState] = useState<LiveChatAuthState>("CHECKING");
+  const [chatSignOutFn, setChatSignOutFn] = useState<(() => void) | undefined>(undefined);
+
+  const handleRegisterSignOut = useCallback((fn: () => void) => {
+    setChatSignOutFn(() => fn);
+  }, []);
 
   const handleNavigate = (view: AssistantView) => {
     setSlideDirection(1);
@@ -105,7 +125,6 @@ export const AssistantWindow: React.FC<AssistantWindowProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Immediate frame-0 focus entry
     if (windowRef.current) {
       const closeBtn = windowRef.current.querySelector<HTMLElement>('button[aria-label="Close assistant"]');
       const focusable = closeBtn || windowRef.current.querySelector<HTMLElement>('button, [tabindex="0"]');
@@ -170,7 +189,7 @@ export const AssistantWindow: React.FC<AssistantWindowProps> = ({
           }}
           transition={{ duration: 0.24, ease: "easeInOut" }}
           onClick={onClose}
-          className="fixed inset-0 z-[5050] bg-black/45 backdrop-blur-md cursor-pointer"
+          className="fixed inset-0 z-[5050] bg-black/60 backdrop-blur-md cursor-pointer"
           aria-hidden="true"
         />
       )}
@@ -213,117 +232,120 @@ export const AssistantWindow: React.FC<AssistantWindowProps> = ({
                   mass: 0.75,
                 }
           }
-          className="fixed z-[5060] flex flex-col bg-white text-neutral-900 overflow-hidden inset-0 w-full h-[100dvh] max-h-[100dvh] rounded-none border-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[460px] md:w-[485px] lg:w-[495px] sm:max-w-[calc(100vw-3rem)] sm:h-[580px] md:h-[620px] lg:h-[650px] sm:max-h-[calc(100dvh-4.5rem)] sm:rounded-[22px] sm:border sm:border-neutral-200/90 sm:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3),0_0_0_1px_rgba(0,0,0,0.06)] focus:outline-none"
+          className="fixed z-[5060] flex flex-col bg-white text-neutral-950 overflow-hidden inset-0 w-full h-[100dvh] max-h-[100dvh] rounded-none border-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[460px] md:w-[485px] lg:w-[495px] sm:max-w-[calc(100vw-3rem)] sm:h-[580px] md:h-[620px] lg:h-[650px] sm:max-h-[calc(100dvh-4.5rem)] sm:rounded-[22px] sm:border sm:border-neutral-200/80 sm:shadow-[0_20px_50px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.04)] focus:outline-none"
           style={{
             transformOrigin: "bottom right",
+            colorScheme: "light",
             paddingTop: "env(safe-area-inset-top, 0px)",
             paddingBottom: "env(safe-area-inset-bottom, 0px)",
             paddingLeft: "env(safe-area-inset-left, 0px)",
             paddingRight: "env(safe-area-inset-right, 0px)",
           }}
         >
-            {/* 1. Fixed Header with Dynamic Identity, Back Navigation & Accessible Close Button */}
-            <AssistantHeader
-              onClose={onClose}
-              onBack={handleBack}
-              currentView={currentView}
-              assistantName={assistantName}
-              avatarUrl={avatarUrl}
-            />
+          {/* 1. Dynamic Header */}
+          <AssistantHeader
+            onClose={onClose}
+            onBack={handleBack}
+            currentView={currentView}
+            assistantName={assistantName}
+            avatarUrl={avatarUrl}
+            authState={chatAuthState}
+            onSignOut={chatSignOutFn}
+          />
 
-            {/* 2. Scrollable Body: Dynamic Animated Page Views (Home / Questions / Chat) */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 bg-white flex flex-col items-center justify-center select-none relative">
-              <AnimatePresence mode="wait" custom={slideDirection}>
-                <motion.div
-                  key={currentView}
-                  custom={slideDirection}
-                  initial={
-                    prefersReducedMotion
-                      ? { opacity: 0 }
-                      : { opacity: 0, x: slideDirection * 24 }
-                  }
-                  animate={
-                    prefersReducedMotion
-                      ? { opacity: 1 }
-                      : { opacity: 1, x: 0 }
-                  }
-                  exit={
-                    prefersReducedMotion
-                      ? { opacity: 0 }
-                      : { opacity: 0, x: -slideDirection * 24 }
-                  }
-                  transition={
-                    prefersReducedMotion
-                      ? { duration: 0.1 }
-                      : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
-                  }
-                  className="w-full flex-1 flex flex-col items-center justify-center"
-                >
-                  {currentView === "home" && (
-                    <AssistantHomeView
-                      onNavigate={handleNavigate}
-                      onBack={handleBack}
-                      assistantName={assistantName}
-                      avatarUrl={avatarUrl}
-                    />
-                  )}
-                  {currentView === "questions" && (
-                    <AssistantQuestionsView
-                      onNavigate={handleNavigate}
-                      onBack={handleBack}
-                      assistantName={assistantName}
-                      avatarUrl={avatarUrl}
-                    />
-                  )}
-                  {currentView === "chat" && (
-                    <AssistantChatView
-                      onNavigate={handleNavigate}
-                      onBack={handleBack}
-                      assistantName={assistantName}
-                      avatarUrl={avatarUrl}
-                    />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
+          {/* 2. Scrollable Body: Dynamic Animated Page Views (Home / Questions / Chat) */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 bg-white flex flex-col items-center justify-center select-none relative">
+            <AnimatePresence mode="wait" custom={slideDirection}>
+              <motion.div
+                key={currentView}
+                custom={slideDirection}
+                initial={
+                  prefersReducedMotion
+                    ? { opacity: 0 }
+                    : { opacity: 0, x: slideDirection * 24 }
+                }
+                animate={
+                  prefersReducedMotion
+                    ? { opacity: 1 }
+                    : { opacity: 1, x: 0 }
+                }
+                exit={
+                  prefersReducedMotion
+                    ? { opacity: 0 }
+                    : { opacity: 0, x: -slideDirection * 24 }
+                }
+                transition={
+                  prefersReducedMotion
+                    ? { duration: 0.1 }
+                    : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
+                }
+                className="w-full h-full flex-1 flex flex-col items-center justify-center"
+              >
+                {currentView === "home" && (
+                  <AssistantHomeView
+                    onNavigate={handleNavigate}
+                    onBack={handleBack}
+                    assistantName={assistantName}
+                    avatarUrl={avatarUrl}
+                  />
+                )}
+                {currentView === "questions" && (
+                  <AssistantQuestionsView
+                    onNavigate={handleNavigate}
+                    onBack={handleBack}
+                    assistantName={assistantName}
+                    avatarUrl={avatarUrl}
+                  />
+                )}
+                {currentView === "chat" && (
+                  <AssistantChatView
+                    onNavigate={handleNavigate}
+                    onBack={handleBack}
+                    assistantName={assistantName}
+                    avatarUrl={avatarUrl}
+                    onAuthStateChange={setChatAuthState}
+                    onRegisterSignOut={handleRegisterSignOut}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
-            {/* 3. Fixed Footer: Policy Disclaimer */}
-            <div className="p-3 sm:p-4 pt-2.5 bg-white shrink-0 select-none border-t border-neutral-100">
-              <div className="text-[11px] sm:text-[12px] leading-relaxed text-neutral-500 text-center px-1 max-w-[96%] mx-auto">
-                <p>
-                  AI assistant can make mistakes. Conversations are informational and subject to our{" "}
-                  <a
-                    href="/terms?focus=assistant#assistant-terms"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-neutral-700 hover:text-[#7C3AED] font-medium transition-colors duration-150 hover:underline hover:underline-offset-2 hover:decoration-[#7C3AED]/40"
-                  >
-                    Terms of Service
-                  </a>
-                  {" "}and{" "}
-                  <a
-                    href="/privacy?focus=assistant#assistant-privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-neutral-700 hover:text-[#7C3AED] font-medium transition-colors duration-150 hover:underline hover:underline-offset-2 hover:decoration-[#7C3AED]/40"
-                  >
-                    Privacy Policy
-                  </a>
-                  .{" "}
-                  <Link
-                    href="/chat"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#7C3AED] hover:text-[#5B21B6] font-semibold transition-colors duration-150 hover:underline hover:underline-offset-2 hover:decoration-[#7C3AED]"
-                  >
-                    Learn more
-                  </Link>
-                  .
-                </p>
-              </div>
+          {/* 3. Fixed Footer: Policy Disclaimer */}
+          {/* 3. Fixed Footer: Terms, Privacy & Do's and Don'ts */}
+          <footer className="py-2.5 px-3 sm:px-4 bg-white shrink-0 select-none border-t border-neutral-100">
+            <div className="text-[11px] sm:text-[11.5px] leading-relaxed text-neutral-500 text-center px-1 max-w-[96%] mx-auto flex items-center justify-center flex-wrap gap-x-2.5 gap-y-0.5">
+              <Link
+                href="/terms?focus=assistant#assistant-terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-neutral-500 hover:text-[#7C3AED] font-medium transition-colors hover:underline hover:underline-offset-2"
+              >
+                Terms of Service
+              </Link>
+              <span className="text-neutral-300">•</span>
+              <Link
+                href="/privacy?focus=assistant#assistant-privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-neutral-500 hover:text-[#7C3AED] font-medium transition-colors hover:underline hover:underline-offset-2"
+              >
+                Privacy Policy
+              </Link>
+              <span className="text-neutral-300">•</span>
+              <Link
+                href="/chat#dos-and-donts"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-neutral-700 hover:text-[#7C3AED] font-semibold transition-colors hover:underline hover:underline-offset-2"
+              >
+                Do&apos;s &amp; Don&apos;ts
+              </Link>
             </div>
-          </motion.div>
-        )}
+          </footer>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 };
+

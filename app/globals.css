@@ -197,4 +197,24 @@
   }
 }
 
+/* Assistant Swiss Light Inputs: Force 100% pure white background and solid black text across normal & autofill states */
+.assistant-input {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  caret-color: #0f172a !important;
+}
+
+.assistant-input:-webkit-autofill,
+.assistant-input:-webkit-autofill:hover,
+.assistant-input:-webkit-autofill:focus,
+.assistant-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  caret-color: #0f172a !important;
+}
+
 

@@ -329,14 +329,39 @@ function TermsContentInner() {
             <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
               <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-purple" />
-                Purpose &amp; Scope of Gaurav Assistant
+                Purpose &amp; Scope of Gaurav Assistant &amp; Live Chat
               </h3>
               <p className="text-sm text-neutral-300 leading-relaxed">
-                The Personal Assistant is designed as an interactive guide to assist recruiters, clients, and developers in exploring Gaurav Patil&apos;s full-stack projects, design systems, and engineering benchmarks. It provides direct, automated insights into architecture patterns, GitHub code repositories, and developer specializations.
+                The Personal Assistant and Live Chat system are engineered to provide an interactive, personal communication channel with Gaurav Patil. It provides direct, automated insights into engineering benchmarks, architecture patterns, and project deliverables, while facilitating immediate 1-to-1 live communication.
               </p>
             </div>
 
-            {/* Subsection 2: Custom Mail Domain Support */}
+            {/* Subsection 2: Live Chat Real-Time & Fallback Delivery Architecture */}
+            <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                Live Chat Real-Time Dispatch &amp; Notification Architecture
+              </h3>
+              <p className="text-sm text-neutral-300 leading-relaxed">
+                When you initiate a conversation through <strong className="text-white">Live Chat with Gaurav</strong>, our backend operates a hybrid real-time communication pipeline:
+              </p>
+              <ul className="list-disc list-inside space-y-2 pl-2 text-sm text-neutral-300">
+                <li>
+                  <strong className="text-white">Active Online Streaming:</strong> If Gaurav is actively online and connected to the session, incoming messages arrive instantly in real-time.
+                </li>
+                <li>
+                  <strong className="text-white">Automated Inbox Dispatch:</strong> If Gaurav is away or offline, our server instantaneously generates and dispatches an automated lead notification directly to Gaurav&apos;s private inbox containing your verified sender details and full message transcript with 1-click direct response routing.
+                </li>
+                <li>
+                  <strong className="text-white">Single-Use 6-Digit Email Verification:</strong> To eliminate spam and protect system resources, access to Live Chat requires a single-use 6-digit OTP code dispatched exclusively from <code className="text-purple font-mono">no-reply@gauravpatil.online</code>. Verification codes expire in 5 minutes.
+                </li>
+                <li>
+                  <strong className="text-white">4-Hour Active Session Token:</strong> Once verified, an encrypted session remains active for 4 hours. You may close and reopen the chat window anytime within this window without re-authenticating. Visitors may explicitly terminate their session at any time using the <strong className="text-white">Sign out</strong> button in the top-right header.
+                </li>
+              </ul>
+            </div>
+
+            {/* Subsection 3: Custom Mail Domain Support */}
             <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
               <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-purple" />
@@ -360,12 +385,12 @@ function TermsContentInner() {
                 </div>
                 <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
                   <span className="text-xs sm:text-sm text-purple font-mono font-bold">no-reply@gauravpatil.online</span>
-                  <p className="text-xs text-neutral-400">Automated system receipts, transaction verification, and non-interactive alerts.</p>
+                  <p className="text-xs text-neutral-400">Automated Live Chat OTP passcodes, system receipts, and non-interactive alerts.</p>
                 </div>
               </div>
             </div>
 
-            {/* Subsection 3: AI Disclaimer & Acceptable Use */}
+            {/* Subsection 4: AI Disclaimer & Acceptable Use */}
             <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
               <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-purple" />
@@ -373,7 +398,7 @@ function TermsContentInner() {
               </h3>
               <ul className="list-disc list-inside space-y-2 pl-2 text-sm text-neutral-300">
                 <li>
-                  <strong className="text-white">Generative Limitations:</strong> While tuned for accuracy, generative AI models may occasionally produce incomplete, speculative, or outdated responses. Official GitHub commits and verified documentation remain the authoritative benchmark.
+                  <strong className="text-white">Generative Limitations:</strong> While tuned for accuracy, automated assistant responses may occasionally produce incomplete or summarized statements. Official portfolio source code and direct communication with Gaurav remain authoritative benchmarks.
                 </li>
                 <li>
                   <strong className="text-white">Acceptable Use:</strong> Visitors agree not to attempt prompt-injections, reverse-engineer underlying system prompts, extract internal configuration, or send abusive payloads.

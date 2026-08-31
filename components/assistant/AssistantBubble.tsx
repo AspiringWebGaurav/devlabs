@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { AssistantWindow } from "./AssistantWindow";
-import type { AssistantBubbleProps, AssistantPositionMode } from "./types";
+import type { AssistantBubbleProps, AssistantPositionMode, AssistantView } from "./types";
 
 const DRAG_THRESHOLD_PX = 5;
 const STORAGE_KEY = "gaurav_assistant_drag_pos";
@@ -16,6 +16,7 @@ interface DragCoordinates {
 export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isWindowMounted, setIsWindowMounted] = useState(false);
+  const [initialView, setInitialView] = useState<AssistantView>("home");
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [customPosition, setCustomPosition] = useState<DragCoordinates | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -28,7 +29,7 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const isEnabled = config?.isEnabled !== false;
   const assistantName = config?.assistantName || "Gaurav Assistant";
-  const avatarUrl = config?.avatarUrl;
+  const avatarUrl = config?.avatarUrl && config.avatarUrl.trim() !== "" ? config.avatarUrl.trim() : undefined;
   const positionMode: AssistantPositionMode = config?.positionMode === "draggable" ? "draggable" : "fixed";
 
   // Clamp coordinates within visible safe viewport bounds
@@ -111,6 +112,28 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     }
   }, [isEnabled, isOpen]);
 
+  // 5. Detect ?chat=open on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const chatParam = urlParams.get("chat");
+
+      if (chatParam === "open") {
+        setInitialView("chat");
+        setIsWindowMounted(true);
+        setIsOpen(true);
+
+        // Immediate address bar sanitization (clean URL)
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, "", cleanUrl);
+      }
+    } catch {
+      // Safe fallback
+    }
+  }, []);
+
   const handleOpen = useCallback(() => {
     setIsWindowMounted(true);
     setIsOpen(true);
@@ -120,7 +143,7 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     setIsOpen(false);
   }, []);
 
-  // 5. Focus Restoration when Window finishes exit animation (Zero arbitrary timer)
+  // 6. Focus Restoration when Window finishes exit animation (Zero arbitrary timer)
   const handleExitComplete = useCallback(() => {
     setIsWindowMounted(false);
     triggerButtonRef.current?.focus({ preventScroll: true });
@@ -304,7 +327,7 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
             />
 
             {/* 3. Icon: Speech Bubble with Namecheap-style Sea Wave Dots Animation */}
-            <div className="relative z-10 flex items-center justify-center text-[#0D0D0D] group-hover:text-[#7C3AED] transition-colors duration-200 pointer-events-none">
+            <div className="relative z-10 flex items-center justify-center text-neutral-800 group-hover:text-[#7C3AED] transition-colors duration-200 pointer-events-none">
               <svg
                 viewBox="0 0 28 28"
                 fill="none"
@@ -400,6 +423,7 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
         assistantName={assistantName}
         avatarUrl={avatarUrl}
         onExitComplete={handleExitComplete}
+        initialView={initialView}
       />
     </>
   );

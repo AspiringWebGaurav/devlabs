@@ -13,7 +13,6 @@ export async function middleware(request: NextRequest) {
     const sessionCookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
     const verifiedSession = sessionCookie ? await verifyAdminSession(sessionCookie) : null;
     const isAuthenticated = verifiedSession !== null;
-
     const isPublicAdminRoute =
       pathname === "/admin/login" ||
       pathname === "/admin/terms" ||

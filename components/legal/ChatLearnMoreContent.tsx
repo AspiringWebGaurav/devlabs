@@ -177,23 +177,23 @@ export const ChatLearnMoreContent: React.FC = () => {
                   <span className="text-xs font-mono font-semibold uppercase tracking-wider text-[#CBACF9]">
                     Section 04
                   </span>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                    <IoTimeOutline className="w-3 h-3" />
-                    Preview / In Development
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <IoCheckmarkCircleOutline className="w-3 h-3" />
+                    Production Ready &bull; OTP Authenticated
                   </span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                   What is &ldquo;Live Chat with Gaurav&rdquo;?
                 </h2>
                 <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-                  <strong>Current Status:</strong> The Live Chat with Gaurav view inside the bubble is configured as a direct communication channel. When connected, the system will notify Gaurav live so he can respond directly.
+                  <strong>Direct Personal Connection:</strong> Live Chat establishes a real-time messaging channel with Gaurav Patil. To safeguard against spam and protect communication integrity, visitors authenticate with a single-use 6-digit verification code sent to their email via <span className="font-mono text-purple">no-reply@gauravpatil.online</span>.
                 </p>
-                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-2">
-                  <h3 className="text-xs font-mono uppercase tracking-wider font-semibold text-amber-400">
-                    Important Clarification on Live Chat
+                <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-2">
+                  <h3 className="text-xs font-mono uppercase tracking-wider font-semibold text-purple">
+                    Direct Creator Notification &amp; 1-Click Reply
                   </h3>
                   <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
-                    Live Chat with Gaurav is designed to dispatch real-time alerts to Gaurav. <strong>It does not establish an outsourced chat operator team.</strong> All human correspondence and collaboration are conducted directly by Gaurav Patil.
+                    When you post a message, a real-time alert is immediately delivered to Gaurav&apos;s personal device. All human correspondence and collaboration are conducted directly by Gaurav Patil with zero intermediary call centers or outsourced operators.
                   </p>
                 </div>
               </div>
@@ -223,7 +223,7 @@ export const ChatLearnMoreContent: React.FC = () => {
                   Gaurav Portfolio is owned, developed, and operated exclusively by <strong>Gaurav Patil</strong> as an individual creator and developer.
                 </p>
                 <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-                  When you submit a project inquiry or send a message through the contact system, your submission routes directly to Gaurav&apos;s personal inbox. There are no intermediary call centers, support tiers, or automated surrogate responders handling your correspondence.
+                  When you submit a project inquiry or send a message through Live Chat, your submission routes directly to Gaurav&apos;s personal inbox. There are no intermediary call centers, support tiers, or automated surrogate responders handling your correspondence.
                 </p>
               </div>
             </div>
@@ -242,35 +242,35 @@ export const ChatLearnMoreContent: React.FC = () => {
                   </span>
                   <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                     <IoCheckmarkCircleOutline className="w-3 h-3" />
-                    Code-Verified Privacy
+                    Code-Verified Privacy &amp; Security
                   </span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                   How Is Chat Data Handled?
                 </h2>
                 <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-                  Based on current code implementation:
+                  Security and privacy standards implemented across Live Chat:
                 </p>
                 <ul className="space-y-2 text-xs sm:text-sm text-neutral-300">
                   <li className="flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple mt-1.5 shrink-0" />
-                    <span><strong>In-Memory Navigation State:</strong> In the current implementation, chat interaction state is held in React browser memory and is not persisted by the chat components.</span>
+                    <span><strong>Ephemeral OTP Challenges:</strong> 6-digit codes are stored as salted HMAC-SHA256 hashes with 5-minute lifetimes and automatically purged after 24 hours.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple mt-1.5 shrink-0" />
-                    <span><strong>No Chat Database Persistence:</strong> Chat navigation views do not execute database writes or local storage logging.</span>
+                    <span><strong>Signed Visitor Sessions:</strong> Authenticated sessions use HttpOnly, SameSite=Lax cookies with server-authoritative 24-hour expiration.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple mt-1.5 shrink-0" />
-                    <span><strong>No Third-Party AI Models:</strong> The current Chat Bubble implementation does not send chat messages to a third-party AI model provider.</span>
+                    <span><strong>Conversation Privacy Boundary:</strong> Messages in your thread are strictly accessible only to your authenticated email session and Gaurav Patil.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple mt-1.5 shrink-0" />
-                    <span><strong>No Chat-Specific Cookies:</strong> The assistant components do not create or use chat-specific cookies.</span>
+                    <span><strong>Automated 90-Day Retention Purge:</strong> Inactive conversations and messages are permanently purged after 90 days.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple mt-1.5 shrink-0" />
-                    <span><strong>Separate Contact Workflow:</strong> Contact-form submissions are a separate workflow governed by the existing <Link href="/privacy" className="text-purple hover:underline">Privacy Policy</Link> and contact/data-request process.</span>
+                    <span><strong>Separate Contact Workflow:</strong> Inquiries via the contact modal remain a distinct submission workflow governed by the <Link href="/privacy" className="text-purple hover:underline">Privacy Policy</Link>.</span>
                   </li>
                 </ul>
               </div>
@@ -298,6 +298,85 @@ export const ChatLearnMoreContent: React.FC = () => {
                 <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
                   For formal inquiries, technical audits, or engineering consultations, please refer directly to the verified source code in public repositories and communicate directly with Gaurav Patil.
                 </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 08: Chat Guidelines — Do's & Don'ts */}
+          <section id="dos-and-donts" className="p-6 sm:p-8 rounded-2xl bg-white/[0.02] border border-white/[0.08] backdrop-blur-xl shadow-xl transition-all duration-300">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-purple/10 border border-purple/20 flex items-center justify-center text-purple shrink-0 mt-1">
+                <FaShieldHalved className="w-5 h-5" />
+              </div>
+              <div className="space-y-4 flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="text-xs font-mono font-semibold uppercase tracking-wider text-purple">
+                    Section 08 &bull; Code of Conduct
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple">
+                    Official Guidelines
+                  </span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  Live Chat Guidelines: Do&apos;s &amp; Don&apos;ts
+                </h2>
+                <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
+                  To ensure high-priority message routing and maintain an executive, productive standard of communication for recruiters, engineering leads, and clients, please observe the following guidelines:
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  {/* DO'S */}
+                  <div className="p-4 sm:p-5 rounded-xl bg-emerald-500/[0.04] border border-emerald-500/20 space-y-3">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                      <IoCheckmarkCircleOutline className="w-4 h-4 text-emerald-400" />
+                      <span>DO (Recommended &amp; Welcomed)</span>
+                    </div>
+                    <ul className="space-y-2.5 text-xs sm:text-[13px] text-neutral-300">
+                      <li className="flex items-start gap-2">
+                        <span className="text-emerald-400 font-bold">✓</span>
+                        <span><strong>Engineering Roles &amp; Opportunities:</strong> Full-time positions, contracting, technical leadership, and freelance collaborations.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-emerald-400 font-bold">✓</span>
+                        <span><strong>Project Scopes &amp; Architecture:</strong> Web development, 3D WebGL, Next.js architecture, API integrations, and consultations.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-emerald-400 font-bold">✓</span>
+                        <span><strong>Clear Details &amp; Context:</strong> High-level project specifications, timeline expectations, or links to job descriptions.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-emerald-400 font-bold">✓</span>
+                        <span><strong>Technical Q&amp;A:</strong> Questions regarding technologies, performance benchmarks, and development workflow.</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* DON'TS */}
+                  <div className="p-4 sm:p-5 rounded-xl bg-rose-500/[0.04] border border-rose-500/20 space-y-3">
+                    <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+                      <FaTriangleExclamation className="w-3.5 h-3.5 text-rose-400" />
+                      <span>DON&apos;T (Prohibited &amp; Restricted)</span>
+                    </div>
+                    <ul className="space-y-2.5 text-xs sm:text-[13px] text-neutral-300">
+                      <li className="flex items-start gap-2">
+                        <span className="text-rose-400 font-bold">✕</span>
+                        <span><strong>No Unsolicited Marketing &amp; Spam:</strong> Cold sales outreach, bulk promotions, or automated link drops.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-rose-400 font-bold">✕</span>
+                        <span><strong>No Sensitive Credentials:</strong> Never share passwords, private API keys, payment data, or confidential secrets.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-rose-400 font-bold">✕</span>
+                        <span><strong>No Inappropriate or Abusive Language:</strong> Harassing, offensive, or malicious communications are strictly blocked.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-rose-400 font-bold">✕</span>
+                        <span><strong>No Blank Test Submissions:</strong> Provide your specific inquiry directly so Gaurav can follow up with exact information.</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           </section>

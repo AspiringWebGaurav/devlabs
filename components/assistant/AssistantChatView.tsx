@@ -1,34 +1,177 @@
 "use client";
 
-import React from "react";
-import { IoChatbubblesOutline, IoArrowBack } from "react-icons/io5";
-import type { AssistantViewProps } from "./types";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import type {
+  AssistantViewProps,
+  LiveChatAuthState,
+  LiveChatSessionData,
+} from "./types";
+import { LiveChatAuthForm } from "./auth/LiveChatAuthForm";
+import { LiveChatOtpVerify } from "./auth/LiveChatOtpVerify";
+import { LiveChatVerifiedComposer } from "./auth/LiveChatVerifiedComposer";
+import { CgSpinner } from "react-icons/cg";
 
-export const AssistantChatView: React.FC<AssistantViewProps> = ({ onBack }) => {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-5 sm:py-8 select-none w-full max-w-[440px] mx-auto">
-      {/* Icon Capsule */}
-      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#F5F3FF] border border-[#DDD6FE] flex items-center justify-center text-[#7C3AED] shadow-2xs mb-3.5 sm:mb-4">
-        <IoChatbubblesOutline className="w-6 h-6 sm:w-7 sm:h-7" />
+interface AssistantChatViewExtendedProps extends AssistantViewProps {
+  onAuthStateChange?: (state: LiveChatAuthState) => void;
+  onRegisterSignOut?: (signOutFn: () => void) => void;
+}
+
+export const AssistantChatView: React.FC<AssistantChatViewExtendedProps> = ({
+  onBack,
+  onAuthStateChange,
+  onRegisterSignOut,
+}) => {
+  const [authState, setAuthState] = useState<LiveChatAuthState>("CHECKING");
+  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [visitorEmail, setVisitorEmail] = useState<string>("");
+  const [visitorName, setVisitorName] = useState<string>("");
+
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
+  const onAuthStateChangeRef = useRef(onAuthStateChange);
+  const onRegisterSignOutRef = useRef(onRegisterSignOut);
+  const onBackRef = useRef(onBack);
+
+  useEffect(() => {
+    onAuthStateChangeRef.current = onAuthStateChange;
+    onRegisterSignOutRef.current = onRegisterSignOut;
+    onBackRef.current = onBack;
+  });
+
+  // Sync auth state to parent header
+  useEffect(() => {
+    onAuthStateChangeRef.current?.(authState);
+  }, [authState]);
+
+  // Sign out method
+  const handleSignOut = useCallback(async () => {
+    try {
+      await fetch("/api/assistant/auth/session", { method: "DELETE" });
+      broadcastChannelRef.current?.postMessage({
+        type: "SESSION_STATE_CHANGED",
+        status: "UNAUTHENTICATED",
+      });
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      setAuthState("UNAUTHENTICATED");
+      setVisitorEmail("");
+      setVisitorName("");
+      setChallengeId(null);
+      onBackRef.current?.();
+    }
+  }, []);
+
+  // Register sign out handler with parent
+  useEffect(() => {
+    onRegisterSignOutRef.current?.(handleSignOut);
+  }, [handleSignOut]);
+
+  // 1. Initial Session Verification & BroadcastChannel listener
+  const checkSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/assistant/auth/session");
+      const data = await res.json();
+
+      if (res.ok && data.ok && data.authenticated && data.session) {
+        setVisitorEmail(data.session.email);
+        setVisitorName(data.session.name);
+        setAuthState("AUTHENTICATED");
+      } else {
+        setAuthState("UNAUTHENTICATED");
+      }
+    } catch {
+      setAuthState("UNAUTHENTICATED");
+    }
+  }, []);
+
+  useEffect(() => {
+    checkSession();
+
+    // Multi-Tab synchronization using BroadcastChannel
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        const bc = new BroadcastChannel("live_chat_sync");
+        broadcastChannelRef.current = bc;
+
+        bc.onmessage = (event) => {
+          if (event.data?.type === "SESSION_STATE_CHANGED") {
+            if (event.data.status === "AUTHENTICATED") {
+              checkSession();
+            } else if (event.data.status === "UNAUTHENTICATED") {
+              setAuthState("UNAUTHENTICATED");
+              setVisitorEmail("");
+              setVisitorName("");
+            }
+          }
+        };
+
+        return () => {
+          bc.close();
+        };
+      } catch {
+        // BroadcastChannel unavailable
+      }
+    }
+  }, [checkSession]);
+
+  // ---------------------------------------------------------------------------
+  // View Rendering based on Auth State
+  // ---------------------------------------------------------------------------
+
+  if (authState === "CHECKING") {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center space-y-3 text-center p-6 select-none bg-white">
+        <CgSpinner className="w-8 h-8 text-[#7C3AED] animate-spin" />
+        <p className="text-xs text-neutral-500 font-medium">Verifying session...</p>
       </div>
+    );
+  }
 
-      {/* View Title & Subtitle */}
-      <h3 className="text-lg sm:text-2xl font-bold text-neutral-950 tracking-tight leading-tight">
-        Live Chat with Gaurav
-      </h3>
-      <p className="text-xs sm:text-sm text-neutral-500 max-w-[340px] mt-2 leading-relaxed">
-        Real-time interactive messaging is coming soon. When connected, the system will notify Gaurav live to respond directly.
-      </p>
+  if (authState === "UNAUTHENTICATED") {
+    return (
+      <LiveChatAuthForm
+        initialName={visitorName}
+        initialEmail={visitorEmail}
+        onOtpDispatched={(cId, name, email) => {
+          setChallengeId(cId);
+          setVisitorName(name);
+          setVisitorEmail(email);
+          setAuthState("OTP_SENT");
+        }}
+        onBack={onBack}
+      />
+    );
+  }
 
-      {/* Return to Options Action Button */}
-      <button
-        type="button"
-        onClick={onBack}
-        className="mt-5 sm:mt-6 inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-950 bg-neutral-100/90 hover:bg-neutral-200/90 border border-neutral-200/80 rounded-full transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED]"
-      >
-        <IoArrowBack className="w-3.5 h-3.5" />
-        <span>Return to Assistant Home</span>
-      </button>
-    </div>
+  if (authState === "OTP_SENT" && challengeId) {
+    return (
+      <LiveChatOtpVerify
+        challengeId={challengeId}
+        email={visitorEmail}
+        name={visitorName}
+        onVerified={(session: LiveChatSessionData) => {
+          setVisitorEmail(session.email);
+          setVisitorName(session.name);
+          setAuthState("AUTHENTICATED");
+          broadcastChannelRef.current?.postMessage({
+            type: "SESSION_STATE_CHANGED",
+            status: "AUTHENTICATED",
+          });
+        }}
+        onRestart={() => {
+          setChallengeId(null);
+          setAuthState("UNAUTHENTICATED");
+        }}
+      />
+    );
+  }
+
+  return (
+    <LiveChatVerifiedComposer
+      name={visitorName}
+      email={visitorEmail}
+      onBack={onBack}
+      onSignOut={handleSignOut}
+    />
   );
 };

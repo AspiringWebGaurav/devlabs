@@ -29,7 +29,7 @@
 !.env.example
 
 # ==========================================
-# AI Agent Workspaces, Rules & Notes (Local Only)
+# AI Agent Workspaces, Artifacts, Metadata & Rules (Local Only)
 # ==========================================
 /.agents
 /.agents/
@@ -37,6 +37,14 @@
 /.gemini/
 /.claude
 /.claude/
+/.antigravity
+/.antigravity/
+/brain
+/brain/
+/.system_generated
+/.system_generated/
+/scratch
+/scratch/
 
 # ==========================================
 # Vercel & Deployment
@@ -81,6 +89,10 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+*.swp
+*.bak
+*.backup
+*.tmp
 
 # ==========================================
 # Operating System Files
@@ -103,9 +115,3 @@ desktop.ini
 .eslintcache
 .stylelintcache
 .hintrc
-
-# ==========================================
-# Scratch & Local Diagnostic Scripts
-# ==========================================
-/scratch
-/scratch/
