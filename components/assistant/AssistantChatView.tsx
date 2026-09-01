@@ -27,9 +27,16 @@ export const AssistantChatView: React.FC<AssistantChatViewExtendedProps> = ({
   const [visitorName, setVisitorName] = useState<string>("");
 
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const onAuthStateChangeRef = useRef(onAuthStateChange);
   const onRegisterSignOutRef = useRef(onRegisterSignOut);
   const onBackRef = useRef(onBack);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     onAuthStateChangeRef.current = onAuthStateChange;
@@ -69,7 +76,12 @@ export const AssistantChatView: React.FC<AssistantChatViewExtendedProps> = ({
   // 1. Initial Session Verification & BroadcastChannel listener
   const checkSession = useCallback(async () => {
     try {
-      const res = await fetch("/api/assistant/auth/session");
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+
+      const res = await fetch("/api/assistant/auth/session", {
+        signal: abortControllerRef.current.signal,
+      });
       const data = await res.json();
 
       if (res.ok && data.ok && data.authenticated && data.session) {
@@ -79,7 +91,8 @@ export const AssistantChatView: React.FC<AssistantChatViewExtendedProps> = ({
       } else {
         setAuthState("UNAUTHENTICATED");
       }
-    } catch {
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") return;
       setAuthState("UNAUTHENTICATED");
     }
   }, []);

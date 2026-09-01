@@ -114,6 +114,11 @@ export function escapeHtml(text: string): string {
 export function resolveAppUrl(requestHeaders?: Headers | null): string {
   // 1. Authoritative runtime request headers (highest priority for 100% dynamic URL matching)
   if (requestHeaders) {
+    const origin = requestHeaders.get("origin");
+    if (origin && origin.startsWith("http")) {
+      return origin.replace(/\/$/, "");
+    }
+
     const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host");
     if (host) {
       const proto =
@@ -121,9 +126,18 @@ export function resolveAppUrl(requestHeaders?: Headers | null): string {
         (host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https");
       return `${proto}://${host}`.replace(/\/$/, "");
     }
+
+    const referer = requestHeaders.get("referer");
+    if (referer && referer.startsWith("http")) {
+      try {
+        return new URL(referer).origin.replace(/\/$/, "");
+      } catch {
+        // Fallback below
+      }
+    }
   }
 
-  // 2. In local development without explicit request headers, default to localhost
+  // 2. In local development without explicit request headers, default to localhost:3000
   if (process.env.NODE_ENV === "development") {
     if (
       process.env.NEXT_PUBLIC_APP_URL &&
@@ -811,9 +825,7 @@ export async function dispatchLiveChatAdminNotificationEmail(
   }
 
   const baseUrl = (params.baseUrl || resolveAppUrl(params.requestHeaders)).replace(/\/$/, "");
-  const roomAccessUrl = params.roomAccessSecret
-    ? `${baseUrl}/admin/chat/room-access/${params.roomAccessSecret}`
-    : `${baseUrl}/admin/chat/${params.threadId}`;
+  const roomAccessUrl = `${baseUrl}/chat/room?threadId=${encodeURIComponent(params.threadId)}&token=${encodeURIComponent(params.roomAccessSecret || "")}`;
 
   const ctaButtonHtml = `
     <div style="margin: 22px 0 16px 0; text-align: left;">
@@ -885,28 +897,28 @@ export async function dispatchLiveChatVisitorReplyEmail(
   const safeReply = escapeHtml(params.replySnippet.trim()).replace(/\n/g, "<br />");
 
   const baseUrl = (params.baseUrl || resolveAppUrl(params.requestHeaders)).replace(/\/$/, "");
-  const returnUrl = `${baseUrl}/?chat=open&c=${encodeURIComponent(params.capabilityToken)}`;
+  const returnUrl = params.capabilityToken
+    ? `${baseUrl}/?chat=open&c=${encodeURIComponent(params.capabilityToken)}`
+    : `${baseUrl}/?chat=open`;
   const termsUrl = `${baseUrl}/terms?focus=assistant#assistant-terms`;
   const privacyUrl = `${baseUrl}/privacy?focus=assistant#assistant-privacy`;
 
   const ctaButtonHtml = `
-    <div style="margin: 22px 0 16px 0; text-align: left;">
-      <a href="${returnUrl}" style="background-color: #7C3AED; color: #FFFFFF; font-size: 14px; font-weight: 600; text-decoration: none; padding: 10px 20px; border-radius: 8px; display: inline-block; box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);">
-        Open Conversation in Portfolio &rarr;
+    <div style="margin: 8px 0 6px 0;">
+      <a href="${returnUrl}" style="background-color: #7C3AED; color: #FFFFFF; font-size: 12px; font-weight: 600; text-decoration: none; padding: 7px 14px; border-radius: 6px; display: inline-block;">
+        Open Conversation &rarr;
       </a>
-      <p style="margin: 6px 0 0 0; font-size: 11px; color: #94A3B8;">Returns directly to your conversation in the live chat</p>
     </div>
   `;
 
   const bodyContentHtml = `
-    <p style="${EMAIL_SPACING.greetingMargin}font-weight:600;color:${EMAIL_TYPOGRAPHY.colorHeading};">Hi ${safeVisitorName},</p>
-    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};font-weight:600;">${safeAdminName} replied to your message:</p>
-    <div style="margin:12px 0;padding:12px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-left:3px solid #7C3AED;border-radius:8px;font-size:${EMAIL_TYPOGRAPHY.sizeBody};color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:${EMAIL_TYPOGRAPHY.lineHeightBody};">
+    <p style="margin:0 0 4px 0;font-weight:600;color:#111827;font-size:14px;">Hi ${safeVisitorName},</p>
+    <p style="margin:0 0 6px 0;color:#374151;font-size:13px;line-height:1.4;">${safeAdminName} replied to your message:</p>
+    <div style="margin:6px 0 8px 0;padding:8px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-left:3px solid #7C3AED;border-radius:6px;font-size:13px;color:#111827;line-height:1.4;">
       ${safeReply}
     </div>
-    <p style="${EMAIL_SPACING.keyValMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};">Sent: ${formattedTime}</p>
     ${ctaButtonHtml}
-    <p style="${EMAIL_SPACING.signoffMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorBody};">${safeAdminName}</p>
+    <p style="margin:0;color:#94a3b8;font-size:10px;">Sent: ${formattedTime}</p>
   `;
 
   const htmlContent = renderCompactEmailLayout({
@@ -916,8 +928,8 @@ export async function dispatchLiveChatVisitorReplyEmail(
     footerContext: {
       termsUrl,
       privacyUrl,
-      termsLabel: "Terms for Live Chat",
-      privacyLabel: "Privacy for Live Chat",
+      termsLabel: "Terms",
+      privacyLabel: "Privacy",
       brandName: "Gaurav Patil",
       contextTitle: "Live Chat with Gaurav",
     },

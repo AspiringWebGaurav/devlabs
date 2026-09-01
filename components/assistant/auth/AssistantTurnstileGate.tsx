@@ -7,7 +7,6 @@ import {
   IoClose,
   IoAlertCircle,
   IoRefresh,
-  IoCheckmarkCircle,
   IoMailOutline,
   IoKeyOutline,
   IoArrowBack,
@@ -113,15 +112,12 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
 
             const data = await res.json();
             if (res.ok && data.ok) {
-              setStatus("SUCCESS");
               if (typeof window !== "undefined") {
                 sessionStorage.setItem("gaurav_assistant_turnstile_verified_at", Date.now().toString());
                 sessionStorage.removeItem("gaurav_cf_circuit_broken");
               }
-              setTimeout(() => {
-                cleanupWidget();
-                onVerified();
-              }, 350);
+              cleanupWidget();
+              onVerified();
             } else {
               setFailureCount((c) => {
                 const next = c + 1;
@@ -132,7 +128,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                 return next;
               });
               setStatus("ERROR");
-              setErrorMessage(data.error || "Security verification failed. Cloudflare conflict detected.");
+              setErrorMessage(data.error || "Verification failed. Please try again.");
             }
           } catch {
             setFailureCount((c) => {
@@ -144,7 +140,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
               return next;
             });
             setStatus("ERROR");
-            setErrorMessage("Network error during Cloudflare verification.");
+            setErrorMessage("Network error during verification.");
           }
         },
         "error-callback": () => {
@@ -157,7 +153,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
             return next;
           });
           setStatus("ERROR");
-          setErrorMessage("Cloudflare challenge encountered a connection conflict.");
+          setErrorMessage("Connection conflict detected.");
         },
         "expired-callback": () => {
           if (widgetIdRef.current && window.turnstile) {
@@ -177,7 +173,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
         return next;
       });
       setStatus("ERROR");
-      setErrorMessage("Unable to initialize Cloudflare widget.");
+      setErrorMessage("Unable to connect to verification service.");
     }
   }, [cleanupWidget, onVerified]);
 
@@ -492,13 +488,13 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="text-xs font-bold text-white tracking-tight">
                   {activeSubView === "TURNSTILE"
-                    ? "Security Check"
+                    ? "Quick Verification"
                     : activeSubView === "FALLBACK_EMAIL"
                     ? "Email Verification"
                     : "Enter 6-Digit Code"}
                 </span>
                 <span className="text-[10px] text-neutral-400 font-mono tracking-wider uppercase">
-                  • {activeSubView === "TURNSTILE" ? "Cloudflare" : "Fallback"}
+                  • {activeSubView === "TURNSTILE" ? "Fast Pass" : "Email Code"}
                 </span>
               </div>
             </div>
@@ -510,7 +506,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                 onClose();
               }}
               className="w-7 h-7 sm:w-6 sm:h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/[0.1] transition-colors cursor-pointer"
-              aria-label="Close security check"
+              aria-label="Close"
             >
               <IoClose className="w-3.5 h-3.5" />
             </button>
@@ -522,29 +518,15 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
               {activeStatus === "LOADING" && (
                 <div className="flex items-center gap-2 text-xs text-neutral-400 font-medium py-3">
                   <CgSpinner className="w-4 h-4 animate-spin text-[#f38020]" />
-                  <span>Loading Cloudflare challenge...</span>
+                  <span>Loading...</span>
                 </div>
               )}
 
-              {activeStatus === "VERIFYING" && (
-                <div className="flex items-center gap-2 text-xs text-purple font-medium py-3 animate-pulse">
-                  <CgSpinner className="w-4 h-4 animate-spin text-[#7C3AED]" />
-                  <span>Verifying security token...</span>
-                </div>
-              )}
-
-              {activeStatus === "SUCCESS" && (
-                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 py-3 animate-in zoom-in-95 duration-150">
-                  <IoCheckmarkCircle className="w-5 h-5 text-emerald-400" />
-                  <span>Verified! Opening Assistant...</span>
-                </div>
-              )}
-
-              {/* Turnstile Dark Widget Mounting Container */}
+              {/* Turnstile Native Widget Container */}
               <div
                 ref={containerRef}
                 className={`flex justify-center transition-opacity duration-150 ${
-                  activeStatus === "READY" ? "opacity-100" : "hidden opacity-0"
+                  activeStatus === "READY" || activeStatus === "VERIFYING" ? "opacity-100" : "hidden opacity-0"
                 }`}
               />
 
@@ -559,7 +541,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                         <div>
                           <div className="font-semibold text-amber-200">Connection hiccup (Attempt 1 of 2)</div>
                           <div className="text-[11px] text-amber-300/80 mt-0.5">
-                            {activeErrorMessage || "Cloudflare had trouble loading. Click retry to refresh widget."}
+                            {activeErrorMessage || "Unable to connect. Click retry to try again."}
                           </div>
                         </div>
                       </div>
@@ -571,7 +553,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                           className="w-full py-2.5 sm:py-1.5 px-3 rounded-lg bg-white/[0.1] hover:bg-white/[0.18] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-white/[0.1] min-h-[40px]"
                         >
                           <IoRefresh className="w-3.5 h-3.5 text-[#f38020]" />
-                          <span>Retry Cloudflare Check (1 left)</span>
+                          <span>Retry (1 left)</span>
                         </button>
 
                         <div className="text-center pt-0.5">
@@ -595,9 +577,9 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                       <div className="p-2.5 rounded-xl bg-purple/15 border border-purple/30 text-white text-xs flex items-start gap-2 text-left">
                         <IoShieldCheckmark className="w-4 h-4 shrink-0 text-purple mt-0.5" />
                         <div>
-                          <div className="font-semibold text-[#CBACF9]">Cloudflare blocked or unavailable</div>
+                          <div className="font-semibold text-[#CBACF9]">Connection unavailable</div>
                           <div className="text-[11px] text-neutral-300 mt-0.5 leading-relaxed">
-                            Looks like your browser or network has Cloudflare conflicts. Don&apos;t worry &mdash; authenticate directly via Email code!
+                            Looks like there is a temporary connection conflict. Don&apos;t worry &mdash; continue directly via Email code!
                           </div>
                         </div>
                       </div>
@@ -613,7 +595,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                           className="w-full py-2.5 px-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-[0_0_15px_rgba(124,58,237,0.3)] min-h-[42px]"
                         >
                           <IoMailOutline className="w-4 h-4" />
-                          <span>Authenticate via Email Code (Recommended)</span>
+                          <span>Continue via Email Code</span>
                         </button>
 
                         {/* Only allow 1 final retry if failureCount is exactly 2; beyond 2, kill completely to avoid burning system */}
@@ -623,8 +605,8 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                             onClick={handleRetry}
                             className="w-full py-1.5 px-3 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-neutral-400 hover:text-white text-[11px] font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer min-h-[36px]"
                           >
-                            <IoRefresh className="w-3 h-3" />
-                            <span>Try Cloudflare Once More</span>
+                            <IoRefresh className="w-3 circular-spin h-3" />
+                            <span>Try Once More</span>
                           </button>
                         )}
                       </div>
@@ -639,7 +621,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
           {activeSubView === "FALLBACK_EMAIL" && (
             <form onSubmit={handleSendFallbackOtp} className="space-y-3 pt-1 animate-in fade-in duration-150">
               <p className="text-xs text-neutral-300 leading-relaxed">
-                Cloudflare conflict detected. Enter your email to receive a 6-digit security passcode:
+                Enter your email to receive a 6-digit verification code:
               </p>
 
               <div className="relative">
@@ -670,7 +652,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                 {fallbackLoading ? (
                   <>
                     <CgSpinner className="w-4 h-4 animate-spin" />
-                    <span>Dispatching Code...</span>
+                    <span>Sending Code...</span>
                   </>
                 ) : (
                   <>
@@ -732,7 +714,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                 ) : (
                   <>
                     <IoShieldCheckmark className="w-3.5 h-3.5" />
-                    <span>Verify &amp; Unlock Assistant</span>
+                    <span>Verify &amp; Open Assistant</span>
                   </>
                 )}
               </button>

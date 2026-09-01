@@ -14,6 +14,10 @@ import { hashRateLimitEmail } from "../lib/assistant/services/live-chat-rate-lim
 import { formatBrevoIdempotencyKey } from "../lib/email/brevo";
 import { EMAIL_IDENTITIES } from "../lib/email/identities";
 import { verifyTurnstileToken } from "../lib/security/turnstile";
+import {
+  generateAdminThreadToken,
+  verifyAdminThreadToken,
+} from "../lib/dal/repositories/live-chat.repository";
 
 export type TestType = "UNIT" | "INTEGRATION" | "API_SEC" | "CONCURRENCY" | "FAILURE";
 
@@ -305,6 +309,31 @@ async function runTestSuite() {
     const valid = computeOtpVerifier("ch_cf_fb_1", "salt_fb", "654321");
     const wrong = computeOtpVerifier("ch_cf_fb_1", "salt_fb", "000000");
     return valid !== wrong;
+  });
+
+  // Category 8: Admin Magic Link Room Token Security
+  await assertAsyncTest("THREAD-01", "THREAD_TOKEN", "UNIT", "Generates deterministic HMAC-SHA256 admin room token and verifies correctly", async () => {
+    const token = generateAdminThreadToken("thread_123", "neha@example.com");
+    return verifyAdminThreadToken("thread_123", "neha@example.com", token);
+  });
+
+  await assertAsyncTest("THREAD-02", "THREAD_TOKEN", "API_SEC", "Rejects tampered or invalid admin room tokens", async () => {
+    const validToken = generateAdminThreadToken("thread_123", "neha@example.com");
+    const tampered = validToken.slice(0, -2) + "ab";
+    return !verifyAdminThreadToken("thread_123", "neha@example.com", tampered) &&
+           !verifyAdminThreadToken("thread_123", "neha@example.com", "random_string");
+  });
+
+  await assertAsyncTest("THREAD-03", "THREAD_TOKEN", "API_SEC", "Distinct thread IDs produce distinct admin room tokens", async () => {
+    const t1 = generateAdminThreadToken("thread_123", "neha@example.com");
+    const t2 = generateAdminThreadToken("thread_456", "neha@example.com");
+    return t1 !== t2;
+  });
+
+  await assertAsyncTest("THREAD-04", "THREAD_TOKEN", "API_SEC", "Distinct visitor emails produce distinct admin room tokens", async () => {
+    const t1 = generateAdminThreadToken("thread_123", "neha@example.com");
+    const t2 = generateAdminThreadToken("thread_123", "client@example.com");
+    return t1 !== t2;
   });
 
   console.log("\n===================================================================");
