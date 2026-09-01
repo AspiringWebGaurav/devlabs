@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { IoArrowUp, IoLockClosedOutline, IoTimeOutline, IoSparkles } from "react-icons/io5";
+import { IoArrowUp, IoLockClosedOutline, IoTimeOutline, IoSparkles, IoChevronDown } from "react-icons/io5";
 import { CgSpinner } from "react-icons/cg";
 import { BsLightningChargeFill } from "react-icons/bs";
 
@@ -51,6 +51,8 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
   const [isSending, setIsSending] = useState(false);
   const [deliveryStage, setDeliveryStage] = useState<DeliveryStage>("idle");
   const [sendError, setSendError] = useState<string | null>(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [hasNewMessageBelow, setHasNewMessageBelow] = useState(false);
 
   const [isCircuitBroken, setIsCircuitBroken] = useState(false);
 
@@ -63,11 +65,47 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
   const isIdleRef = useRef(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
-  const isInitialLoadRef = useRef(true);
+  const hasInitialScrolledRef = useRef(false);
+  const prevMessagesCountRef = useRef(1);
+  const prevVisibleLimitRef = useRef(PAGE_SIZE);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // Robust bottom scrolling with requestAnimationFrame for layout-ready execution
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      if (behavior === "auto") {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+    setHasNewMessageBelow(false);
+  }, []);
+
+  // Distance from bottom check
+  const isNearBottom = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return true;
+    const threshold = 120;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distanceFromBottom <= threshold;
+  }, []);
+
+  // Scroll listener for floating "Jump to Latest" button
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isScrolledUp = distanceFromBottom > 120;
+    setShowScrollBottom(isScrolledUp);
+    if (!isScrolledUp) {
+      setHasNewMessageBelow(false);
+    }
+  }, []);
 
   // Server message segmentation for pagination
   const serverMessages = useMemo(
@@ -337,16 +375,60 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
     };
   }, [fetchMessages, resetIdleState, isVisitorLocked, isSessionPaused]);
 
+  // 3. Robust Multi-Stage Auto-Scroll Engine (Facebook Messenger / WhatsApp style)
   useEffect(() => {
-    if (isInitialLoadRef.current && messages.length > 0) {
-      scrollToBottom();
-      isInitialLoadRef.current = false;
-    } else if (isSending || deliveryStage === "sending") {
-      scrollToBottom();
-    }
-  }, [messages, isVisitorLocked, deliveryStage, isSending]);
+    const isOlderMessagesExpansion = visibleLimit > prevVisibleLimitRef.current;
+    prevVisibleLimitRef.current = visibleLimit;
 
-  // 3. Dispatch visitor message to Gaurav with realistic lifecycle transitions
+    // If the user expanded history upward via "Load older messages", preserve scroll offset without scrolling to bottom
+    if (isOlderMessagesExpansion) {
+      prevMessagesCountRef.current = messages.length;
+      return;
+    }
+
+    const isMessageCountIncreased = messages.length > prevMessagesCountRef.current;
+    prevMessagesCountRef.current = messages.length;
+
+    // Stage 1: Initial History Mount / Load (When history is fetched from server or on first paint)
+    if (!hasInitialScrolledRef.current) {
+      scrollToBottom("auto");
+
+      // Double frame verification to handle async font paint, avatar load, and layout reflow
+      const timerId1 = setTimeout(() => {
+        scrollToBottom("auto");
+      }, 50);
+      const timerId2 = setTimeout(() => {
+        scrollToBottom("auto");
+        if (serverMessages.length > 0) {
+          hasInitialScrolledRef.current = true;
+        }
+      }, 150);
+      timersRef.current.push(timerId1, timerId2);
+      return;
+    }
+
+    // Stage 2: User is sending or actively dispatched a message -> Instant / smooth scroll
+    if (isSending || deliveryStage === "sending") {
+      scrollToBottom("smooth");
+      return;
+    }
+
+    // Stage 3: New message arrived from server / polling / other tab
+    if (isMessageCountIncreased) {
+      const latestMsg = messages[messages.length - 1];
+      const isFromUser = latestMsg?.sender === "visitor" || latestMsg?.sender === "user";
+
+      if (isFromUser || isNearBottom()) {
+        // User was already near bottom or sent this message -> Smoothly scroll down
+        scrollToBottom("smooth");
+      } else {
+        // User deliberately scrolled up -> Keep their position and show new message badge on floating button
+        setHasNewMessageBelow(true);
+      }
+    }
+  }, [messages, visibleLimit, isSending, deliveryStage, scrollToBottom, isNearBottom, serverMessages.length]);
+
+  // 4. Dispatch visitor message to Gaurav with realistic lifecycle transitions
   const handleSendMessage = async () => {
     const trimmed = inputText.trim();
     if (!trimmed || isSending || isVisitorLocked) return;
@@ -419,7 +501,8 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
       {/* 1. Message Transcript */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 select-text"
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 select-text overscroll-contain"
       >
         {/* Top Pagination Landmark / Load Older Messages Trigger */}
         {hasOlderMessages ? (
@@ -568,6 +651,22 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Floating Scroll to Bottom Jump Button (Facebook/WhatsApp Style) */}
+      {showScrollBottom && (
+        <button
+          type="button"
+          onClick={() => scrollToBottom("smooth")}
+          className="absolute right-4 bottom-20 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-neutral-200 text-neutral-700 hover:text-neutral-900 text-xs font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:bg-neutral-50 active:scale-95 cursor-pointer animate-in fade-in zoom-in-95"
+          aria-label="Scroll to latest message"
+        >
+          {hasNewMessageBelow && (
+            <span className="w-2 h-2 rounded-full bg-[#7C3AED] animate-pulse" />
+          )}
+          <span className="text-[11px] font-semibold">{hasNewMessageBelow ? "New message" : "Latest"}</span>
+          <IoChevronDown className="w-3.5 h-3.5 text-[#7C3AED]" />
+        </button>
+      )}
 
       {/* 2. Auto-Expanding Input Bar / Turn-Locked State */}
       <div className="p-3.5 bg-white border-t border-neutral-100 shrink-0 select-none">

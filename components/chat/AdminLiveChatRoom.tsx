@@ -13,6 +13,7 @@ import {
   IoCheckmarkDoneOutline,
   IoTimeOutline,
   IoSparkles,
+  IoChevronDown,
 } from "react-icons/io5";
 import { CgSpinner } from "react-icons/cg";
 import { BsLightningChargeFill } from "react-icons/bs";
@@ -35,6 +36,8 @@ export const AdminLiveChatRoom: React.FC = () => {
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [hasNewMessageBelow, setHasNewMessageBelow] = useState(false);
 
   const [isCircuitBroken, setIsCircuitBroken] = useState(false);
 
@@ -47,11 +50,47 @@ export const AdminLiveChatRoom: React.FC = () => {
   const isIdleRef = useRef(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
-  const isInitialLoadRef = useRef(true);
+  const hasInitialScrolledRef = useRef(false);
+  const prevMessagesCountRef = useRef(0);
+  const prevVisibleLimitRef = useRef(PAGE_SIZE);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // Robust bottom scrolling with requestAnimationFrame for layout-ready execution
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      if (behavior === "auto") {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+    setHasNewMessageBelow(false);
+  }, []);
+
+  // Distance from bottom check
+  const isNearBottom = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return true;
+    const threshold = 120;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distanceFromBottom <= threshold;
+  }, []);
+
+  // Scroll listener for floating "Jump to Latest" button
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isScrolledUp = distanceFromBottom > 120;
+    setShowScrollBottom(isScrolledUp);
+    if (!isScrolledUp) {
+      setHasNewMessageBelow(false);
+    }
+  }, []);
 
   const totalMessages = messages.length;
   const hasOlderMessages = totalMessages > visibleLimit;
@@ -305,14 +344,54 @@ export const AdminLiveChatRoom: React.FC = () => {
     };
   }, [fetchThread, resetIdleState, isSessionPaused]);
 
+  // 2. Robust Multi-Stage Auto-Scroll Engine (Facebook Messenger / WhatsApp style)
   useEffect(() => {
-    if (isInitialLoadRef.current && messages.length > 0) {
-      scrollToBottom();
-      isInitialLoadRef.current = false;
-    } else if (isSending) {
-      scrollToBottom();
+    const isOlderMessagesExpansion = visibleLimit > prevVisibleLimitRef.current;
+    prevVisibleLimitRef.current = visibleLimit;
+
+    // If older messages were prepended, preserve scroll offset without scrolling to bottom
+    if (isOlderMessagesExpansion) {
+      prevMessagesCountRef.current = messages.length;
+      return;
     }
-  }, [messages, isSending]);
+
+    const isMessageCountIncreased = messages.length > prevMessagesCountRef.current;
+    prevMessagesCountRef.current = messages.length;
+
+    // Stage 1: Initial History Mount / Load (When history is fetched from server or on first paint)
+    if (!hasInitialScrolledRef.current && messages.length > 0) {
+      scrollToBottom("auto");
+
+      // Double frame verification to handle layout and dynamic text heights
+      const timerId1 = setTimeout(() => {
+        scrollToBottom("auto");
+      }, 50);
+      const timerId2 = setTimeout(() => {
+        scrollToBottom("auto");
+        hasInitialScrolledRef.current = true;
+      }, 150);
+      timersRef.current.push(timerId1, timerId2);
+      return;
+    }
+
+    // Stage 2: Admin is sending or actively dispatched a reply -> Instant / smooth scroll
+    if (isSending) {
+      scrollToBottom("smooth");
+      return;
+    }
+
+    // Stage 3: New visitor message arrived from server / polling / other tab
+    if (isMessageCountIncreased) {
+      const latestMsg = messages[messages.length - 1];
+      const isFromAdmin = latestMsg?.sender === "gaurav";
+
+      if (isFromAdmin || isNearBottom()) {
+        scrollToBottom("smooth");
+      } else {
+        setHasNewMessageBelow(true);
+      }
+    }
+  }, [messages, visibleLimit, isSending, scrollToBottom, isNearBottom]);
 
   // 3. Dispatch Gaurav's Reply with Multi-Room Broadcast and Safe Fallback
   const handleSendReply = async (e?: React.FormEvent) => {
@@ -478,6 +557,7 @@ export const AdminLiveChatRoom: React.FC = () => {
         {/* 2. Message Transcript Area (Clean Bubble White/Light Theme) */}
         <div
           ref={scrollContainerRef}
+          onScroll={handleScroll}
           className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-5 sm:py-5 space-y-3.5 sm:space-y-4 min-h-0 select-text bg-white overscroll-contain"
         >
           {/* Top Pagination Landmark / Load Older Messages Trigger */}
@@ -606,6 +686,22 @@ export const AdminLiveChatRoom: React.FC = () => {
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Floating Scroll to Bottom Jump Button (Facebook/WhatsApp Style) */}
+        {showScrollBottom && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom("smooth")}
+            className="absolute right-4 bottom-28 sm:bottom-24 z-20 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-neutral-200 text-neutral-700 hover:text-neutral-900 text-xs font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:bg-neutral-50 active:scale-95 cursor-pointer animate-in fade-in zoom-in-95"
+            aria-label="Scroll to latest message"
+          >
+            {hasNewMessageBelow && (
+              <span className="w-2 h-2 rounded-full bg-[#7C3AED] animate-pulse" />
+            )}
+            <span className="text-[11.5px] sm:text-[11px] font-semibold">{hasNewMessageBelow ? "New message" : "Latest"}</span>
+            <IoChevronDown className="w-3.5 h-3.5 text-[#7C3AED]" />
+          </button>
+        )}
 
         {/* 3. Gaurav Auto-Expanding Reply Composer Bar (Bubble-Matched) */}
         <div className="p-3 sm:p-4 bg-white border-t border-neutral-100 shrink-0 select-none pb-[max(0.75rem,env(safe-area-inset-bottom))]">
