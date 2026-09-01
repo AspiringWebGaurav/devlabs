@@ -77,33 +77,68 @@ export function extractClientIp(req: NextRequest): string {
  * Validates request Origin against authorized production, preview, and local development origins.
  */
 export function validateCsrfOrigin(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
+  const origin = req.headers.get("origin") || req.headers.get("referer");
   if (!origin) {
-    // Missing origin on browser state-changing POST/DELETE is rejected
+    // Missing origin/referer on browser state-changing POST/DELETE is rejected
     return false;
   }
 
-  const cleanOrigin = origin.trim().toLowerCase();
+  let cleanOrigin: string;
+  try {
+    cleanOrigin = new URL(origin).origin.toLowerCase();
+  } catch {
+    cleanOrigin = origin.trim().toLowerCase().replace(/\/$/, "");
+  }
 
-  // 1. Canonical Production Domain
-  if (cleanOrigin === "https://gauravpatil.online") return true;
-
-  // 2. Local Development
-  if (
-    cleanOrigin === "http://localhost:3000" ||
-    cleanOrigin === "http://127.0.0.1:3000"
-  ) {
+  // 1. Same-Origin Check (Matches incoming Next.js request origin directly)
+  if (req.nextUrl?.origin && cleanOrigin === req.nextUrl.origin.toLowerCase()) {
     return true;
   }
 
-  // 3. Vercel Preview Deployment Hostname Pattern
-  const previewRegex = /^https:\/\/(devlabs|gaurav-portfolio)-[a-z0-9-]+-aspiringwebgauravs-projects\.vercel\.app$/;
-  if (previewRegex.test(cleanOrigin)) return true;
+  // 2. Host / X-Forwarded-Host Header Match
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  if (host) {
+    const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+    if (cleanOrigin === `${proto}://${host}`.toLowerCase()) return true;
+  }
 
-  // 4. Custom App URL override
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    const configuredUrl = process.env.NEXT_PUBLIC_APP_URL.trim().replace(/\/$/, "");
-    if (cleanOrigin === configuredUrl) return true;
+  // 3. All Vercel Deployments (*.vercel.app)
+  if (cleanOrigin.endsWith(".vercel.app") && cleanOrigin.startsWith("https://")) {
+    return true;
+  }
+
+  // 4. Canonical Production & Supported Custom Domains
+  const trustedDomains = [
+    "https://gauravpatil.online",
+    "https://www.gauravpatil.online",
+    "https://gauravservices.eu.cc",
+    "https://www.gauravservices.eu.cc",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+  ];
+
+  if (trustedDomains.includes(cleanOrigin)) return true;
+
+  // 5. Allow any localhost / 127.0.0.1 port in development
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) {
+    return true;
+  }
+
+  // 6. Environment Variable Overrides
+  const envUrls = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : null,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null,
+  ].filter(Boolean) as string[];
+
+  for (const envUrl of envUrls) {
+    try {
+      const parsedEnvOrigin = new URL(envUrl).origin.toLowerCase();
+      if (cleanOrigin === parsedEnvOrigin) return true;
+    } catch {
+      if (cleanOrigin === envUrl.trim().toLowerCase().replace(/\/$/, "")) return true;
+    }
   }
 
   return false;
