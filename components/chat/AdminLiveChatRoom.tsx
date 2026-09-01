@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,10 +12,13 @@ import {
   IoRefresh,
   IoCheckmarkDoneOutline,
   IoTimeOutline,
+  IoSparkles,
 } from "react-icons/io5";
 import { CgSpinner } from "react-icons/cg";
 import { BsLightningChargeFill } from "react-icons/bs";
 import type { LiveChatThreadDocument, LiveChatMessageDocument } from "@/lib/dal/repositories/live-chat.repository";
+
+const PAGE_SIZE = 15;
 
 export const AdminLiveChatRoom: React.FC = () => {
   const searchParams = useSearchParams();
@@ -24,6 +27,8 @@ export const AdminLiveChatRoom: React.FC = () => {
 
   const [thread, setThread] = useState<LiveChatThreadDocument | null>(null);
   const [messages, setMessages] = useState<LiveChatMessageDocument[]>([]);
+  const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -33,6 +38,7 @@ export const AdminLiveChatRoom: React.FC = () => {
 
   const [isCircuitBroken, setIsCircuitBroken] = useState(false);
 
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -41,9 +47,42 @@ export const AdminLiveChatRoom: React.FC = () => {
   const isIdleRef = useRef(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
+  const isInitialLoadRef = useRef(true);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const totalMessages = messages.length;
+  const hasOlderMessages = totalMessages > visibleLimit;
+  const remainingOlderCount = Math.max(0, totalMessages - visibleLimit);
+
+  const displayedMessages = useMemo(() => {
+    return hasOlderMessages ? messages.slice(-visibleLimit) : messages;
+  }, [hasOlderMessages, messages, visibleLimit]);
+
+  // Facebook-style smooth load older history with scroll-offset preservation
+  const handleLoadOlderMessages = () => {
+    if (isLoadingOlder || !hasOlderMessages) return;
+    setIsLoadingOlder(true);
+
+    const container = scrollContainerRef.current;
+    const oldScrollHeight = container ? container.scrollHeight : 0;
+    const oldScrollTop = container ? container.scrollTop : 0;
+
+    const timerId = setTimeout(() => {
+      setVisibleLimit((prev) => Math.min(prev + PAGE_SIZE, totalMessages));
+      setIsLoadingOlder(false);
+
+      requestAnimationFrame(() => {
+        if (container) {
+          const newScrollHeight = container.scrollHeight;
+          container.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
+        }
+      });
+    }, 200);
+
+    timersRef.current.push(timerId);
   };
 
   // Clear timers and abort pending requests on unmount
@@ -267,8 +306,13 @@ export const AdminLiveChatRoom: React.FC = () => {
   }, [fetchThread, resetIdleState, isSessionPaused]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (isInitialLoadRef.current && messages.length > 0) {
+      scrollToBottom();
+      isInitialLoadRef.current = false;
+    } else if (isSending) {
+      scrollToBottom();
+    }
+  }, [messages, isSending]);
 
   // 3. Dispatch Gaurav's Reply with Multi-Room Broadcast and Safe Fallback
   const handleSendReply = async (e?: React.FormEvent) => {
@@ -380,14 +424,14 @@ export const AdminLiveChatRoom: React.FC = () => {
       <div className="w-full sm:max-w-2xl flex flex-col h-[100dvh] sm:h-[92vh] sm:max-h-[860px] bg-white rounded-none sm:rounded-3xl border-0 sm:border border-neutral-200/90 shadow-2xl overflow-hidden relative z-10">
         
         {/* 1. Header Bar with Verified Visitor Metadata */}
-        <div className="p-3.5 sm:p-4 bg-white border-b border-neutral-100 flex items-center justify-between shrink-0 shadow-2xs">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#7C3AED] text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-2xs shrink-0">
+        <div className="px-3.5 py-3 sm:px-4 sm:py-3.5 bg-white border-b border-neutral-100 flex items-center justify-between shrink-0 shadow-2xs">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-[#7C3AED] text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-2xs shrink-0">
               {visitorInitial}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm sm:text-base font-bold text-neutral-900 tracking-tight truncate">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h2 className="text-[14.5px] sm:text-base font-bold text-neutral-900 tracking-tight truncate">
                   {thread.visitorName}
                 </h2>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[10px] font-semibold shrink-0">
@@ -396,12 +440,12 @@ export const AdminLiveChatRoom: React.FC = () => {
                 </span>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <p className="text-[11px] sm:text-xs text-neutral-500 truncate flex items-center gap-1">
+                <p className="text-xs text-neutral-500 truncate flex items-center gap-1">
                   <IoMailOutline className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
                   <span className="truncate">{thread.visitorEmail}</span>
                 </p>
                 <span className="text-neutral-300 hidden sm:inline">•</span>
-                <span className="text-[10px] text-[#7C3AED] hidden sm:inline-flex items-center gap-1 font-mono font-medium">
+                <span className="text-[10.5px] text-[#7C3AED] hidden sm:inline-flex items-center gap-1 font-mono font-medium">
                   <BsLightningChargeFill className="w-2.5 h-2.5" />
                   <span>Direct Channel</span>
                 </span>
@@ -409,11 +453,11 @@ export const AdminLiveChatRoom: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => fetchThread(false)}
-              className="w-8 h-8 rounded-xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/80 text-neutral-600 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-9 h-9 sm:w-8 sm:h-8 rounded-xl bg-neutral-50 hover:bg-neutral-100 active:scale-95 border border-neutral-200/80 text-neutral-600 flex items-center justify-center transition-all cursor-pointer"
               title="Refresh conversation"
               aria-label="Refresh conversation"
             >
@@ -421,7 +465,7 @@ export const AdminLiveChatRoom: React.FC = () => {
             </button>
             <a
               href={`mailto:${thread.visitorEmail}`}
-              className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200 text-xs font-semibold text-neutral-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200/80 active:scale-95 border border-neutral-200 text-xs font-semibold text-neutral-700 transition-all"
               title="Email visitor directly"
             >
               <IoPersonCircleOutline className="w-4 h-4 text-[#7C3AED]" />
@@ -432,52 +476,102 @@ export const AdminLiveChatRoom: React.FC = () => {
         </div>
 
         {/* 2. Message Transcript Area (Clean Bubble White/Light Theme) */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5 space-y-4 min-h-0 select-text bg-white">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-5 sm:py-5 space-y-3.5 sm:space-y-4 min-h-0 select-text bg-white overscroll-contain"
+        >
+          {/* Top Pagination Landmark / Load Older Messages Trigger */}
+          {hasOlderMessages ? (
+            <div className="flex flex-col items-center justify-center pb-2 animate-in fade-in duration-150">
+              <button
+                type="button"
+                onClick={handleLoadOlderMessages}
+                disabled={isLoadingOlder}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200/80 text-neutral-700 text-[11.5px] sm:text-[11px] font-medium transition-all shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                {isLoadingOlder ? (
+                  <>
+                    <CgSpinner className="w-3.5 h-3.5 animate-spin text-[#7C3AED]" />
+                    <span>Loading older history...</span>
+                  </>
+                ) : (
+                  <>
+                    <IoTimeOutline className="w-3.5 h-3.5 text-neutral-500" />
+                    <span>Load older messages ({remainingOlderCount} earlier)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : messages.length > 0 ? (
+            <div className="flex flex-col items-center justify-center py-2.5 text-center space-y-1 animate-in fade-in duration-200 border-b border-neutral-100/80 mb-2">
+              <div className="w-6 h-6 rounded-full bg-purple/10 border border-purple/20 flex items-center justify-center text-[#7C3AED]">
+                <IoSparkles className="w-3 h-3" />
+              </div>
+              <p className="text-[11.5px] sm:text-[11px] font-semibold text-neutral-800 tracking-tight">Beginning of Conversation</p>
+              <p className="text-[10.5px] sm:text-[10px] text-neutral-400 font-mono">Authenticated channel with {thread.visitorName}</p>
+            </div>
+          ) : null}
+
           {messages.length === 0 ? (
             <div className="text-center py-16 text-neutral-400 text-xs flex flex-col items-center gap-2">
               <IoTimeOutline className="w-6 h-6 text-neutral-300" />
               <span>No messages in this conversation yet.</span>
             </div>
           ) : (
-            messages.map((msg) => {
+            displayedMessages.map((msg) => {
               const isAdmin = msg.sender === "gaurav";
 
               return (
-                <div
-                  key={msg.id}
-                  className={`flex items-start gap-2.5 ${isAdmin ? "flex-row-reverse" : "flex-row"} animate-in fade-in slide-in-from-bottom-1 duration-150`}
-                >
-                  {/* Avatar */}
-                  {isAdmin ? (
-                    <div className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
-                      GP
-                    </div>
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
-                      {visitorInitial.slice(0, 1)}
-                    </div>
-                  )}
-
-                  {/* Message Bubble */}
+                <div key={msg.id} className="space-y-1.5">
                   <div
-                    className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-[13px] sm:text-[13.5px] leading-relaxed shadow-2xs ${
-                      isAdmin
-                        ? "bg-[#7C3AED] text-white rounded-tr-xs"
-                        : "bg-neutral-100/90 text-neutral-800 rounded-tl-xs border border-neutral-200/60"
-                    }`}
+                    className={`flex items-start gap-2.5 ${isAdmin ? "flex-row-reverse" : "flex-row"} animate-in fade-in slide-in-from-bottom-1 duration-150`}
                   >
-                    <div className="whitespace-pre-wrap break-words">{msg.text}</div>
+                    {/* Avatar */}
+                    {isAdmin ? (
+                      <div className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+                        GP
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+                        {visitorInitial.slice(0, 1)}
+                      </div>
+                    )}
+
+                    {/* Message Bubble */}
                     <div
-                      className={`text-[10px] mt-1.5 text-right font-mono ${
-                        isAdmin ? "text-purple-200" : "text-neutral-400"
+                      className={`max-w-[88%] sm:max-w-[75%] rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-[14px] sm:text-[13.5px] leading-relaxed shadow-2xs ${
+                        isAdmin
+                          ? "bg-[#7C3AED] text-white rounded-tr-xs"
+                          : "bg-neutral-100/90 text-neutral-800 rounded-tl-xs border border-neutral-200/60"
                       }`}
                     >
-                      {isAdmin ? "Gaurav replied • " : `${thread.visitorName} • `}
-                      {msg.createdAt
-                        ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                        : "Just now"}
+                      <div className="whitespace-pre-wrap break-words">{msg.text}</div>
+                      <div
+                        className={`text-[10.5px] sm:text-[10px] mt-1 text-right font-mono ${
+                          isAdmin ? "text-purple-200" : "text-neutral-400"
+                        }`}
+                      >
+                        {msg.createdAt
+                          ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                          : "Just now"}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Gaurav / Admin Celebratory Status Badge */}
+                  {isAdmin && (
+                    <div className="flex items-center justify-end pr-10 animate-in fade-in duration-200">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple/10 border border-purple/20 text-[#7C3AED] text-[11.5px] sm:text-[11px] font-medium shadow-2xs">
+                        <BsLightningChargeFill className="w-3 h-3 text-[#7C3AED] shrink-0" />
+                        <span>
+                          You replied &bull;{" "}
+                          {msg.createdAt
+                            ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                            : "Just now"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -488,7 +582,7 @@ export const AdminLiveChatRoom: React.FC = () => {
               <button
                 type="button"
                 onClick={() => fetchThread(false, true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium shadow-2xs hover:bg-amber-100 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11.5px] sm:text-[11px] font-medium shadow-2xs hover:bg-amber-100 transition-colors cursor-pointer"
               >
                 <span>Connection paused &bull; Tap to reconnect</span>
               </button>
@@ -503,7 +597,7 @@ export const AdminLiveChatRoom: React.FC = () => {
                   setIsSessionPaused(false);
                   fetchThread(false, true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-medium shadow-2xs hover:bg-slate-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11.5px] sm:text-[11px] font-medium shadow-2xs hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 <span>Live sync paused &bull; Tap to resume</span>
               </button>
@@ -516,14 +610,14 @@ export const AdminLiveChatRoom: React.FC = () => {
         {/* 3. Gaurav Auto-Expanding Reply Composer Bar (Bubble-Matched) */}
         <div className="p-3 sm:p-4 bg-white border-t border-neutral-100 shrink-0 select-none pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {sendSuccess && (
-            <div className="mb-2 text-center text-emerald-600 text-xs flex items-center justify-center gap-1 animate-in fade-in">
+            <div className="mb-2 text-center text-emerald-600 text-xs sm:text-[13px] flex items-center justify-center gap-1 animate-in fade-in">
               <IoCheckmarkDoneOutline className="w-4 h-4" />
               <span>Reply delivered to {thread.visitorName} &bull; Email notification sent!</span>
             </div>
           )}
 
           {replyError && (
-            <div className="mb-2 p-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs text-center animate-in fade-in">
+            <div className="mb-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs sm:text-[13px] text-center animate-in fade-in">
               {replyError}
             </div>
           )}
@@ -536,16 +630,16 @@ export const AdminLiveChatRoom: React.FC = () => {
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
               disabled={isSending}
-              placeholder={`Reply to ${thread.visitorName}... (Press Enter to send)`}
-              className="w-full py-2 pl-4 pr-12 text-xs sm:text-[13.5px] bg-transparent text-neutral-900 placeholder-neutral-400 focus:outline-none resize-none max-h-36 leading-relaxed overflow-y-auto"
+              placeholder={`Reply to ${thread.visitorName}...`}
+              className="w-full py-2.5 pl-4 pr-12 text-[15px] sm:text-[14px] bg-transparent text-neutral-900 placeholder-neutral-400 focus:outline-none resize-none min-h-[44px] max-h-36 leading-normal overflow-y-auto"
             />
 
             <button
               type="submit"
               disabled={!replyText.trim() || isSending}
-              className={`absolute right-2 bottom-2 w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              className={`absolute right-1.5 bottom-1.5 w-9 h-9 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 replyText.trim() && !isSending
-                  ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-2xs active:scale-95"
+                  ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-2xs active:scale-90"
                   : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
               }`}
               aria-label="Send reply"
@@ -554,7 +648,7 @@ export const AdminLiveChatRoom: React.FC = () => {
             </button>
           </form>
 
-          <p className="text-[10px] text-neutral-400 text-center mt-2 font-mono">
+          <p className="text-[10.5px] sm:text-[10px] text-neutral-400 text-center mt-2 font-mono">
             Direct authenticated session &bull; Your reply sends immediately and emails {thread.visitorName}.
           </p>
         </div>

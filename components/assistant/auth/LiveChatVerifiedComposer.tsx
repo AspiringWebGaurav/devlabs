@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { IoArrowUp, IoLockClosedOutline } from "react-icons/io5";
+import { IoArrowUp, IoLockClosedOutline, IoTimeOutline, IoSparkles } from "react-icons/io5";
 import { CgSpinner } from "react-icons/cg";
 import { BsLightningChargeFill } from "react-icons/bs";
 
@@ -15,6 +15,8 @@ interface ChatMessage {
 }
 
 type DeliveryStage = "idle" | "sending" | "notifying" | "notified";
+
+const PAGE_SIZE = 15;
 
 interface LiveChatVerifiedComposerProps {
   name: string;
@@ -42,6 +44,8 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
   );
 
   const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage]);
+  const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [inputText, setInputText] = useState("");
   const [isVisitorLocked, setIsVisitorLocked] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -50,6 +54,7 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
 
   const [isCircuitBroken, setIsCircuitBroken] = useState(false);
 
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -58,9 +63,50 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
   const isIdleRef = useRef(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
+  const isInitialLoadRef = useRef(true);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Server message segmentation for pagination
+  const serverMessages = useMemo(
+    () => messages.filter((m) => m.id !== "msg_welcome"),
+    [messages]
+  );
+  const totalServerMessages = serverMessages.length;
+  const hasOlderMessages = totalServerMessages > visibleLimit;
+  const remainingOlderCount = Math.max(0, totalServerMessages - visibleLimit);
+
+  const displayedMessages = useMemo(() => {
+    if (!hasOlderMessages) {
+      return [welcomeMessage, ...serverMessages];
+    }
+    return serverMessages.slice(-visibleLimit);
+  }, [hasOlderMessages, welcomeMessage, serverMessages, visibleLimit]);
+
+  // Facebook-style smooth load older history with scroll-offset preservation
+  const handleLoadOlderMessages = () => {
+    if (isLoadingOlder || !hasOlderMessages) return;
+    setIsLoadingOlder(true);
+
+    const container = scrollContainerRef.current;
+    const oldScrollHeight = container ? container.scrollHeight : 0;
+    const oldScrollTop = container ? container.scrollTop : 0;
+
+    const timerId = setTimeout(() => {
+      setVisibleLimit((prev) => Math.min(prev + PAGE_SIZE, totalServerMessages));
+      setIsLoadingOlder(false);
+
+      requestAnimationFrame(() => {
+        if (container) {
+          const newScrollHeight = container.scrollHeight;
+          container.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
+        }
+      });
+    }, 200);
+
+    timersRef.current.push(timerId);
   };
 
   // Clear all pending timeouts and abort controllers on unmount
@@ -292,8 +338,13 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
   }, [fetchMessages, resetIdleState, isVisitorLocked, isSessionPaused]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isVisitorLocked, deliveryStage]);
+    if (isInitialLoadRef.current && messages.length > 0) {
+      scrollToBottom();
+      isInitialLoadRef.current = false;
+    } else if (isSending || deliveryStage === "sending") {
+      scrollToBottom();
+    }
+  }, [messages, isVisitorLocked, deliveryStage, isSending]);
 
   // 3. Dispatch visitor message to Gaurav with realistic lifecycle transitions
   const handleSendMessage = async () => {
@@ -366,10 +417,45 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
   return (
     <div className="flex-1 flex flex-col h-full w-full bg-white relative overflow-hidden select-none">
       {/* 1. Message Transcript */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 select-text">
-        {messages.map((msg, index) => {
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 select-text"
+      >
+        {/* Top Pagination Landmark / Load Older Messages Trigger */}
+        {hasOlderMessages ? (
+          <div className="flex flex-col items-center justify-center pb-2 animate-in fade-in duration-150">
+            <button
+              type="button"
+              onClick={handleLoadOlderMessages}
+              disabled={isLoadingOlder}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200/80 text-neutral-700 text-[11px] font-medium transition-all shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
+            >
+              {isLoadingOlder ? (
+                <>
+                  <CgSpinner className="w-3.5 h-3.5 animate-spin text-[#7C3AED]" />
+                  <span>Loading older history...</span>
+                </>
+              ) : (
+                <>
+                  <IoTimeOutline className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>Load older messages ({remainingOlderCount} earlier)</span>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-2.5 text-center space-y-1 animate-in fade-in duration-200 border-b border-neutral-100/80 mb-2">
+            <div className="w-6 h-6 rounded-full bg-purple/10 border border-purple/20 flex items-center justify-center text-[#7C3AED]">
+              <IoSparkles className="w-3 h-3" />
+            </div>
+            <p className="text-[11px] font-semibold text-neutral-800 tracking-tight">Beginning of Direct Channel</p>
+            <p className="text-[10px] text-neutral-400 font-mono">End-to-end encrypted with Gaurav Patil</p>
+          </div>
+        )}
+
+        {displayedMessages.map((msg, index) => {
           const isUser = msg.sender === "user" || msg.sender === "visitor";
-          const isLatestVisitorMsg = isUser && index === messages.length - 1;
+          const isLatestVisitorMsg = isUser && index === displayedMessages.length - 1;
 
           return (
             <div key={msg.id} className="space-y-1.5">
@@ -403,10 +489,20 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
                       isUser ? "text-purple-200" : "text-neutral-400"
                     }`}
                   >
-                    {!isUser && msg.id !== "msg_welcome" ? `Gaurav replied • ${msg.timestamp}` : msg.timestamp}
+                    {msg.timestamp}
                   </div>
                 </div>
               </div>
+
+              {/* Gaurav Reply Celebratory Status Badge */}
+              {!isUser && msg.id !== "msg_welcome" && (
+                <div className="flex items-center justify-start pl-10 animate-in fade-in duration-200">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple/10 border border-purple/20 text-[#7C3AED] text-[11px] font-medium shadow-2xs">
+                    <BsLightningChargeFill className="w-3 h-3 text-[#7C3AED] shrink-0" />
+                    <span>Gaurav replied &bull; {msg.timestamp}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Dynamic Notification Lifecycle Badge */}
               {isLatestVisitorMsg && isVisitorLocked && (
@@ -495,16 +591,16 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
               onKeyDown={handleKeyDown}
               disabled={isSending}
               placeholder="Type your message to Gaurav..."
-              className="w-full py-2 pl-4 pr-11 text-xs sm:text-[13.5px] bg-transparent text-neutral-900 placeholder-neutral-400 focus:outline-none resize-none max-h-36 leading-relaxed overflow-y-auto"
+              className="w-full py-2.5 pl-4 pr-11 text-[14.5px] sm:text-[13.5px] bg-transparent text-neutral-900 placeholder-neutral-400 focus:outline-none resize-none min-h-[40px] max-h-36 leading-normal overflow-y-auto"
             />
 
             <button
               type="button"
               onClick={handleSendMessage}
               disabled={!inputText.trim() || isSending}
-              className={`absolute right-2 bottom-2 w-7 h-7 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              className={`absolute right-1.5 bottom-1.5 w-8 h-8 sm:w-7 sm:h-7 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 inputText.trim() && !isSending
-                  ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-2xs"
+                  ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-2xs active:scale-90"
                   : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
               }`}
               aria-label="Send message"

@@ -8,6 +8,7 @@ import {
 } from "react-icons/io5";
 import { CgSpinner } from "react-icons/cg";
 import Link from "next/link";
+import { LiveChatLearnMoreModal } from "./LiveChatLearnMoreModal";
 import type { LiveChatSessionData } from "../types";
 
 interface LiveChatOtpVerifyProps {
@@ -33,6 +34,7 @@ export const LiveChatOtpVerify: React.FC<LiveChatOtpVerifyProps> = ({
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [cooldown, setCooldown] = useState(60);
+  const [showLearnMore, setShowLearnMore] = useState(false);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -335,13 +337,13 @@ export const LiveChatOtpVerify: React.FC<LiveChatOtpVerifyProps> = ({
               Privacy
             </Link>
             .{" "}
-            <Link
-              href="/terms?focus=assistant#assistant-terms"
-              target="_blank"
-              className="text-[#7C3AED] hover:text-[#6D28D9] font-medium underline-offset-2 hover:underline"
+            <button
+              type="button"
+              onClick={() => setShowLearnMore(true)}
+              className="text-[#7C3AED] hover:text-[#6D28D9] font-medium underline-offset-2 hover:underline cursor-pointer inline"
             >
               Learn more
-            </Link>
+            </button>
             .
           </p>
           <p className="text-[10px] text-neutral-400">
@@ -349,6 +351,12 @@ export const LiveChatOtpVerify: React.FC<LiveChatOtpVerifyProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Non-Technical Learn More Modal */}
+      <LiveChatLearnMoreModal
+        isOpen={showLearnMore}
+        onClose={() => setShowLearnMore(false)}
+      />
     </div>
   );
 };

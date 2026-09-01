@@ -9,6 +9,7 @@ import {
 } from "react-icons/io5";
 import { CgSpinner } from "react-icons/cg";
 import Link from "next/link";
+import { LiveChatLearnMoreModal } from "./LiveChatLearnMoreModal";
 
 interface LiveChatAuthFormProps {
   initialName?: string;
@@ -32,6 +33,7 @@ export const LiveChatAuthForm: React.FC<LiveChatAuthFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showLearnMore, setShowLearnMore] = useState(false);
 
   // Rate-limit countdown timer
   React.useEffect(() => {
@@ -253,13 +255,13 @@ export const LiveChatAuthForm: React.FC<LiveChatAuthFormProps> = ({
               Privacy
             </Link>
             .{" "}
-            <Link
-              href="/terms?focus=assistant#assistant-terms"
-              target="_blank"
-              className="text-[#7C3AED] hover:text-[#6D28D9] font-medium underline-offset-2 hover:underline"
+            <button
+              type="button"
+              onClick={() => setShowLearnMore(true)}
+              className="text-[#7C3AED] hover:text-[#6D28D9] font-medium underline-offset-2 hover:underline cursor-pointer inline"
             >
               Learn more
-            </Link>
+            </button>
             .
           </p>
           <button
@@ -271,6 +273,12 @@ export const LiveChatAuthForm: React.FC<LiveChatAuthFormProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Non-Technical Learn More Modal */}
+      <LiveChatLearnMoreModal
+        isOpen={showLearnMore}
+        onClose={() => setShowLearnMore(false)}
+      />
     </div>
   );
 };

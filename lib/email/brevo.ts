@@ -918,7 +918,8 @@ export async function dispatchLiveChatVisitorReplyEmail(
       ${safeReply}
     </div>
     ${ctaButtonHtml}
-    <p style="margin:0;color:#94a3b8;font-size:10px;">Sent: ${formattedTime}</p>
+    <p style="margin:6px 0 0 0;font-size:11px;color:#64748b;line-height:1.4;">This is an automated notification. Please do not reply directly to this email &mdash; click the button above to continue your conversation in the Live Chat bubble.</p>
+    <p style="margin:4px 0 0 0;color:#94a3b8;font-size:10px;">Sent: ${formattedTime}</p>
   `;
 
   const htmlContent = renderCompactEmailLayout({
@@ -935,11 +936,11 @@ export async function dispatchLiveChatVisitorReplyEmail(
     },
   });
 
-  const textContent = `Hi ${params.visitorName.trim()},\n\n${params.adminName.trim() || "Gaurav Patil"} replied to your message (${formattedTime}):\n\n"${params.replySnippet.trim()}"\n\nOpen your conversation in the portfolio to reply:\n${returnUrl}\n\n--------------------------------------------------\nLive Chat with Gaurav\nTerms for Live Chat: ${termsUrl}\nPrivacy for Live Chat: ${privacyUrl}\n© Gaurav Patil`;
+  const textContent = `Hi ${params.visitorName.trim()},\n\n${params.adminName.trim() || "Gaurav Patil"} replied to your message (${formattedTime}):\n\n"${params.replySnippet.trim()}"\n\nOpen your conversation in the Live Chat bubble to reply:\n${returnUrl}\n\n(This is an automated notification. Please do not reply to this email. Continue in Live Chat.)\n\n--------------------------------------------------\nLive Chat with Gaurav\nTerms for Live Chat: ${termsUrl}\nPrivacy for Live Chat: ${privacyUrl}\n© Gaurav Patil`;
 
   return sendTransactionalEmail({
-    purpose: "CONTACT_FORM",
-    identity: EMAIL_IDENTITIES.HELLO,
+    purpose: "SYSTEM_NOTIFICATION",
+    identity: EMAIL_IDENTITIES.NO_REPLY,
     to: [{ email: rawEmail, name: params.visitorName.trim() }],
     subject: "Gaurav replied to your message | Gaurav Patil",
     htmlContent,
