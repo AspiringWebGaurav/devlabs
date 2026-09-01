@@ -39,12 +39,17 @@
 /.claude/
 /.antigravity
 /.antigravity/
+/.cursor
+/.cursor/
+/.windsurf
+/.windsurf/
 /brain
 /brain/
 /.system_generated
 /.system_generated/
 /scratch
 /scratch/
+*.local.md
 
 # ==========================================
 # Vercel & Deployment

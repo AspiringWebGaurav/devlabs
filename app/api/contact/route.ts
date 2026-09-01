@@ -16,6 +16,7 @@ import { validateEmail, validateName, validateMessage, MESSAGE_MIN_CHARS, MESSAG
 import { evaluateContentModeration } from "@/lib/security/ai-moderation";
 import { inquiriesRepository } from "@/lib/admin/repositories";
 import { getRequestContext } from "@/lib/api/context";
+import { isLifecycleLockActive } from "@/lib/dal/lifecycle/lock";
 import { ApiError, createApiErrorResponse } from "@/lib/api/error";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,22 @@ const ContactSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const { requestId, clientIp } = getRequestContext(request);
+
+  // 0. Maintenance Lock Guard during Database Lifecycle Reset
+  if (await isLifecycleLockActive()) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "SERVICE_UNAVAILABLE",
+          message: "Database maintenance in progress. Please retry in a few moments.",
+          retryable: true,
+          requestId,
+        },
+      },
+      { status: 503, headers: { "Retry-After": "5", "x-request-id": requestId } }
+    );
+  }
 
   try {
     // 1. Content-Length Protection (Max 1MB)

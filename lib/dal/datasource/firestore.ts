@@ -256,6 +256,82 @@ class FirestoreDataSource {
       throw err;
     }
   }
+
+  /**
+   * Retrieves all root collection names from Firestore.
+   */
+  public async listAllCollections(): Promise<string[]> {
+    const startTime = Date.now();
+    const db = this.getDb();
+    if (!db) {
+      adminLogger.warn("FirestoreDataSource:listAllCollections", "Firestore Admin App not configured");
+      return [];
+    }
+
+    try {
+      const collections = await db.listCollections();
+      const names = collections.map((col) => col.id);
+      adminLogger.latency("Firestore:listAllCollections", Date.now() - startTime, { count: names.length });
+      return names;
+    } catch (err) {
+      adminLogger.error("Firestore:listAllCollections", err, "Failed to list collections");
+      throw err;
+    }
+  }
+
+  /**
+   * Deletes all documents in a collection in chunked WriteBatches (idempotent, supports large sets).
+   * Also deletes subcollections recursively if any exist.
+   */
+  public async deleteCollectionBatched(collectionName: string, batchSize = 400): Promise<number> {
+    const startTime = Date.now();
+    const db = this.getDb();
+    if (!db) throw new Error("Firestore Admin App not configured");
+
+    let totalDeleted = 0;
+
+    try {
+      const collectionRef = db.collection(collectionName);
+
+      while (true) {
+        const snapshot = await collectionRef.limit(batchSize).get();
+        if (snapshot.empty) break;
+
+        const batch = db.batch();
+        for (const doc of snapshot.docs) {
+          // Check for subcollections recursively
+          const subcollections = await doc.ref.listCollections();
+          for (const subcol of subcollections) {
+            const subSnapshot = await subcol.get();
+            const subBatch = db.batch();
+            for (const subDoc of subSnapshot.docs) {
+              subBatch.delete(subDoc.ref);
+            }
+            if (subSnapshot.size > 0) {
+              await subBatch.commit();
+              totalDeleted += subSnapshot.size;
+            }
+          }
+
+          batch.delete(doc.ref);
+        }
+
+        await batch.commit();
+        totalDeleted += snapshot.size;
+
+        if (snapshot.size < batchSize) break;
+      }
+
+      adminLogger.latency(`Firestore:deleteCollectionBatched:${collectionName}`, Date.now() - startTime, {
+        totalDeleted,
+      });
+
+      return totalDeleted;
+    } catch (err) {
+      adminLogger.error(`Firestore:deleteCollectionBatched:${collectionName}`, err, "Failed to delete collection batched");
+      throw err;
+    }
+  }
 }
 
 export const firestoreDataSource = new FirestoreDataSource();

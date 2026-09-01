@@ -42,7 +42,12 @@ export const BUTTON_HELP = {
   UPLOAD_MEDIA: "Uploads an image file to Firebase Storage and records it in your media ledger.",
   UPLOAD_ASSET: "Uploads an image file to Firebase Storage and records it in your media ledger.",
   SWEEP_ORPHANS: "Scans for unused, unlinked files older than 24 hours and permanently deletes them to save storage space.",
-} as const;
 
+  // Database Lifecycle & Purge (/admin/purge)
+  DATABASE_AUDIT: "Scans all root Firestore collections, RTDB nodes, and Upstash Redis keys to calculate exact deletion and preservation counts.",
+  DRY_RUN: "Simulates discovery, classification, and calculation with zero destructive writes to preview exact impact.",
+  PURGE_DATABASE: "Permanently wipes all dynamic inquiries, emails, chats, tokens, and Upstash Redis state while keeping static portfolio content 100% intact.",
+  RESET_AND_RESEED: "Wipes dynamic data and repopulates the development database with realistic synthetic dummy inquiries, chats, and mail records.",
+} as const;
 
 export type ButtonHelpKey = keyof typeof BUTTON_HELP;
