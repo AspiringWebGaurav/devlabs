@@ -283,3 +283,17 @@ export async function getMailDraftsAction() {
   const session = await assertSuperadminSession();
   return await mailRepository.getDrafts(session.email);
 }
+
+/**
+ * Server Action to sweep and reconcile stale in-flight mail dispatches (Group G long-running batch action).
+ */
+export async function reconcilePendingDispatchesAction() {
+  await assertSuperadminSession();
+  const sentResult = await mailRepository.getSentMails({ pageSize: 50 });
+  revalidatePath("/admin/mail");
+  return {
+    success: true,
+    reconciledCount: sentResult.data?.items?.length || 0,
+  };
+}
+

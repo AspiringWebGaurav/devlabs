@@ -13,10 +13,12 @@ import {
   type AuthStatusApiResponse,
 } from "@/lib/admin/auth";
 import { otpService } from "@/lib/admin/services/otp.service";
+import { getRequestContext } from "@/lib/api/context";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest): Promise<NextResponse<AuthStatusApiResponse>> {
+  const { requestId } = getRequestContext(request);
   const now = Date.now();
 
   try {
@@ -24,7 +26,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<AuthStatus
     if (!challengeId) {
       return NextResponse.json(
         { success: false, status: "UNAUTHORIZED", serverTime: now, error: "No active challenge cookie." },
-        { status: 401 }
+        { status: 401, headers: { "x-request-id": requestId } }
       );
     }
 

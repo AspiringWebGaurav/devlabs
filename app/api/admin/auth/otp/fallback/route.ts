@@ -12,16 +12,19 @@ import {
 } from "@/lib/admin/auth";
 import { otpService } from "@/lib/admin/services/otp.service";
 import { extractClientIp } from "@/lib/admin/services/ip-security.service";
+import { getRequestContext } from "@/lib/api/context";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest): Promise<NextResponse<AuthFallbackApiResponse>> {
+  const { requestId } = getRequestContext(request);
+
   try {
     const challengeId = request.cookies.get(ADMIN_OTP_COOKIE_NAME)?.value;
     if (!challengeId) {
       return NextResponse.json(
         { success: false, error: "No active verification challenge. Please sign in again." },
-        { status: 401 }
+        { status: 401, headers: { "x-request-id": requestId } }
       );
     }
 

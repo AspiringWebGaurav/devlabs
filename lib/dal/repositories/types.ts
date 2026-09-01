@@ -44,6 +44,25 @@ export interface InquiryItem {
   senderIdentity?: string;
   replyLockUntil?: number | null;
   activeReplyKey?: string;
+  // Durable Inquiry Extension Fields
+  leadNumber?: number;
+  requestId?: string;
+  payloadHash?: string;
+  durableStatus?: "PROCESSING" | "CONFIRMED" | "FAILED" | "DELIVERY_UNCERTAIN";
+  deliveries?: {
+    ownerNotification?: {
+      state: "PENDING" | "SENT" | "FAILED" | "DELIVERY_UNCERTAIN";
+      brevoMessageId?: string;
+      dispatchedAt?: string;
+      error?: string;
+    };
+    visitorAutoReply?: {
+      state: "PENDING" | "SENT" | "FAILED" | "DELIVERY_UNCERTAIN";
+      brevoMessageId?: string;
+      dispatchedAt?: string;
+      error?: string;
+    };
+  };
 }
 
 export interface AcquireReplyLockResult {

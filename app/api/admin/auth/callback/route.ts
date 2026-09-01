@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminEmail } from "@/lib/admin/auth";
+import { fetchWithTimeout } from "@/lib/api/fetcher";
 
 export const dynamic = "force-dynamic";
-
 
 /**
  * Handles Google OAuth 2.0 PKCE Callback, verifies email authorization,
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   try {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
 
-    // Exchange PKCE authorization code for Google access token & ID token
+    // Exchange PKCE authorization code for Google access token & ID token (4.0s timeout)
     const tokenRequestBody: Record<string, string> = {
       client_id: clientId,
       client_secret: clientSecret,
@@ -48,23 +48,28 @@ export async function GET(request: NextRequest) {
       code_verifier: codeVerifier || "",
     };
 
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(tokenRequestBody),
-    });
+    const tokenResponse = await fetchWithTimeout(
+      "https://oauth2.googleapis.com/token",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(tokenRequestBody),
+      },
+      4000
+    );
 
     const tokenData = await tokenResponse.json();
     if (!tokenResponse.ok || !tokenData.access_token) {
       throw new Error(tokenData.error_description || "Failed to exchange OAuth token with Google.");
     }
 
-    // Fetch verified Google User Profile
-    const userinfoResponse = await fetch(
+    // Fetch verified Google User Profile (3.0s timeout)
+    const userinfoResponse = await fetchWithTimeout(
       "https://www.googleapis.com/oauth2/v3/userinfo",
       {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
-      }
+      },
+      3000
     );
 
     const profile = await userinfoResponse.json();

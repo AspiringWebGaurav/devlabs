@@ -3,6 +3,13 @@ import { ipSecurityService } from "@/lib/admin/services/ip-security.service";
 
 export const dynamic = "force-dynamic";
 
+const NO_CACHE_HEADERS = {
+  "Content-Type": "text/html; charset=utf-8",
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -18,7 +25,7 @@ export async function GET(request: NextRequest) {
         }),
         {
           status: 400,
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+          headers: NO_CACHE_HEADERS,
         }
       );
     }
@@ -43,7 +50,7 @@ export async function GET(request: NextRequest) {
         }),
         {
           status: 400,
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+          headers: NO_CACHE_HEADERS,
         }
       );
     }
@@ -57,7 +64,7 @@ export async function GET(request: NextRequest) {
       }),
       {
         status: 200,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: NO_CACHE_HEADERS,
       }
     );
   } catch (error: unknown) {
@@ -70,7 +77,7 @@ export async function GET(request: NextRequest) {
       }),
       {
         status: 500,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: NO_CACHE_HEADERS,
       }
     );
   }

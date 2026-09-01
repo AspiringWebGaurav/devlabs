@@ -5,6 +5,7 @@
  */
 
 import { checkProfanity } from "@/lib/contact/profanity-filter";
+import { fetchWithTimeout } from "@/lib/api/fetcher";
 
 export interface AIModerationResult {
   flagged: boolean;
@@ -14,27 +15,25 @@ export interface AIModerationResult {
 }
 
 /**
- * 1. OpenAI Free Moderation API (omni-moderation-latest)
+ * 1. OpenAI Free Moderation API (omni-moderation-latest, 2.0s timeout)
  */
 async function checkOpenAIModeration(text: string, apiKey: string): Promise<AIModerationResult | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2500);
-
   try {
-    const res = await fetch("https://api.openai.com/v1/moderations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+    const res = await fetchWithTimeout(
+      "https://api.openai.com/v1/moderations",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          input: text,
+          model: "omni-moderation-latest",
+        }),
       },
-      body: JSON.stringify({
-        input: text,
-        model: "omni-moderation-latest",
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
+      2000
+    );
 
     if (!res.ok) return null;
 
@@ -51,37 +50,34 @@ async function checkOpenAIModeration(text: string, apiKey: string): Promise<AIMo
 
     return { flagged: false, source: "openai" };
   } catch {
-    clearTimeout(timeoutId);
     return null;
   }
 }
 
 /**
- * 2. Google Perspective API (Jigsaw)
+ * 2. Google Perspective API (Jigsaw, 2.0s timeout)
  */
 async function checkPerspectiveAPI(text: string, apiKey: string): Promise<AIModerationResult | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2500);
-
   try {
     const url = `https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze?key=${apiKey}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        comment: { text },
-        languages: ["en", "hi", "mr"],
-        requestedAttributes: {
-          TOXICITY: {},
-          SEVERE_TOXICITY: {},
-          INSULT: {},
-          THREAT: {},
-        },
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
+    const res = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          comment: { text },
+          languages: ["en", "hi", "mr"],
+          requestedAttributes: {
+            TOXICITY: {},
+            SEVERE_TOXICITY: {},
+            INSULT: {},
+            THREAT: {},
+          },
+        }),
+      },
+      2000
+    );
 
     if (!res.ok) return null;
 
@@ -101,26 +97,23 @@ async function checkPerspectiveAPI(text: string, apiKey: string): Promise<AIMode
 
     return { flagged: false, source: "perspective", score: toxicityScore };
   } catch {
-    clearTimeout(timeoutId);
     return null;
   }
 }
 
 /**
- * 3. PurgoMalum Public Profanity REST API
+ * 3. PurgoMalum Public Profanity REST API (1.5s timeout)
  */
 async function checkPurgoMalum(text: string): Promise<AIModerationResult | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 1800);
-
   try {
     const url = `https://www.purgomalum.com/service/containsprofanity?text=${encodeURIComponent(text)}`;
-    const res = await fetch(url, {
-      method: "GET",
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
+    const res = await fetchWithTimeout(
+      url,
+      {
+        method: "GET",
+      },
+      1500
+    );
 
     if (!res.ok) return null;
 
@@ -135,7 +128,6 @@ async function checkPurgoMalum(text: string): Promise<AIModerationResult | null>
 
     return { flagged: false, source: "purgomalum" };
   } catch {
-    clearTimeout(timeoutId);
     return null;
   }
 }

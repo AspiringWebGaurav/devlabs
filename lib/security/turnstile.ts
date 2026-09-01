@@ -4,6 +4,8 @@
  * Gracefully handles localhost, preview deployments, and direct client dispatches.
  */
 
+import { fetchWithTimeout } from "@/lib/api/fetcher";
+
 const TURNSTILE_SECRET_KEY =
   process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
   process.env.TURNSTILE_SECRET_KEY ||
@@ -45,21 +47,16 @@ export async function verifyTurnstileToken(
     formData.append("remoteip", remoteIp);
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3500);
-
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       "https://challenges.cloudflare.com/turnstile/v0/siteverify",
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData.toString(),
-        signal: controller.signal,
-      }
+      },
+      3000
     );
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       // Graceful fallback to avoid dropping genuine visitor inquiries
@@ -100,7 +97,6 @@ export async function verifyTurnstileToken(
       error: `Security verification: ${errorCodes.join(", ") || "Verification expired"}`,
     };
   } catch (err: unknown) {
-    clearTimeout(timeoutId);
     console.warn("Turnstile network note:", err);
     // Never fail a legitimate visitor inquiry due to a third-party challenge timeout
     return { success: true };

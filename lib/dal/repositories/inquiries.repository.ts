@@ -142,15 +142,36 @@ export class InquiriesRepository extends BaseRepository {
       message: inquiryData.message,
       createdAt: inquiryData.createdAt || new Date().toISOString(),
       status: inquiryData.status || "unread",
+      leadNumber: inquiryData.leadNumber,
+      requestId: inquiryData.requestId,
+      payloadHash: inquiryData.payloadHash,
+      durableStatus: inquiryData.durableStatus,
+      deliveries: inquiryData.deliveries,
     };
 
     return this.executeMutation(
       "createInquiry",
       async () => {
-        await firestoreDataSource.setDocument("inquiries", id, record, false);
+        await firestoreDataSource.setDocument("inquiries", id, record, true);
         return record;
       },
       { id, email: record.email }
+    );
+  }
+
+  /**
+   * Updates delivery status for an inquiry.
+   */
+  public async updateInquiryDeliveries(
+    id: string,
+    update: Partial<Pick<InquiryItem, "durableStatus" | "deliveries" | "status">>
+  ): Promise<RepositoryResult<void>> {
+    return this.executeMutation(
+      "updateInquiryDeliveries",
+      async () => {
+        await firestoreDataSource.setDocument("inquiries", id, update, true);
+      },
+      { id }
     );
   }
 

@@ -16,6 +16,7 @@ import {
   EMAIL_SPACING,
   EMAIL_TYPOGRAPHY,
 } from "./layout";
+import { fetchWithTimeout } from "@/lib/api/fetcher";
 
 const BREVO_API_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 
@@ -251,9 +252,6 @@ export async function sendTransactionalEmail(
     payload.headers = options.headers;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
   const requestHeaders: Record<string, string> = {
     accept: "application/json",
     "api-key": apiKey,
@@ -265,14 +263,15 @@ export async function sendTransactionalEmail(
   }
 
   try {
-    const res = await fetch(BREVO_API_ENDPOINT, {
-      method: "POST",
-      headers: requestHeaders,
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
+    const res = await fetchWithTimeout(
+      BREVO_API_ENDPOINT,
+      {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify(payload),
+      },
+      8000
+    );
 
     const data = await res.json().catch(() => ({}));
 
@@ -296,13 +295,14 @@ export async function sendTransactionalEmail(
       statusCode: res.status,
     };
   } catch (err: unknown) {
-    clearTimeout(timeoutId);
     const error = err as Error;
-    const isTimeout = error.name === "AbortError";
+    const isTimeout =
+      error.name === "AbortError" ||
+      (typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "GATEWAY_TIMEOUT");
     return {
       success: false,
       error: isTimeout
-        ? "Brevo email dispatch timed out (10s)."
+        ? "Brevo email dispatch timed out (8.0s)."
         : error.message || "Network error connecting to Brevo API.",
     };
   }

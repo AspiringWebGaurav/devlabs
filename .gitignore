@@ -74,6 +74,17 @@ lerna-debug.log*
 # ==========================================
 /coverage
 /.nyc_output
+/playwright-report
+/playwright-report/
+/test-results
+/test-results/
+/.playwright
+/.playwright/
+/playwright/.cache
+/playwright.config.ts
+/playwright.config.js
+/tests
+/tests/
 
 # ==========================================
 # IDE & Editor Files

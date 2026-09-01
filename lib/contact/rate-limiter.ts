@@ -14,6 +14,8 @@
  * - Upstash Redis Global Sync (when UPSTASH_REDIS_REST_URL is configured).
  */
 
+import { fetchWithTimeout } from "@/lib/api/fetcher";
+
 interface RateLimitEntry {
   count: number;
   lastTimestamp: number;
@@ -152,23 +154,21 @@ export async function checkContactRateLimit(
   }
 
   // =========================================================================
-  // 5. Upstash Redis Global Sync (Fast 2s timeout for edge resilience)
+  // 5. Upstash Redis Global Sync (Fast 1.5s timeout for edge resilience)
   // =========================================================================
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (redisUrl && redisToken) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
-
     try {
       const redisKey = `ratelimit:contact:ip:${normalizedIp.replace(/[^a-zA-Z0-9_]/g, "_")}`;
-      const res = await fetch(`${redisUrl}/get/${redisKey}`, {
-        headers: { Authorization: `Bearer ${redisToken}` },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
+      const res = await fetchWithTimeout(
+        `${redisUrl}/get/${redisKey}`,
+        {
+          headers: { Authorization: `Bearer ${redisToken}` },
+        },
+        1500
+      );
 
       if (res.ok) {
         const data = (await res.json()) as { result: string | number | null };
@@ -182,7 +182,6 @@ export async function checkContactRateLimit(
         }
       }
     } catch (redisErr) {
-      clearTimeout(timeoutId);
       console.warn("Upstash Redis rate-limit sync note:", redisErr);
       // Fallback cleanly to in-memory check
     }

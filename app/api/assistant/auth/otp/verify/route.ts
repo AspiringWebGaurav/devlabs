@@ -18,6 +18,7 @@ import {
 } from "@/lib/assistant/services/live-chat-rate-limiter";
 import { computeOtpVerifier } from "@/lib/assistant/services/live-chat-otp.service";
 import crypto from "crypto";
+import { getRequestContext } from "@/lib/api/context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,11 +26,12 @@ export const dynamic = "force-dynamic";
 const OTP_REGEX = /^\d{6}$/;
 
 export async function POST(req: NextRequest) {
+  const { requestId } = getRequestContext(req);
   // 1. Kill Switch Check
   if (!isLiveChatEnabled()) {
     return NextResponse.json(
       { ok: false, code: "FEATURE_DISABLED", message: "Live Chat is currently offline." },
-      { status: 503 }
+      { status: 503, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (!validateCsrfOrigin(req)) {
     return NextResponse.json(
       { ok: false, code: "CSRF_ORIGIN_REJECTED", message: "Cross-origin request rejected." },
-      { status: 403 }
+      { status: 403, headers: { "x-request-id": requestId } }
     );
   }
 

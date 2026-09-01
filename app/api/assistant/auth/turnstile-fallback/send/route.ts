@@ -15,6 +15,7 @@ import {
   LiveChatChallengeDocument,
 } from "@/lib/dal/repositories/live-chat-challenges.repository";
 import { dispatchTurnstileFallbackOtpEmail } from "@/lib/email/brevo";
+import { getRequestContext } from "@/lib/api/context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,17 +23,18 @@ export const dynamic = "force-dynamic";
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
 export async function POST(req: NextRequest) {
+  const { requestId } = getRequestContext(req);
   if (!isLiveChatEnabled()) {
     return NextResponse.json(
       { ok: false, code: "FEATURE_DISABLED", message: "Assistant security verification is temporarily unavailable." },
-      { status: 503 }
+      { status: 503, headers: { "x-request-id": requestId } }
     );
   }
 
   if (!validateCsrfOrigin(req)) {
     return NextResponse.json(
       { ok: false, code: "CSRF_ORIGIN_REJECTED", message: "Cross-origin request rejected." },
-      { status: 403 }
+      { status: 403, headers: { "x-request-id": requestId } }
     );
   }
 

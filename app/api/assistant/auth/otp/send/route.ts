@@ -5,6 +5,7 @@ import {
   isLiveChatEnabled,
 } from "@/lib/assistant/session";
 import { generateAndDispatchOtp } from "@/lib/assistant/services/live-chat-otp.service";
+import { getRequestContext } from "@/lib/api/context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,11 +13,12 @@ export const dynamic = "force-dynamic";
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
 export async function POST(req: NextRequest) {
+  const { requestId } = getRequestContext(req);
   // 1. Kill Switch Check
   if (!isLiveChatEnabled()) {
     return NextResponse.json(
       { ok: false, code: "FEATURE_DISABLED", message: "Live Chat is currently offline." },
-      { status: 503 }
+      { status: 503, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (!validateCsrfOrigin(req)) {
     return NextResponse.json(
       { ok: false, code: "CSRF_ORIGIN_REJECTED", message: "Cross-origin request rejected." },
-      { status: 403 }
+      { status: 403, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
     if (contentLength && parseInt(contentLength, 10) > 16384) {
       return NextResponse.json(
         { ok: false, code: "PAYLOAD_TOO_LARGE", message: "Request payload exceeds 16KB limit." },
-        { status: 413 }
+        { status: 413, headers: { "x-request-id": requestId } }
       );
     }
 
@@ -42,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (!body || typeof body !== "object") {
       return NextResponse.json(
         { ok: false, code: "VALIDATION_ERROR", message: "Invalid request payload." },
-        { status: 400 }
+        { status: 400, headers: { "x-request-id": requestId } }
       );
     }
 
@@ -51,14 +53,14 @@ export async function POST(req: NextRequest) {
     if (!name || typeof name !== "string" || name.trim().length === 0 || name.trim().length > 100) {
       return NextResponse.json(
         { ok: false, code: "VALIDATION_ERROR", message: "Please provide a valid name (1-100 characters)." },
-        { status: 400 }
+        { status: 400, headers: { "x-request-id": requestId } }
       );
     }
 
     if (!email || typeof email !== "string" || !EMAIL_REGEX.test(email.trim()) || email.trim().length > 150) {
       return NextResponse.json(
         { ok: false, code: "VALIDATION_ERROR", message: "Please provide a valid email address." },
-        { status: 400 }
+        { status: 400, headers: { "x-request-id": requestId } }
       );
     }
 
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest) {
           ? 502
           : 400;
 
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = { "x-request-id": requestId };
       if (result.retryAfterSeconds) {
         headers["Retry-After"] = result.retryAfterSeconds.toString();
       }
@@ -97,16 +99,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      challengeId: result.challengeId,
-      message: "Verification code sent to your email.",
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        challengeId: result.challengeId,
+        message: "Verification code sent to your email.",
+      },
+      { status: 200, headers: { "x-request-id": requestId } }
+    );
   } catch (err: unknown) {
     const error = err as Error;
     return NextResponse.json(
       { ok: false, code: "INTERNAL_ERROR", message: error.message || "An unexpected error occurred." },
-      { status: 500 }
+      { status: 500, headers: { "x-request-id": requestId } }
     );
   }
 }

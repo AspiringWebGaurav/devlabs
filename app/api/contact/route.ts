@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import crypto from "crypto";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import { sanitizeAndValidateText } from "@/lib/contact/profanity-filter";
 import { checkContactRateLimit, recordContactSubmission } from "@/lib/contact/rate-limiter";
 import { getNextSynchronizedLeadNumber } from "@/lib/contact/lead-counter";
-import { dispatchContactFormWorkflow } from "@/lib/email";
+import {
+  sendTransactionalEmail,
+  generateInternalNotificationHtml,
+  generateVisitorAutoReplyHtml,
+  formatSubmissionTimestamp,
+  EMAIL_IDENTITIES,
+} from "@/lib/email";
 import { validateEmail, validateName, validateMessage, MESSAGE_MIN_CHARS, MESSAGE_MAX_CHARS } from "@/lib/contact/validation";
 import { evaluateContentModeration } from "@/lib/security/ai-moderation";
 import { inquiriesRepository } from "@/lib/admin/repositories";
+import { getRequestContext } from "@/lib/api/context";
+import { ApiError, createApiErrorResponse } from "@/lib/api/error";
 
 export const dynamic = "force-dynamic";
 
@@ -25,123 +34,91 @@ const ContactSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const { requestId, clientIp } = getRequestContext(request);
+
   try {
-    const rawBody = await request.json().catch(() => null);
-    if (!rawBody) {
-      return NextResponse.json(
-        { success: false, error: "Invalid JSON payload in request." },
-        { status: 400 }
-      );
+    // 1. Content-Length Protection (Max 1MB)
+    const contentLength = request.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > 1048576) {
+      throw new ApiError("PAYLOAD_TOO_LARGE", "Request payload exceeds 1MB limit.");
     }
 
-    // 1. Zod Schema Validation
+    const rawBody = await request.json().catch(() => null);
+    if (!rawBody) {
+      throw new ApiError("VALIDATION_FAILED", "Invalid JSON payload in request.");
+    }
+
+    // 2. Synchronous Schema Validation
     const parsed = ContactSchema.safeParse(rawBody);
     if (!parsed.success) {
-      const issue =
-        parsed.error.issues[0]?.message ||
-        "Validation failed on submitted fields.";
-      return NextResponse.json(
-        { success: false, error: issue },
-        { status: 400 }
-      );
+      const issue = parsed.error.issues[0]?.message || "Validation failed on submitted fields.";
+      throw new ApiError("VALIDATION_FAILED", issue);
     }
 
     const { name, email, role, subject, category, message, turnstileToken } = parsed.data;
 
-    // 2. Strict Email Typo & Format Validation
+    // Strict Field Validations
     const emailValidation = validateEmail(email);
     if (!emailValidation.isValid) {
-      return NextResponse.json(
-        { success: false, error: emailValidation.error },
-        { status: 400 }
-      );
+      throw new ApiError("VALIDATION_FAILED", emailValidation.error);
     }
 
     const nameValidation = validateName(name);
     if (!nameValidation.isValid) {
-      return NextResponse.json(
-        { success: false, error: nameValidation.error },
-        { status: 400 }
-      );
+      throw new ApiError("VALIDATION_FAILED", nameValidation.error);
     }
 
     const messageValidation = validateMessage(message);
     if (!messageValidation.isValid) {
-      return NextResponse.json(
-        { success: false, error: messageValidation.error },
-        { status: 400 }
-      );
+      throw new ApiError("VALIDATION_FAILED", messageValidation.error);
     }
 
-    // 3. Extract Client IP
-    const forwardedFor = request.headers.get("x-forwarded-for");
-    const realIp = request.headers.get("x-real-ip");
-    const clientIp = forwardedFor
-      ? forwardedFor.split(",")[0].trim()
-      : realIp || "127.0.0.1";
-
-    // 4. Multi-Tier Anti-Abuse Rate Limiting
+    // 3. Multi-Tier Anti-Abuse Rate Limiting
     const rateLimitCheck = await checkContactRateLimit(clientIp, email);
     if (!rateLimitCheck.allowed) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: rateLimitCheck.reason || "Submission rate limit exceeded. Please try again later.",
-          retryAfter: rateLimitCheck.retryAfterSeconds,
-        },
-        { status: 429 }
+      throw new ApiError(
+        "RATE_LIMITED_HOURLY",
+        rateLimitCheck.reason || "Submission rate limit exceeded. Please try again later.",
+        rateLimitCheck.retryAfterSeconds
       );
     }
 
-    // 5. Cloudflare Turnstile Bot Verification (Server-Side)
-    if (turnstileToken) {
-      const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIp);
-      if (!turnstileResult.success) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              turnstileResult.error ||
-              "Cloudflare security challenge verification failed. Please try again.",
-          },
-          { status: 403 }
-        );
-      }
+    // 4. Concurrent Security Gate: Turnstile Bot Verification + AI Moderation
+    const [turnstileResult, aiModeration] = await Promise.all([
+      turnstileToken ? verifyTurnstileToken(turnstileToken, clientIp) : Promise.resolve({ success: true, error: undefined }),
+      evaluateContentModeration(message),
+    ]);
+
+    // Fail-Closed Turnstile Bot Mitigation
+    if (!turnstileResult.success) {
+      throw new ApiError(
+        "BOT_CHALLENGE_FAILED",
+        turnstileResult.error || "Cloudflare security challenge verification failed. Please try again."
+      );
     }
 
-    // 6. Sanitization & AI Content Moderation
+    // Sanitization Checks
     const nameSanitization = sanitizeAndValidateText(name, "Full Name", 2, 100);
     const messageSanitization = sanitizeAndValidateText(message, "Message", 10, 2000);
 
     if (!nameSanitization.isValid) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: nameSanitization.error || "Your name contains disallowed terms. Please revise.",
-        },
-        { status: 422 }
+      throw new ApiError(
+        "PROFANITY_DETECTED",
+        nameSanitization.error || "Your name contains disallowed terms. Please revise."
       );
     }
 
     if (!messageSanitization.isValid) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: messageSanitization.error || "Your message contains prohibited language. Please revise.",
-        },
-        { status: 422 }
+      throw new ApiError(
+        "PROFANITY_DETECTED",
+        messageSanitization.error || "Your message contains prohibited language. Please revise."
       );
     }
 
-    // Deep AI Moderation Verification (OpenAI / Perspective if configured)
-    const aiModeration = await evaluateContentModeration(message);
     if (aiModeration.flagged) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: aiModeration.reason || "Your message was flagged for abusive or toxic language. Please revise.",
-        },
-        { status: 422 }
+      throw new ApiError(
+        "TOXICITY_BLOCKED",
+        aiModeration.reason || "Your message was flagged by automated moderation. Please revise."
       );
     }
 
@@ -149,98 +126,174 @@ export async function POST(request: NextRequest) {
     const selectedSubject = subject?.trim() || category?.trim() || "General Inquiry";
     const selectedCategory = category?.trim() || selectedSubject;
 
-    // 7. Generate Synchronized Lead Number
+    // 5. Authoritative Lead Number Generation
     const leadNumber = await getNextSynchronizedLeadNumber();
 
-    // 8. Dispatch Dual Brevo Transactional Emails (Lead Alert + Auto-Reply Template #1)
-    let emailResult = {
-      internalEmailSent: false,
-      autoReplySent: false,
-      errors: [] as string[],
-    };
+    // 6. Pre-Dispatch Durable State Record (inquiries/{operationId})
+    const operationId = `inq_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+    const payloadHash = crypto
+      .createHash("sha256")
+      .update(`${email.trim().toLowerCase()}:${messageSanitization.sanitizedText}`)
+      .digest("hex");
 
-    try {
-      emailResult = await dispatchContactFormWorkflow({
-        name: nameSanitization.sanitizedText,
-        email: email.trim().toLowerCase(),
-        role: selectedRole,
-        subject: selectedSubject,
-        category: selectedCategory,
-        message: messageSanitization.sanitizedText,
-        ip: clientIp,
-        leadNumber,
-      });
-    } catch (err) {
-      console.warn("Brevo contact email dispatch note:", err);
-      emailResult = {
-        internalEmailSent: false,
-        autoReplySent: false,
-        errors: [String(err)],
-      };
-    }
-
-    const emailDelivered =
-      emailResult.internalEmailSent || emailResult.autoReplySent;
-
-    // Reject if both email operations failed completely (guarantees Zero Orphaned DB records)
-    if (!emailDelivered) {
-      const detailError =
-        emailResult.errors[0] ||
-        "Email delivery failed. Please try again or reach out directly.";
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Failed to dispatch message via email gateway. Please try again later.",
-          detail:
-            process.env.NODE_ENV === "development" ? detailError : undefined,
-        },
-        { status: 502 }
-      );
-    }
-
-    // Record verified rate-limit entry only upon successful email dispatch
-    recordContactSubmission(clientIp, email);
-
-    // 9. Persist Verified Inquiry via Repository Layer (4-Tier Compliance & Zero Stale Data)
-    const now = Date.now();
-    const isoDate = new Date(now).toISOString();
-    const messageId = `msg_${now}_${Math.random().toString(36).substring(2, 7)}`;
-
-    // Write to Firestore inquiries collection (used by /admin/inquiries)
     await inquiriesRepository.createInquiry({
-      id: messageId,
+      id: operationId,
       name: nameSanitization.sanitizedText,
       email: email.trim().toLowerCase(),
       subject: selectedSubject,
       message: messageSanitization.sanitizedText,
-      createdAt: isoDate,
+      createdAt: new Date().toISOString(),
       status: "unread",
-    }).catch((inqErr) => {
-      console.warn("Firestore inquiries repository note:", inqErr);
-    });
-
-
-
-    return NextResponse.json({
-      success: true,
-      messageId,
       leadNumber,
-      emailDelivered,
-      autoReplyDelivered: emailResult.autoReplySent,
-      timestamp: isoDate,
-    });
-  } catch (err: unknown) {
-    const error = err as Error;
-    console.error("Unhandled contact submission error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          error.message ||
-          "An unexpected error occurred while processing your message.",
+      requestId,
+      payloadHash,
+      durableStatus: "PROCESSING",
+      deliveries: {
+        ownerNotification: { state: "PENDING" },
+        visitorAutoReply: { state: "PENDING" },
       },
-      { status: 500 }
+    });
+
+    // 7. Concurrent Dual Brevo Dispatch (Promise.allSettled within single bounded deadline)
+    const formattedTime = formatSubmissionTimestamp();
+    const internalRecipient =
+      process.env.BREVO_NOTIFICATION_RECIPIENT ||
+      process.env.ADMIN_EMAIL ||
+      "gauravpatil5737@gmail.com";
+
+    const internalHtml = generateInternalNotificationHtml(
+      {
+        name: nameSanitization.sanitizedText,
+        email: email.trim().toLowerCase(),
+        role: selectedRole,
+        category: selectedCategory,
+        message: messageSanitization.sanitizedText,
+        leadNumber,
+      },
+      formattedTime
     );
+
+    const emailSubject = `New Contact Inquiry (Lead #${leadNumber}): ${nameSanitization.sanitizedText} [${selectedRole}]`;
+    const internalPlainText = `Hi Gaurav,\n\nFrom: ${nameSanitization.sanitizedText} (${selectedRole})\nEmail: ${email.trim().toLowerCase()}\nReceived: ${formattedTime} • Lead #${leadNumber}\n\nMessage:\n${messageSanitization.sanitizedText}`;
+
+    const autoReplyHtml = generateVisitorAutoReplyHtml({
+      name: nameSanitization.sanitizedText,
+    });
+    const autoReplyPlainText = `Hi ${nameSanitization.sanitizedText.split(" ")[0]},\n\nThanks for reaching out through my portfolio. I've received your message and will get back to you as soon as possible.\n\nGaurav Patil\nhttps://gauravpatil.online`;
+
+    const [ownerResult, visitorResult] = await Promise.allSettled([
+      sendTransactionalEmail({
+        purpose: "CONTACT_FORM",
+        to: [{ email: internalRecipient, name: "Gaurav Patil" }],
+        replyTo: { email: email.trim().toLowerCase(), name: nameSanitization.sanitizedText },
+        subject: emailSubject,
+        htmlContent: internalHtml,
+        textContent: internalPlainText,
+        tags: ["portfolio_inquiry", "internal_notification"],
+        idempotencyKey: `${operationId}_owner`,
+      }),
+      sendTransactionalEmail({
+        purpose: "CONTACT_FORM_AUTO_REPLY",
+        to: [{ email: email.trim().toLowerCase(), name: nameSanitization.sanitizedText }],
+        replyTo: { email: EMAIL_IDENTITIES.HELLO.primary.email, name: "Gaurav Patil" },
+        subject: "Thanks for contacting Gaurav Patil",
+        htmlContent: autoReplyHtml,
+        textContent: autoReplyPlainText,
+        headers: {
+          "X-Auto-Response-Suppress": "OOF, AutoReply",
+          "Auto-Submitted": "auto-replied",
+        },
+        tags: ["portfolio_auto_reply", "visitor_confirmation"],
+        idempotencyKey: `${operationId}_visitor`,
+      }),
+    ]);
+
+    // 8. Reconcile Deliveries & Update Durable State
+    const ownerSuccess = ownerResult.status === "fulfilled" && ownerResult.value.success;
+    const visitorSuccess = visitorResult.status === "fulfilled" && visitorResult.value.success;
+
+    const ownerState = ownerSuccess
+      ? ("SENT" as const)
+      : ownerResult.status === "rejected"
+      ? ("DELIVERY_UNCERTAIN" as const)
+      : ("FAILED" as const);
+
+    const visitorState = visitorSuccess
+      ? ("SENT" as const)
+      : visitorResult.status === "rejected"
+      ? ("DELIVERY_UNCERTAIN" as const)
+      : ("FAILED" as const);
+
+    const isFullyConfirmed = ownerSuccess && visitorSuccess;
+    const isDeliveryUncertain =
+      ownerState === "DELIVERY_UNCERTAIN" ||
+      visitorState === "DELIVERY_UNCERTAIN" ||
+      (!ownerSuccess && visitorSuccess) ||
+      (ownerSuccess && !visitorSuccess);
+
+    const aggregateStatus = isFullyConfirmed
+      ? ("CONFIRMED" as const)
+      : isDeliveryUncertain
+      ? ("DELIVERY_UNCERTAIN" as const)
+      : ("FAILED" as const);
+
+    // Update Firestore record with terminal delivery outcomes
+    await inquiriesRepository.updateInquiryDeliveries(operationId, {
+      durableStatus: aggregateStatus,
+      deliveries: {
+        ownerNotification: {
+          state: ownerState,
+          brevoMessageId: ownerResult.status === "fulfilled" ? ownerResult.value.messageId : undefined,
+          dispatchedAt: new Date().toISOString(),
+          error: ownerResult.status === "fulfilled" ? ownerResult.value.error : String(ownerResult.reason),
+        },
+        visitorAutoReply: {
+          state: visitorState,
+          brevoMessageId: visitorResult.status === "fulfilled" ? visitorResult.value.messageId : undefined,
+          dispatchedAt: new Date().toISOString(),
+          error: visitorResult.status === "fulfilled" ? visitorResult.value.error : String(visitorResult.reason),
+        },
+      },
+    }).catch((err: unknown) => {
+      console.warn("Failed to update inquiry delivery status:", err);
+    });
+
+    // Record submission for rate limiting
+    recordContactSubmission(clientIp, email);
+
+    // 9. Return Standardized Response Contract
+    if (isFullyConfirmed) {
+      return NextResponse.json(
+        {
+          success: true,
+          leadNumber,
+          requestId,
+          messageId: operationId,
+        },
+        { status: 201, headers: { "x-request-id": requestId } }
+      );
+    }
+
+    if (aggregateStatus === "DELIVERY_UNCERTAIN") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "DELIVERY_UNCERTAIN",
+            message: "Submission received but confirmation is pending. Please verify before resending.",
+            retryable: false,
+            requestId,
+          },
+          leadNumber,
+          messageId: operationId,
+        },
+        { status: 502, headers: { "x-request-id": requestId } }
+      );
+    }
+
+    // Both failed
+    throw new ApiError("GATEWAY_UNAVAILABLE", "Failed to dispatch email notification. Please try again.");
+  } catch (err: unknown) {
+    return createApiErrorResponse(err, requestId);
   }
 }

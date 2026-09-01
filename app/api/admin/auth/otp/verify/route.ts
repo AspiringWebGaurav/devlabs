@@ -13,16 +13,19 @@ import { otpService } from "@/lib/admin/services/otp.service";
 import { ipSecurityService, normalizeIpAddress } from "@/lib/admin/services/ip-security.service";
 import { authChallengesRepository } from "@/lib/admin/repositories/auth-challenges.repository";
 import { dispatchNewIpSecurityAlert } from "@/lib/email/brevo";
+import { getRequestContext } from "@/lib/api/context";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest): Promise<NextResponse<AuthVerifyApiResponse>> {
+  const { requestId } = getRequestContext(request);
+
   try {
     const challengeId = request.cookies.get(ADMIN_OTP_COOKIE_NAME)?.value;
     if (!challengeId) {
       return NextResponse.json<AuthVerifyApiResponse>(
         { success: false, verified: false, error: "No active verification challenge. Please sign in again." },
-        { status: 401 }
+        { status: 401, headers: { "x-request-id": requestId } }
       );
     }
 

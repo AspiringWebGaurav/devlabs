@@ -5,6 +5,8 @@ import { IoArrowUp, IoLockClosedOutline, IoTimeOutline, IoSparkles, IoChevronDow
 import { CgSpinner } from "react-icons/cg";
 import { BsLightningChargeFill } from "react-icons/bs";
 
+import { useChatAutoScroll } from "@/components/chat/useChatAutoScroll";
+
 interface ChatMessage {
   id: string;
   sender: "gaurav" | "visitor" | "user";
@@ -51,13 +53,9 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
   const [isSending, setIsSending] = useState(false);
   const [deliveryStage, setDeliveryStage] = useState<DeliveryStage>("idle");
   const [sendError, setSendError] = useState<string | null>(null);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
-  const [hasNewMessageBelow, setHasNewMessageBelow] = useState(false);
 
   const [isCircuitBroken, setIsCircuitBroken] = useState(false);
 
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const timersRef = useRef<NodeJS.Timeout[]>([]);
@@ -65,47 +63,6 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
   const isIdleRef = useRef(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
-  const hasInitialScrolledRef = useRef(false);
-  const prevMessagesCountRef = useRef(1);
-  const prevVisibleLimitRef = useRef(PAGE_SIZE);
-
-  // Robust bottom scrolling with requestAnimationFrame for layout-ready execution
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    const container = scrollContainerRef.current;
-    if (container) {
-      if (behavior === "auto") {
-        container.scrollTop = container.scrollHeight;
-      } else {
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: "smooth",
-        });
-      }
-    }
-    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
-    setHasNewMessageBelow(false);
-  }, []);
-
-  // Distance from bottom check
-  const isNearBottom = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return true;
-    const threshold = 120;
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    return distanceFromBottom <= threshold;
-  }, []);
-
-  // Scroll listener for floating "Jump to Latest" button
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isScrolledUp = distanceFromBottom > 120;
-    setShowScrollBottom(isScrolledUp);
-    if (!isScrolledUp) {
-      setHasNewMessageBelow(false);
-    }
-  }, []);
 
   // Server message segmentation for pagination
   const serverMessages = useMemo(
@@ -123,26 +80,39 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
     return serverMessages.slice(-visibleLimit);
   }, [hasOlderMessages, welcomeMessage, serverMessages, visibleLimit]);
 
-  // Facebook-style smooth load older history with scroll-offset preservation
+  // Production-Grade Lifecycle-Aware Chat Auto-Scroll Controller
+  const {
+    scrollContainerRef,
+    messagesContentRef,
+    composerContainerRef,
+    handleScroll,
+    scrollToLatest,
+    prepareHistoryPrepend,
+    finishHistoryPrepend,
+    showScrollBottom,
+    hasNewMessageBelow,
+  } = useChatAutoScroll({
+    conversationKey: email || "live_chat_visitor",
+    messages: displayedMessages,
+    adminSender: "gaurav",
+    visitorSender: "visitor",
+    bottomTolerance: 28,
+    nearBottomThreshold: 100,
+    isOpen: true,
+  });
+
+  // Smooth load older history with exact scroll-offset preservation
   const handleLoadOlderMessages = () => {
     if (isLoadingOlder || !hasOlderMessages) return;
     setIsLoadingOlder(true);
 
-    const container = scrollContainerRef.current;
-    const oldScrollHeight = container ? container.scrollHeight : 0;
-    const oldScrollTop = container ? container.scrollTop : 0;
+    const snapshot = prepareHistoryPrepend();
 
     const timerId = setTimeout(() => {
       setVisibleLimit((prev) => Math.min(prev + PAGE_SIZE, totalServerMessages));
       setIsLoadingOlder(false);
-
-      requestAnimationFrame(() => {
-        if (container) {
-          const newScrollHeight = container.scrollHeight;
-          container.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
-        }
-      });
-    }, 200);
+      finishHistoryPrepend(snapshot);
+    }, 120);
 
     timersRef.current.push(timerId);
   };
@@ -247,8 +217,14 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
     }
   };
 
-  // Multi-Tab Shared Sync Channel
+  // Multi-Tab & In-App Shared Sync Channel
   useEffect(() => {
+    const handleRefresh = () => {
+      fetchMessages(true);
+    };
+
+    window.addEventListener("refresh-live-chat-transcript", handleRefresh);
+
     if (typeof BroadcastChannel !== "undefined") {
       try {
         const bc = new BroadcastChannel("live_chat_transcript_sync");
@@ -262,6 +238,10 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
         // Safe fallback
       }
     }
+
+    return () => {
+      window.removeEventListener("refresh-live-chat-transcript", handleRefresh);
+    };
   }, [fetchMessages]);
 
   const lockStartedAtRef = useRef<number | null>(null);
@@ -375,60 +355,7 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
     };
   }, [fetchMessages, resetIdleState, isVisitorLocked, isSessionPaused]);
 
-  // 3. Robust Multi-Stage Auto-Scroll Engine (Facebook Messenger / WhatsApp style)
-  useEffect(() => {
-    const isOlderMessagesExpansion = visibleLimit > prevVisibleLimitRef.current;
-    prevVisibleLimitRef.current = visibleLimit;
-
-    // If the user expanded history upward via "Load older messages", preserve scroll offset without scrolling to bottom
-    if (isOlderMessagesExpansion) {
-      prevMessagesCountRef.current = messages.length;
-      return;
-    }
-
-    const isMessageCountIncreased = messages.length > prevMessagesCountRef.current;
-    prevMessagesCountRef.current = messages.length;
-
-    // Stage 1: Initial History Mount / Load (When history is fetched from server or on first paint)
-    if (!hasInitialScrolledRef.current) {
-      scrollToBottom("auto");
-
-      // Double frame verification to handle async font paint, avatar load, and layout reflow
-      const timerId1 = setTimeout(() => {
-        scrollToBottom("auto");
-      }, 50);
-      const timerId2 = setTimeout(() => {
-        scrollToBottom("auto");
-        if (serverMessages.length > 0) {
-          hasInitialScrolledRef.current = true;
-        }
-      }, 150);
-      timersRef.current.push(timerId1, timerId2);
-      return;
-    }
-
-    // Stage 2: User is sending or actively dispatched a message -> Instant / smooth scroll
-    if (isSending || deliveryStage === "sending") {
-      scrollToBottom("smooth");
-      return;
-    }
-
-    // Stage 3: New message arrived from server / polling / other tab
-    if (isMessageCountIncreased) {
-      const latestMsg = messages[messages.length - 1];
-      const isFromUser = latestMsg?.sender === "visitor" || latestMsg?.sender === "user";
-
-      if (isFromUser || isNearBottom()) {
-        // User was already near bottom or sent this message -> Smoothly scroll down
-        scrollToBottom("smooth");
-      } else {
-        // User deliberately scrolled up -> Keep their position and show new message badge on floating button
-        setHasNewMessageBelow(true);
-      }
-    }
-  }, [messages, visibleLimit, isSending, deliveryStage, scrollToBottom, isNearBottom, serverMessages.length]);
-
-  // 4. Dispatch visitor message to Gaurav with realistic lifecycle transitions
+  // Dispatch visitor message to Gaurav with realistic lifecycle transitions
   const handleSendMessage = async () => {
     const trimmed = inputText.trim();
     if (!trimmed || isSending || isVisitorLocked) return;
@@ -502,176 +429,206 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 select-text overscroll-contain"
+        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-3.5 sm:py-4 space-y-3.5 sm:space-y-4 min-h-0 select-text overscroll-contain touch-pan-y"
       >
-        {/* Top Pagination Landmark / Load Older Messages Trigger */}
-        {hasOlderMessages ? (
-          <div className="flex flex-col items-center justify-center pb-2 animate-in fade-in duration-150">
-            <button
-              type="button"
-              onClick={handleLoadOlderMessages}
-              disabled={isLoadingOlder}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200/80 text-neutral-700 text-[11px] font-medium transition-all shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
-            >
-              {isLoadingOlder ? (
-                <>
-                  <CgSpinner className="w-3.5 h-3.5 animate-spin text-[#7C3AED]" />
-                  <span>Loading older history...</span>
-                </>
-              ) : (
-                <>
-                  <IoTimeOutline className="w-3.5 h-3.5 text-neutral-500" />
-                  <span>Load older messages ({remainingOlderCount} earlier)</span>
-                </>
-              )}
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-2.5 text-center space-y-1 animate-in fade-in duration-200 border-b border-neutral-100/80 mb-2">
-            <div className="w-6 h-6 rounded-full bg-purple/10 border border-purple/20 flex items-center justify-center text-[#7C3AED]">
-              <IoSparkles className="w-3 h-3" />
-            </div>
-            <p className="text-[11px] font-semibold text-neutral-800 tracking-tight">Beginning of Direct Channel</p>
-            <p className="text-[10px] text-neutral-400 font-mono">End-to-end encrypted with Gaurav Patil</p>
-          </div>
-        )}
-
-        {displayedMessages.map((msg, index) => {
-          const isUser = msg.sender === "user" || msg.sender === "visitor";
-          const isLatestVisitorMsg = isUser && index === displayedMessages.length - 1;
-
-          return (
-            <div key={msg.id} className="space-y-1.5">
-              <div
-                className={`flex items-start gap-2.5 ${
-                  isUser ? "flex-row-reverse" : "flex-row"
-                } animate-in fade-in slide-in-from-bottom-2 duration-150`}
+        <div ref={messagesContentRef} className="space-y-3.5 sm:space-y-4">
+          {/* Top Pagination Landmark / Load Older Messages Trigger */}
+          {hasOlderMessages ? (
+            <div className="flex flex-col items-center justify-center pb-2 animate-in fade-in duration-150">
+              <button
+                type="button"
+                onClick={handleLoadOlderMessages}
+                disabled={isLoadingOlder}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200/80 text-neutral-700 text-[11.5px] sm:text-[11px] font-medium transition-all shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50 touch-manipulation"
               >
-                {/* Avatar */}
-                {isUser ? (
-                  <div className="w-8 h-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
-                    {name.slice(0, 2).toUpperCase() || "ME"}
-                  </div>
+                {isLoadingOlder ? (
+                  <>
+                    <CgSpinner className="w-3.5 h-3.5 animate-spin text-[#7C3AED]" />
+                    <span>Loading older history...</span>
+                  </>
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
-                    GP
+                  <>
+                    <IoTimeOutline className="w-3.5 h-3.5 text-neutral-500" />
+                    <span>Load older messages ({remainingOlderCount} earlier)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-2.5 text-center space-y-1 animate-in fade-in duration-200 border-b border-neutral-100/80 mb-2">
+              <div className="w-6 h-6 rounded-full bg-purple/10 border border-purple/20 flex items-center justify-center text-[#7C3AED]">
+                <IoSparkles className="w-3 h-3" />
+              </div>
+              <p className="text-[11.5px] sm:text-[11px] font-semibold text-neutral-800 tracking-tight">Beginning of Direct Channel</p>
+              <p className="text-[10px] text-neutral-400 font-mono">End-to-end encrypted with Gaurav Patil</p>
+            </div>
+          )}
+
+          {displayedMessages.map((msg, index) => {
+            const isUser = msg.sender === "user" || msg.sender === "visitor";
+            const isLatestVisitorMsg = isUser && index === displayedMessages.length - 1;
+
+            return (
+              <div key={msg.id} className="space-y-1.5">
+                <div
+                  className={`flex items-start gap-2.5 ${
+                    isUser ? "flex-row-reverse" : "flex-row"
+                  } animate-in fade-in slide-in-from-bottom-2 duration-150`}
+                >
+                  {/* Avatar */}
+                  {isUser ? (
+                    <div className="w-8 h-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+                      {name.slice(0, 2).toUpperCase() || "ME"}
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+                      GP
+                    </div>
+                  )}
+
+                  {/* Message Bubble */}
+                  <div
+                    className={`max-w-[88%] sm:max-w-[85%] rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-[14px] sm:text-[13.5px] leading-relaxed shadow-2xs ${
+                      isUser
+                        ? "bg-[#7C3AED] text-white rounded-tr-xs"
+                        : "bg-neutral-100/90 text-neutral-800 rounded-tl-xs border border-neutral-200/60"
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap break-words">{msg.text}</div>
+                    <div
+                      className={`text-[10.5px] sm:text-[10px] mt-1.5 text-right font-mono ${
+                        isUser ? "text-purple-200" : "text-neutral-400"
+                      }`}
+                    >
+                      {msg.timestamp}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gaurav Reply Celebratory Status Badge */}
+                {!isUser && msg.id !== "msg_welcome" && (
+                  <div className="flex items-center justify-start pl-10 animate-in fade-in duration-200">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple/10 border border-purple/20 text-[#7C3AED] text-[11.5px] sm:text-[11px] font-medium shadow-2xs">
+                      <BsLightningChargeFill className="w-3 h-3 text-[#7C3AED] shrink-0" />
+                      <span>Gaurav replied &bull; {msg.timestamp}</span>
+                    </div>
                   </div>
                 )}
 
-                {/* Message Bubble */}
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-[13px] sm:text-[13.5px] leading-relaxed shadow-2xs ${
-                    isUser
-                      ? "bg-[#7C3AED] text-white rounded-tr-xs"
-                      : "bg-neutral-100/90 text-neutral-800 rounded-tl-xs border border-neutral-200/60"
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap break-words">{msg.text}</div>
-                  <div
-                    className={`text-[10px] mt-1.5 text-right font-mono ${
-                      isUser ? "text-purple-200" : "text-neutral-400"
-                    }`}
-                  >
-                    {msg.timestamp}
+                {/* Dynamic Notification Lifecycle Badge */}
+                {isLatestVisitorMsg && isVisitorLocked && (
+                  <div className="flex items-center justify-end pr-10 animate-in fade-in duration-200">
+                    {deliveryStage === "sending" && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-600 text-[11.5px] sm:text-[11px] font-medium shadow-2xs animate-pulse">
+                        <CgSpinner className="w-3 h-3 animate-spin text-[#7C3AED]" />
+                        <span>Delivering to Gaurav&apos;s direct channel...</span>
+                      </div>
+                    )}
+
+                    {deliveryStage === "notifying" && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple/10 border border-purple/30 text-[#7C3AED] text-[11.5px] sm:text-[11px] font-medium shadow-2xs animate-pulse">
+                        <BsLightningChargeFill className="w-3 h-3 text-[#7C3AED] shrink-0" />
+                        <span>Notifying Gaurav on high priority...</span>
+                      </div>
+                    )}
+
+                    {deliveryStage === "notified" && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple/10 border border-purple/20 text-[#7C3AED] text-[11.5px] sm:text-[11px] font-medium shadow-2xs">
+                        <BsLightningChargeFill className="w-3 h-3 text-[#7C3AED] shrink-0" />
+                        <span>System has notified Gaurav on high priority. Gaurav&apos;s reply will show here.</span>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
+            );
+          })}
 
-              {/* Gaurav Reply Celebratory Status Badge */}
-              {!isUser && msg.id !== "msg_welcome" && (
-                <div className="flex items-center justify-start pl-10 animate-in fade-in duration-200">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple/10 border border-purple/20 text-[#7C3AED] text-[11px] font-medium shadow-2xs">
-                    <BsLightningChargeFill className="w-3 h-3 text-[#7C3AED] shrink-0" />
-                    <span>Gaurav replied &bull; {msg.timestamp}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Dynamic Notification Lifecycle Badge */}
-              {isLatestVisitorMsg && isVisitorLocked && (
-                <div className="flex items-center justify-end pr-10 animate-in fade-in duration-200">
-                  {deliveryStage === "sending" && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-600 text-[11px] font-medium shadow-2xs animate-pulse">
-                      <CgSpinner className="w-3 h-3 animate-spin text-[#7C3AED]" />
-                      <span>Delivering to Gaurav&apos;s direct channel...</span>
-                    </div>
-                  )}
-
-                  {deliveryStage === "notifying" && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple/10 border border-purple/30 text-[#7C3AED] text-[11px] font-medium shadow-2xs animate-pulse">
-                      <BsLightningChargeFill className="w-3 h-3 text-[#7C3AED] shrink-0" />
-                      <span>Notifying Gaurav on high priority...</span>
-                    </div>
-                  )}
-
-                  {deliveryStage === "notified" && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple/10 border border-purple/20 text-[#7C3AED] text-[11px] font-medium shadow-2xs">
-                      <BsLightningChargeFill className="w-3 h-3 text-[#7C3AED] shrink-0" />
-                      <span>System has notified Gaurav on high priority. Gaurav&apos;s reply will show here.</span>
-                    </div>
-                  )}
-                </div>
-              )}
+          {isCircuitBroken && (
+            <div className="flex items-center justify-center p-2 animate-in fade-in duration-200">
+              <button
+                type="button"
+                onClick={() => fetchMessages(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11.5px] sm:text-[11px] font-medium shadow-2xs hover:bg-amber-100 transition-colors cursor-pointer touch-manipulation"
+              >
+                <span>Connection paused &bull; Tap to reconnect</span>
+              </button>
             </div>
-          );
-        })}
+          )}
 
-        {isCircuitBroken && (
-          <div className="flex items-center justify-center p-2 animate-in fade-in duration-200">
-            <button
-              type="button"
-              onClick={() => fetchMessages(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium shadow-2xs hover:bg-amber-100 transition-colors cursor-pointer"
-            >
-              <span>Connection paused &bull; Tap to reconnect</span>
-            </button>
-          </div>
-        )}
+          {isSessionPaused && (
+            <div className="flex items-center justify-center p-2 animate-in fade-in duration-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSessionPaused(false);
+                  fetchMessages(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11.5px] sm:text-[11px] font-medium shadow-2xs hover:bg-slate-200 transition-colors cursor-pointer touch-manipulation"
+              >
+                <span>Live sync paused &bull; Tap to resume</span>
+              </button>
+            </div>
+          )}
 
-        {isSessionPaused && (
-          <div className="flex items-center justify-center p-2 animate-in fade-in duration-200">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSessionPaused(false);
-                fetchMessages(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-medium shadow-2xs hover:bg-slate-200 transition-colors cursor-pointer"
-            >
-              <span>Live sync paused &bull; Tap to resume</span>
-            </button>
-          </div>
-        )}
-
-        {sendError && (
-          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs text-center animate-in fade-in">
-            {sendError}
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
+          {sendError && (
+            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs text-center animate-in fade-in">
+              {sendError}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Floating Scroll to Bottom Jump Button (Facebook/WhatsApp Style) */}
-      {showScrollBottom && (
+      {/* Floating Scroll to Bottom Jump Button (Luxury Glowing Pill) */}
+      {(showScrollBottom || hasNewMessageBelow) && (
         <button
           type="button"
-          onClick={() => scrollToBottom("smooth")}
-          className="absolute right-4 bottom-20 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-neutral-200 text-neutral-700 hover:text-neutral-900 text-xs font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:bg-neutral-50 active:scale-95 cursor-pointer animate-in fade-in zoom-in-95"
+          onClick={() => scrollToLatest("smooth", "latest-button")}
+          className={`group absolute right-3.5 sm:right-4 bottom-[4.75rem] sm:bottom-[5rem] z-30 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold tracking-tight transition-all duration-300 active:scale-95 cursor-pointer animate-in fade-in slide-in-from-bottom-2 select-none touch-manipulation ${
+            hasNewMessageBelow
+              ? "bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#6D28D9] text-white shadow-[0_8px_25px_rgba(124,58,237,0.45)] hover:shadow-[0_12px_32px_rgba(124,58,237,0.6)] border border-purple-300/40 hover:scale-105"
+              : "bg-white/95 backdrop-blur-md text-neutral-800 border border-[#7C3AED]/25 shadow-[0_8px_24px_rgba(124,58,237,0.18)] hover:shadow-[0_12px_30px_rgba(124,58,237,0.32)] hover:border-[#7C3AED]/50 hover:text-[#7C3AED] hover:scale-102"
+          }`}
           aria-label="Scroll to latest message"
         >
-          {hasNewMessageBelow && (
-            <span className="w-2 h-2 rounded-full bg-[#7C3AED] animate-pulse" />
-          )}
-          <span className="text-[11px] font-semibold">{hasNewMessageBelow ? "New message" : "Latest"}</span>
-          <IoChevronDown className="w-3.5 h-3.5 text-[#7C3AED]" />
+          {/* Ambient Glow Aura */}
+          <span
+            className={`absolute -inset-0.5 rounded-full blur-xs transition-opacity duration-300 pointer-events-none ${
+              hasNewMessageBelow
+                ? "bg-gradient-to-r from-[#7C3AED] to-[#CBACF9] opacity-75 group-hover:opacity-100 animate-pulse"
+                : "bg-gradient-to-r from-[#7C3AED]/20 to-[#CBACF9]/30 opacity-40 group-hover:opacity-80"
+            }`}
+          />
+
+          {/* Content Layer */}
+          <div className="relative z-10 flex items-center gap-1.5">
+            {hasNewMessageBelow ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                </span>
+                <span className="text-[11px] sm:text-[11.5px] font-bold text-white tracking-tight">New message</span>
+                <IoChevronDown className="w-3.5 h-3.5 text-purple-200 animate-bounce group-hover:translate-y-0.5 transition-transform" />
+              </>
+            ) : (
+              <>
+                <BsLightningChargeFill className="w-2.5 h-2.5 text-[#7C3AED] group-hover:rotate-12 transition-transform" />
+                <span className="text-[10.5px] sm:text-[11px] font-semibold text-neutral-700 group-hover:text-[#7C3AED] transition-colors">Latest</span>
+                <IoChevronDown className="w-3.5 h-3.5 text-[#7C3AED] group-hover:translate-y-0.5 transition-transform duration-200" />
+              </>
+            )}
+          </div>
         </button>
       )}
 
       {/* 2. Auto-Expanding Input Bar / Turn-Locked State */}
-      <div className="p-3.5 bg-white border-t border-neutral-100 shrink-0 select-none">
+      <div
+        ref={composerContainerRef}
+        className="p-3 sm:p-3.5 bg-white border-t border-neutral-100 shrink-0 select-none pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      >
         {isVisitorLocked ? (
-          <div className="w-full py-3 px-4 rounded-2xl bg-neutral-50 border border-neutral-200/70 flex items-center justify-between gap-3 text-neutral-400 shadow-2xs">
+          <div className="w-full py-2.5 sm:py-3 px-3.5 sm:px-4 rounded-2xl bg-neutral-50 border border-neutral-200/70 flex items-center justify-between gap-3 text-neutral-400 shadow-2xs">
             <div className="flex items-center gap-2 text-xs font-medium text-neutral-500">
               <IoLockClosedOutline className="w-4 h-4 text-neutral-400 shrink-0" />
               <span>Awaiting Gaurav&apos;s reply...</span>
@@ -690,14 +647,14 @@ export const LiveChatVerifiedComposer: React.FC<LiveChatVerifiedComposerProps> =
               onKeyDown={handleKeyDown}
               disabled={isSending}
               placeholder="Type your message to Gaurav..."
-              className="w-full py-2.5 pl-4 pr-11 text-[14.5px] sm:text-[13.5px] bg-transparent text-neutral-900 placeholder-neutral-400 focus:outline-none resize-none min-h-[40px] max-h-36 leading-normal overflow-y-auto"
+              className="w-full py-2.5 pl-3.5 sm:pl-4 pr-11 text-[16px] sm:text-[13.5px] bg-transparent text-neutral-900 placeholder-neutral-400 focus:outline-none resize-none min-h-[40px] max-h-36 leading-normal overflow-y-auto"
             />
 
             <button
               type="button"
               onClick={handleSendMessage}
               disabled={!inputText.trim() || isSending}
-              className={`absolute right-1.5 bottom-1.5 w-8 h-8 sm:w-7 sm:h-7 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              className={`absolute right-1.5 bottom-1.5 w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer touch-manipulation ${
                 inputText.trim() && !isSending
                   ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-2xs active:scale-90"
                   : "bg-neutral-200 text-neutral-400 cursor-not-allowed"

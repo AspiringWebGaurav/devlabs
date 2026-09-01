@@ -5,6 +5,7 @@ import {
 } from "@/lib/assistant/session";
 import { LIVE_CHAT_COOKIE_NAME, verifyVisitorSession } from "@/lib/assistant/auth";
 import { liveChatSessionsRepository } from "@/lib/dal/repositories/live-chat-sessions.repository";
+import { getRequestContext } from "@/lib/api/context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,44 +14,52 @@ export const dynamic = "force-dynamic";
  * GET: Checks and returns the current visitor session state.
  */
 export async function GET(req: NextRequest) {
+  const { requestId } = getRequestContext(req);
   try {
     const visitor = await getAuthenticatedVisitor(req);
 
     if (!visitor) {
-      return NextResponse.json({
-        ok: true,
-        authenticated: false,
-      });
+      return NextResponse.json(
+        {
+          ok: true,
+          authenticated: false,
+        },
+        { status: 200, headers: { "x-request-id": requestId } }
+      );
     }
 
-    return NextResponse.json({
-      ok: true,
-      authenticated: true,
-      session: {
-        email: visitor.email,
-        name: visitor.name,
-        expiresAt: visitor.session.expiresAt,
+    return NextResponse.json(
+      {
+        ok: true,
+        authenticated: true,
+        session: {
+          email: visitor.email,
+          name: visitor.name,
+          expiresAt: visitor.session.expiresAt,
+        },
       },
-    });
+      { status: 200, headers: { "x-request-id": requestId } }
+    );
   } catch (err: unknown) {
     const error = err as Error;
     return NextResponse.json(
       { ok: false, code: "INTERNAL_ERROR", message: error.message || "An unexpected error occurred." },
-      { status: 500 }
+      { status: 500, headers: { "x-request-id": requestId } }
     );
   }
 }
 
 /**
- * DELETE: Revokes the active session in Firestore and wips the cookie.
+ * DELETE: Revokes the active session in Firestore and wipes the cookie.
  * Invariant: Revocation remains functional even if the live chat kill switch is active.
  */
 export async function DELETE(req: NextRequest) {
+  const { requestId } = getRequestContext(req);
   // 1. CSRF Origin Check
   if (!validateCsrfOrigin(req)) {
     return NextResponse.json(
       { ok: false, code: "CSRF_ORIGIN_REJECTED", message: "Cross-origin request rejected." },
-      { status: 403 }
+      { status: 403, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -63,10 +72,13 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    const response = NextResponse.json({
-      ok: true,
-      message: "Session signed out successfully.",
-    });
+    const response = NextResponse.json(
+      {
+        ok: true,
+        message: "Session signed out successfully.",
+      },
+      { status: 200, headers: { "x-request-id": requestId } }
+    );
 
     const isProduction = process.env.NODE_ENV === "production";
 
@@ -87,7 +99,7 @@ export async function DELETE(req: NextRequest) {
     const error = err as Error;
     return NextResponse.json(
       { ok: false, code: "INTERNAL_ERROR", message: error.message || "Failed to sign out." },
-      { status: 500 }
+      { status: 500, headers: { "x-request-id": requestId } }
     );
   }
 }

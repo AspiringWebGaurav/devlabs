@@ -5,10 +5,14 @@ import {
   validateCsrfOrigin,
 } from "@/lib/assistant/session";
 import { checkLiveChatRateLimit, recordLiveChatAction } from "@/lib/assistant/services/live-chat-rate-limiter";
+import {
+  createLiveChatAlertJob,
+  triggerAlertJobProcessing,
+} from "@/lib/assistant/services/live-chat-alert-jobs.service";
 import { inquiriesRepository } from "@/lib/admin/repositories";
-import { dispatchLiveChatAdminNotificationEmail } from "@/lib/email/brevo";
 import { liveChatRepository } from "@/lib/dal/repositories/live-chat.repository";
 import { getNextSynchronizedLeadNumber } from "@/lib/contact/lead-counter";
+import { getRequestContext } from "@/lib/api/context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,12 +21,13 @@ export const dynamic = "force-dynamic";
  * GET: Retrieves the conversation transcript and lock status for the active authenticated visitor.
  */
 export async function GET(req: NextRequest) {
+  const { requestId } = getRequestContext(req);
   try {
     const visitor = await getAuthenticatedVisitor(req);
     if (!visitor) {
       return NextResponse.json(
         { ok: false, code: "SESSION_INVALID", message: "Authentication required." },
-        { status: 401 }
+        { status: 401, headers: { "x-request-id": requestId } }
       );
     }
 
@@ -61,12 +66,13 @@ export async function GET(req: NextRequest) {
  * POST: Dispatches a verified visitor message to Gaurav, locks visitor input, and notifies Gaurav via magic link email.
  */
 export async function POST(req: NextRequest) {
+  const { requestId } = getRequestContext(req);
   try {
     // 1. Validate Origin / CSRF Defense
     if (!validateCsrfOrigin(req)) {
       return NextResponse.json(
         { ok: false, code: "CSRF_DETECTED", message: "Cross-site request forgery protection triggered." },
-        { status: 403 }
+        { status: 403, headers: { "x-request-id": requestId } }
       );
     }
 
@@ -75,7 +81,7 @@ export async function POST(req: NextRequest) {
     if (!visitor) {
       return NextResponse.json(
         { ok: false, code: "SESSION_INVALID", message: "Authentication required. Please complete verification." },
-        { status: 401 }
+        { status: 401, headers: { "x-request-id": requestId } }
       );
     }
 
@@ -186,29 +192,38 @@ export async function POST(req: NextRequest) {
         console.warn("Non-fatal: Inquiries repository save warning:", err);
       });
 
-    // 8. Dispatch Real-Time Email Alert to Gaurav with Magic 1-Click Room Access Link
+    // 8. Persist Durable Alert Job in Firestore BEFORE returning HTTP response
     const baseUrl = req.nextUrl.origin;
-    const emailResult = await dispatchLiveChatAdminNotificationEmail({
+    const alertJob = await createLiveChatAlertJob({
+      requestId,
+      threadId: currentThread.id,
+      messageId: appendRes.data.message.id,
       visitorName: visitor.name,
       visitorEmail: visitor.email,
-      message: trimmedMessage,
-      threadId: currentThread.id,
-      roomAccessSecret: currentThread.adminToken,
-      notificationType: "FIRST_MESSAGE",
+      messageText: trimmedMessage,
+      adminToken: currentThread.adminToken,
       baseUrl,
-      requestHeaders: req.headers,
     }).catch((err) => {
-      console.warn("Non-fatal: Brevo live chat admin alert exception:", err);
-      return { success: false, error: (err as Error).message };
+      console.warn("Non-fatal: LiveChatAlertJob creation exception:", err);
+      return null;
     });
 
-    return NextResponse.json({
-      ok: true,
-      message: appendRes.data.message,
-      thread: appendRes.data.thread,
-      isVisitorLocked: true,
-      emailDelivered: emailResult.success,
-    });
+    // 9. Trigger background worker processing asynchronously
+    if (alertJob) {
+      triggerAlertJobProcessing(alertJob.id);
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        message: appendRes.data.message,
+        thread: appendRes.data.thread,
+        isVisitorLocked: true,
+        alertJobId: alertJob?.id || null,
+        alertJobStatus: alertJob?.status || "PENDING",
+      },
+      { headers: { "x-request-id": requestId } }
+    );
   } catch (err: unknown) {
     const error = err as Error;
     return NextResponse.json(
