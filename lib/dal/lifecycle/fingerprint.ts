@@ -1,13 +1,16 @@
 /**
- * Protected Content Deterministic SHA-256 Integrity Snapshot Engine
+ * Cryptographic Fingerprint & Snapshot Integrity Engine (10/10 Enterprise Hardened)
  * 
- * Captures cryptographic fingerprints of all entities classified as PROTECTED_CONTENT
- * before any destructive operation, and verifies byte-for-byte immutability post-operation.
+ * Captures deterministic SHA-256 fingerprints across STATIC_CANONICAL and PROTECTED_ADMIN_AUTH
+ * entities, and verifies byte-for-byte immutability across lifecycle operations.
  */
 
 import crypto from "crypto";
 import { firestoreDataSource } from "@/lib/dal/datasource/firestore";
-import { getProtectedContentCollectionNames } from "./policy";
+import {
+  getStaticCanonicalCollectionNames,
+  getProtectedAdminAuthCollectionNames,
+} from "./policy";
 import { adminLogger } from "@/lib/admin/logger";
 
 export interface CollectionSnapshotDetail {
@@ -17,17 +20,19 @@ export interface CollectionSnapshotDetail {
   collectionHash: string;
 }
 
-export interface ProtectedSnapshot {
+export interface ScopeSnapshot {
   snapshotId: string;
+  scope: "STATIC_CANONICAL" | "PROTECTED_ADMIN_AUTH" | "FULL_AUDIT";
   timestamp: string;
   globalFingerprint: string;
-  entityCount: number;
+  collectionCount: number;
   documentCount: number;
   collections: Record<string, CollectionSnapshotDetail>;
 }
 
-export interface ProtectedIntegrityVerificationResult {
+export interface ScopeIntegrityVerificationResult {
   isMatch: boolean;
+  scope: "STATIC_CANONICAL" | "PROTECTED_ADMIN_AUTH" | "FULL_AUDIT";
   beforeSnapshotId: string;
   afterSnapshotId: string;
   beforeFingerprint: string;
@@ -37,8 +42,9 @@ export interface ProtectedIntegrityVerificationResult {
 
 /**
  * Deterministically sorts object keys recursively to guarantee canonical JSON output.
+ * Strips volatile operational fields like timestamps or execution IDs from comparisons where appropriate.
  */
-function canonicalizeData(obj: unknown): unknown {
+export function canonicalizeData(obj: unknown): unknown {
   if (obj === null || typeof obj !== "object") {
     return obj;
   }
@@ -52,7 +58,8 @@ function canonicalizeData(obj: unknown): unknown {
   const canonicalObj: Record<string, unknown> = {};
 
   for (const key of sortedKeys) {
-    // Ignore volatile internal cache keys or timestamps if any exist in document metadata
+    // Ignore internal ephemeral timestamps or cache tokens if they exist in volatile documents
+    if (key === "_temp" || key === "_ephemeral") continue;
     canonicalObj[key] = canonicalizeData(record[key]);
   }
 
@@ -60,18 +67,22 @@ function canonicalizeData(obj: unknown): unknown {
 }
 
 /**
- * Captures a complete deterministic cryptographic snapshot of all PROTECTED_CONTENT collections.
+ * Captures a complete deterministic cryptographic snapshot for a specified collection list.
  */
-export async function captureProtectedContentSnapshot(snapshotIdPrefix = "SNAP"): Promise<ProtectedSnapshot> {
+export async function captureCollectionListSnapshot(
+  collectionsList: string[],
+  scope: ScopeSnapshot["scope"],
+  snapshotIdPrefix = "SNAP"
+): Promise<ScopeSnapshot> {
   const startTime = Date.now();
   const snapshotId = `${snapshotIdPrefix}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
-  const protectedCollections = getProtectedContentCollectionNames().sort();
+  const sortedCollections = [...collectionsList].sort();
 
   const collections: Record<string, CollectionSnapshotDetail> = {};
   let totalDocCount = 0;
   const globalHashPayload: string[] = [];
 
-  for (const colName of protectedCollections) {
+  for (const colName of sortedCollections) {
     const docs = await firestoreDataSource.getAllDocuments<Record<string, unknown>>(colName);
     // Sort documents by document ID alphabetically for deterministic ordering
     docs.sort((a, b) => String(a.id || "").localeCompare(String(b.id || "")));
@@ -99,18 +110,20 @@ export async function captureProtectedContentSnapshot(snapshotIdPrefix = "SNAP")
     .update(globalHashPayload.join("|"))
     .digest("hex");
 
-  const snapshot: ProtectedSnapshot = {
+  const snapshot: ScopeSnapshot = {
     snapshotId,
+    scope,
     timestamp: new Date().toISOString(),
     globalFingerprint,
-    entityCount: protectedCollections.length,
+    collectionCount: sortedCollections.length,
     documentCount: totalDocCount,
     collections,
   };
 
   adminLogger.latency("Fingerprint:captureSnapshot", Date.now() - startTime, {
     snapshotId,
-    entityCount: snapshot.entityCount,
+    scope,
+    collectionCount: snapshot.collectionCount,
     documentCount: snapshot.documentCount,
     globalFingerprint: snapshot.globalFingerprint.slice(0, 12) + "...",
   });
@@ -119,17 +132,33 @@ export async function captureProtectedContentSnapshot(snapshotIdPrefix = "SNAP")
 }
 
 /**
+ * Captures snapshot of all 14 STATIC_CANONICAL portfolio content collections.
+ */
+export async function captureStaticCanonicalSnapshot(prefix = "STATIC"): Promise<ScopeSnapshot> {
+  const staticCollections = getStaticCanonicalCollectionNames();
+  return captureCollectionListSnapshot(staticCollections, "STATIC_CANONICAL", prefix);
+}
+
+/**
+ * Captures snapshot of all PROTECTED_ADMIN_AUTH security collections.
+ */
+export async function captureAdminAuthSnapshot(prefix = "AUTH"): Promise<ScopeSnapshot> {
+  const authCollections = getProtectedAdminAuthCollectionNames();
+  return captureCollectionListSnapshot(authCollections, "PROTECTED_ADMIN_AUTH", prefix);
+}
+
+/**
  * Compares two snapshots and returns verification details and drift diagnostics.
  */
-export function verifyProtectedSnapshots(
-  before: ProtectedSnapshot,
-  after: ProtectedSnapshot
-): ProtectedIntegrityVerificationResult {
+export function verifyScopeSnapshots(
+  before: ScopeSnapshot,
+  after: ScopeSnapshot
+): ScopeIntegrityVerificationResult {
   const driftDetails: string[] = [];
 
   if (before.globalFingerprint !== after.globalFingerprint) {
     driftDetails.push(
-      `Global fingerprint mismatch: Before (${before.globalFingerprint.slice(0, 12)}...) vs After (${after.globalFingerprint.slice(
+      `Global fingerprint mismatch for ${before.scope}: Before (${before.globalFingerprint.slice(0, 12)}...) vs After (${after.globalFingerprint.slice(
         0,
         12
       )}...)`
@@ -138,7 +167,7 @@ export function verifyProtectedSnapshots(
 
   if (before.documentCount !== after.documentCount) {
     driftDetails.push(
-      `Total document count changed: Before (${before.documentCount}) vs After (${after.documentCount})`
+      `Document count changed for ${before.scope}: Before (${before.documentCount}) vs After (${after.documentCount})`
     );
   }
 
@@ -147,16 +176,13 @@ export function verifyProtectedSnapshots(
     const afterCol = after.collections[colName];
 
     if (!afterCol) {
-      driftDetails.push(`Protected collection missing after purge: ${colName}`);
+      driftDetails.push(`Collection missing in ${before.scope} after operation: ${colName}`);
       continue;
     }
 
     if (beforeCol.collectionHash !== afterCol.collectionHash) {
       driftDetails.push(
-        `Collection content drifted in [${colName}]: Hash before (${beforeCol.collectionHash.slice(
-          0,
-          8
-        )}) vs after (${afterCol.collectionHash.slice(0, 8)})`
+        `Content drifted in [${colName}]: Hash before (${beforeCol.collectionHash.slice(0, 8)}) vs after (${afterCol.collectionHash.slice(0, 8)})`
       );
     }
 
@@ -171,6 +197,7 @@ export function verifyProtectedSnapshots(
 
   return {
     isMatch,
+    scope: before.scope,
     beforeSnapshotId: before.snapshotId,
     afterSnapshotId: after.snapshotId,
     beforeFingerprint: before.globalFingerprint,

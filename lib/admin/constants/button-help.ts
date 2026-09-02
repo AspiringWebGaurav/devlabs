@@ -45,8 +45,11 @@ export const BUTTON_HELP = {
 
   // Database Lifecycle & Purge (/admin/purge)
   DATABASE_AUDIT: "Scans all root Firestore collections, RTDB nodes, and Upstash Redis keys to calculate exact deletion and preservation counts.",
-  DRY_RUN: "Simulates discovery, classification, and calculation with zero destructive writes to preview exact impact.",
-  PURGE_DATABASE: "Permanently wipes all dynamic inquiries, emails, chats, tokens, and Upstash Redis state while keeping static portfolio content 100% intact.",
+  DRY_RUN: "Simulates discovery, classification, and planning with zero mutations to preview exact impact.",
+  PURGE_DATABASE: "Wipes all disposable development inquiries, chats, and emails, and clears lifecycle-managed Redis cache namespaces while keeping static portfolio content and admin login 100% intact.",
+  SEED_STATIC_PILLARS: "Populates all 14 canonical static portfolio content pillars into Firestore and dispatches Realtime CMS sync signals with 0 dummy test data.",
+  RESET_DATABASE: "Full environment reset: wipes all dynamic records and static portfolio content to zero while keeping admin authentication 100% intact.",
+  RECONCILE_DATABASE: "Audits full-system drift across Firestore, RTDB, Redis, and signals; safely repairs missing or drifted static documents.",
   RESET_AND_RESEED: "Wipes dynamic data and repopulates the development database with realistic synthetic dummy inquiries, chats, and mail records.",
 } as const;
 

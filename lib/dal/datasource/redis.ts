@@ -213,6 +213,45 @@ export class RedisDataSource {
       return false;
     }
   }
+
+  /**
+   * Finds all keys matching a pattern (e.g. "counter:*", "ratelimit:*", "cache:*").
+   */
+  public async getKeysByPattern(pattern: string): Promise<string[]> {
+    const { url, token } = this.getCredentials();
+    if (!url || !token) return [];
+
+    try {
+      const res = await fetchWithTimeout(
+        `${url}/keys/${encodeURIComponent(pattern)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        },
+        2000
+      );
+      if (!res.ok) return [];
+      const data = (await res.json()) as { result?: string[] };
+      return Array.isArray(data.result) ? data.result : [];
+    } catch (err) {
+      adminLogger.warn("RedisDataSource:getKeysByPattern", "Failed to query keys by pattern", { pattern, error: String(err) });
+      return [];
+    }
+  }
+
+  /**
+   * Deletes all keys matching a specific namespace pattern.
+   */
+  public async deleteKeysByPattern(pattern: string): Promise<number> {
+    const keys = await this.getKeysByPattern(pattern);
+    let deletedCount = 0;
+    for (const key of keys) {
+      const ok = await this.deleteKey(key);
+      if (ok) deletedCount++;
+    }
+    return deletedCount;
+  }
 }
 
 export const redisDataSource = new RedisDataSource();
+

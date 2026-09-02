@@ -6,16 +6,26 @@ import { DatabasePurgeCanvas } from "./components/DatabasePurgeCanvas";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPurgePage() {
-  const auditRes = await purgeRepository.auditDatabase();
+  const [auditRes, historyRes] = await Promise.all([
+    purgeRepository.auditDatabase(),
+    purgeRepository.getRecentExecutions(10),
+  ]);
+
   const initialAudit = auditRes.data || null;
+  const initialHistory = historyRes.data?.receipts || [];
+  const initialNextCursor = historyRes.data?.nextCursor;
 
   return (
     <AdminPageContainer
       breadcrumb="OPERATIONS / DATABASE RESET"
-      title="Database Reset"
-      subtitle="Clean your development data or start fresh with test data."
+      title="Database Lifecycle Control Center"
+      subtitle="Multi-store sanitation, canonical static seeding, and full-system reconciliation."
     >
-      <DatabasePurgeCanvas initialAudit={initialAudit} />
+      <DatabasePurgeCanvas
+        initialAudit={initialAudit}
+        initialHistory={initialHistory}
+        initialNextCursor={initialNextCursor}
+      />
     </AdminPageContainer>
   );
 }
