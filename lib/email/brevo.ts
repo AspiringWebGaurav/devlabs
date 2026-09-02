@@ -556,105 +556,43 @@ export interface LifecycleOtpEmailParams {
 }
 
 /**
- * Dispatches a specialized, high-security Database Lifecycle Authorization Passcode email.
- * Curated for superadmin lifecycle approvals (CLEAN, RESET, SEED, RESEED, RECONCILE).
+ * Dispatches a clean, single-view Database Lifecycle Authorization Passcode email.
+ * Styled in the pure, compact Wasmer Pro aesthetic with zero scroll and clear security copy.
  */
 export async function dispatchLifecycleOtpEmail(
   params: LifecycleOtpEmailParams
 ): Promise<SendEmailResult> {
   const safeOtp = escapeHtml(params.otp);
   const safeOp = escapeHtml(params.operation.toUpperCase());
-  const safeIp = escapeHtml(params.clientIp || "Unknown IP");
   const expiresMin = params.expiresMinutes || 5;
   const baseUrl = resolveAppUrl(params.requestHeaders);
   const rawTermsUrl = `${baseUrl}/admin/terms`;
   const rawPrivacyUrl = `${baseUrl}/admin/privacy`;
 
-  const isDestructive = safeOp === "CLEAN" || safeOp === "RESET";
-  const badgeBg = isDestructive ? "#FEF2F2" : "#F5F3FF";
-  const badgeBorder = isDestructive ? "#FECACA" : "#DDD6FE";
-  const badgeText = isDestructive ? "#DC2626" : "#7C3AED";
-  const badgeLabel = isDestructive
-    ? `⚠️ CRITICAL ACTION: ${safeOp} DATABASE`
-    : `✨ LIFECYCLE ACTION: ${safeOp} CANONICAL PILLARS`;
-
-  const dynamicCount = params.targetSummary?.dynamicCount ?? 0;
-  const staticCount = params.targetSummary?.staticCount ?? 37;
-  const redisKeys = params.targetSummary?.redisKeysCount ?? 0;
-
   const bodyContentHtml = `
-    <div style="margin-bottom:16px;">
-      <span style="display:inline-block;padding:4px 10px;font-size:11px;font-weight:700;font-family:${EMAIL_TYPOGRAPHY.fontMono};background:${badgeBg};border:1px solid ${badgeBorder};color:${badgeText};border-radius:4px;letter-spacing:0.5px;">
-        ${badgeLabel}
-      </span>
-    </div>
-
     <p style="${EMAIL_SPACING.greetingMargin}font-weight:600;color:${EMAIL_TYPOGRAPHY.colorHeading};">Hi Gaurav,</p>
-    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};">
-      An administrative authorization request was initiated to execute <strong>${safeOp}</strong> on your production database.
-    </p>
-
-    <!-- Passcode Display Card -->
-    <div style="margin:20px 0;padding:24px 16px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;text-align:center;">
-      <div style="font-size:11px;font-weight:700;font-family:${EMAIL_TYPOGRAPHY.fontMono};text-transform:uppercase;color:#64748B;letter-spacing:1px;margin-bottom:8px;">
-        One-Time Security Passcode
-      </div>
-      <div style="font-family:${EMAIL_TYPOGRAPHY.fontMono};font-size:32px;font-weight:800;letter-spacing:8px;color:#0F172A;line-height:1.2;padding-left:8px;">
-        ${safeOtp}
-      </div>
-      <div style="font-size:12px;color:#64748B;margin-top:8px;">
-        Valid for <strong>${expiresMin} minutes</strong> • Single-use authorization
-      </div>
+    <p style="${EMAIL_SPACING.paragraphMargin}color:${EMAIL_TYPOGRAPHY.colorBody};">Here is your security authorization code to execute <strong>${safeOp}</strong> on the database:</p>
+    <div style="${EMAIL_SPACING.codeBlockMargin}">
+      <span style="font-family:${EMAIL_TYPOGRAPHY.fontMono};font-size:${EMAIL_TYPOGRAPHY.sizeOtp};font-weight:700;letter-spacing:5px;color:${EMAIL_TYPOGRAPHY.colorHeading};line-height:${EMAIL_TYPOGRAPHY.lineHeightCode};display:inline-block;">${safeOtp}</span>
     </div>
-
-    <!-- Preflight Target Scope Summary -->
-    <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:4px;font-size:12px;font-family:${EMAIL_TYPOGRAPHY.fontMono};">
-      <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
-        <th style="text-align:left;padding:8px 12px;color:#64748B;font-weight:700;font-size:10px;text-transform:uppercase;">Resource Scope</th>
-        <th style="text-align:right;padding:8px 12px;color:#64748B;font-weight:700;font-size:10px;text-transform:uppercase;">Target State</th>
-      </tr>
-      <tr style="border-bottom:1px solid #F1F5F9;">
-        <td style="padding:8px 12px;color:#16A34A;font-weight:600;">Superadmin Authentication</td>
-        <td style="text-align:right;padding:8px 12px;color:#16A34A;font-weight:700;">100% Protected (Immune)</td>
-      </tr>
-      <tr style="border-bottom:1px solid #F1F5F9;">
-        <td style="padding:8px 12px;color:#7C3AED;font-weight:600;">Canonical Static Content</td>
-        <td style="text-align:right;padding:8px 12px;color:#0F172A;font-weight:700;">${safeOp === "RESET" ? "0 (Wiped)" : `${staticCount} documents`}</td>
-      </tr>
-      <tr style="border-bottom:1px solid #F1F5F9;">
-        <td style="padding:8px 12px;color:#DC2626;font-weight:600;">Dynamic Application Data</td>
-        <td style="text-align:right;padding:8px 12px;color:#0F172A;font-weight:700;">${safeOp === "CLEAN" || safeOp === "RESET" ? "0 (Cleaned)" : `${dynamicCount} records`}</td>
-      </tr>
-      <tr>
-        <td style="padding:8px 12px;color:#64748B;font-weight:600;">Redis Cache & RTDB Leads</td>
-        <td style="text-align:right;padding:8px 12px;color:#0F172A;font-weight:700;">${safeOp === "CLEAN" || safeOp === "RESET" ? "0 keys (Flushed)" : `${redisKeys} keys`}</td>
-      </tr>
-    </table>
-
-    <p style="${EMAIL_SPACING.helperTextMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};">
-      Requesting IP: <code>${safeIp}</code> • State Fingerprint: <code>${escapeHtml(params.auditFingerprint.slice(0, 16))}...</code>
-    </p>
-
-    <p style="${EMAIL_SPACING.helperTextMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};">
-      If you did not request this database lifecycle operation from the Admin Control Center, someone may be attempting unauthorized actions. Your authentication session remains secure.
-    </p>
-    <p style="${EMAIL_SPACING.signoffMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorBody};">Gaurav Services Security</p>
+    <p style="${EMAIL_SPACING.helperTextMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorMuted};">This code is valid for ${expiresMin} minutes. If you did not request this database operation, you can safely ignore this email.</p>
+    <p style="${EMAIL_SPACING.signoffMargin}font-size:${EMAIL_TYPOGRAPHY.sizeSmall};color:${EMAIL_TYPOGRAPHY.colorBody};">Gaurav Security Services</p>
   `;
 
   const htmlContent = renderCompactEmailLayout({
-    title: `Database Lifecycle Authorization: ${safeOp}`,
+    title: `Authorization Code: ${safeOp}`,
     bodyContentHtml,
     footerType: "SECURITY",
-    footerContext: { termsUrl: rawTermsUrl, privacyUrl: rawPrivacyUrl, brandName: "Gaurav Services" },
+    footerContext: { termsUrl: rawTermsUrl, privacyUrl: rawPrivacyUrl, brandName: "Gaurav Security Services" },
   });
 
-  const textContent = `Hi Gaurav,\n\n[SECURITY PASSCODE] ${params.otp}\n\nAn administrative authorization request was initiated to execute ${safeOp} on your production database.\n\nPasscode: ${params.otp}\nValid for: ${expiresMin} minutes\nRequesting IP: ${params.clientIp || "Unknown"}\nAudit Fingerprint: ${params.auditFingerprint}\n\nIf you did not make this request, safely ignore this email.\n\nGaurav Services Security\n\nTerms: ${rawTermsUrl} | Privacy: ${rawPrivacyUrl}`;
+  const textContent = `Hi Gaurav,\n\nHere is your security authorization code to execute ${safeOp} on the database:\n\n${params.otp}\n\nThis code is valid for ${expiresMin} minutes. If you did not request this database operation, you can safely ignore this email.\n\nGaurav Security Services\n\nTerms: ${rawTermsUrl} | Privacy: ${rawPrivacyUrl}`;
 
   return sendTransactionalEmail({
     purpose: "SECURITY_OTP",
     identity: EMAIL_IDENTITIES.SECURITY,
     to: [{ email: params.email, name: params.name || "Gaurav Patil" }],
-    subject: `[SECURITY PASSCODE] ${params.otp} - Authorize ${safeOp} Database`,
+    subject: `Your authorization code is ${params.otp}`,
     htmlContent,
     textContent,
     tags: ["database_lifecycle", "security_otp", safeOp.toLowerCase()],
