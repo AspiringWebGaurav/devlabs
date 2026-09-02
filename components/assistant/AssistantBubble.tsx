@@ -18,6 +18,7 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isWindowMounted, setIsWindowMounted] = useState(false);
   const [isTurnstileGateOpen, setIsTurnstileGateOpen] = useState(false);
+  const [isPreparingTurnstile, setIsPreparingTurnstile] = useState(false);
   const [initialView, setInitialView] = useState<AssistantView>("home");
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [customPosition, setCustomPosition] = useState<DragCoordinates | null>(null);
@@ -26,6 +27,7 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const dragStartRef = useRef<{ pointerX: number; pointerY: number; bubbleX: number; bubbleY: number } | null>(null);
+  const prepIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasDraggedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
 
@@ -33,6 +35,31 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   const assistantName = config?.assistantName || "Gaurav Assistant";
   const avatarUrl = config?.avatarUrl && config.avatarUrl.trim() !== "" ? config.avatarUrl.trim() : undefined;
   const positionMode: AssistantPositionMode = config?.positionMode === "draggable" ? "draggable" : "fixed";
+
+  // Preload Cloudflare Turnstile Script eagerly in the background on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.turnstile) return;
+
+    const existingScript = document.getElementById("cf-turnstile-script");
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.id = "cf-turnstile-script";
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  // Clean up any preparation timers on unmount
+  useEffect(() => {
+    return () => {
+      if (prepIntervalRef.current) {
+        clearInterval(prepIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Clamp coordinates within visible safe viewport bounds
   const clampPosition = useCallback((x: number, y: number): DragCoordinates => {
@@ -151,13 +178,46 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   }, []);
 
   const handleOpen = useCallback(() => {
+    if (isPreparingTurnstile) return;
+
     if (isTurnstileSessionValid()) {
       setIsWindowMounted(true);
       setIsOpen(true);
-    } else {
-      setIsTurnstileGateOpen(true);
+      return;
     }
-  }, [isTurnstileSessionValid]);
+
+    // If Turnstile is already available in window or circuit is broken
+    if (
+      typeof window !== "undefined" &&
+      (window.turnstile || sessionStorage.getItem("gaurav_cf_circuit_broken") === "true")
+    ) {
+      setIsTurnstileGateOpen(true);
+      return;
+    }
+
+    // Turnstile is still loading in background -> Show dynamic animated dots on the chat bubble!
+    setIsPreparingTurnstile(true);
+
+    if (prepIntervalRef.current) {
+      clearInterval(prepIntervalRef.current);
+    }
+
+    let attempts = 0;
+    const maxAttempts = 35; // 3.5s timeout at 100ms interval
+    prepIntervalRef.current = setInterval(() => {
+      attempts++;
+      if (typeof window !== "undefined" && window.turnstile) {
+        if (prepIntervalRef.current) clearInterval(prepIntervalRef.current);
+        setIsPreparingTurnstile(false);
+        setIsTurnstileGateOpen(true);
+      } else if (attempts >= maxAttempts) {
+        if (prepIntervalRef.current) clearInterval(prepIntervalRef.current);
+        setIsPreparingTurnstile(false);
+        // Fallback: open gate anyway so visitor can authenticate via Email OTP / retry
+        setIsTurnstileGateOpen(true);
+      }
+    }, 100);
+  }, [isTurnstileSessionValid, isPreparingTurnstile]);
 
   const handleTurnstileVerified = useCallback(() => {
     setIsTurnstileGateOpen(false);
@@ -323,11 +383,15 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
             whileTap={prefersReducedMotion ? undefined : { scale: 0.94 }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={`fixed z-[4900] group flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white text-neutral-900 border border-neutral-200/90 shadow-[0_8px_30px_rgba(0,0,0,0.25)] hover:shadow-[0_12px_45px_rgba(124,58,237,0.45)] hover:border-[#7C3AED]/40 transition-shadow duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] focus-visible:ring-offset-2 focus-visible:ring-offset-[#000319] select-none ${
+            className={`fixed z-[4900] group flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white text-neutral-900 border ${
+              isPreparingTurnstile
+                ? "border-[#7C3AED] shadow-[0_12px_45px_rgba(124,58,237,0.45)] ring-2 ring-[#7C3AED]/30"
+                : "border-neutral-200/90 shadow-[0_8px_30px_rgba(0,0,0,0.25)] hover:shadow-[0_12px_45px_rgba(124,58,237,0.45)] hover:border-[#7C3AED]/40"
+            } transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] focus-visible:ring-offset-2 focus-visible:ring-offset-[#000319] select-none ${
               positionMode === "draggable" ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-pointer"
             }`}
             style={bubbleStyle}
-            aria-label={`Open ${assistantName}`}
+            aria-label={isPreparingTurnstile ? `Preparing ${assistantName}...` : `Open ${assistantName}`}
             aria-haspopup="dialog"
             aria-expanded={isOpen}
           >
@@ -359,7 +423,11 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
             />
 
             {/* 3. Icon: Speech Bubble with Namecheap-style Sea Wave Dots Animation */}
-            <div className="relative z-10 flex items-center justify-center text-neutral-800 group-hover:text-[#7C3AED] transition-colors duration-200 pointer-events-none">
+            <div
+              className={`relative z-10 flex items-center justify-center transition-colors duration-200 pointer-events-none ${
+                isPreparingTurnstile ? "text-[#7C3AED]" : "text-neutral-800 group-hover:text-[#7C3AED]"
+              }`}
+            >
               <svg
                 viewBox="0 0 28 28"
                 fill="none"
@@ -372,21 +440,21 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
                   fill="currentColor"
                 />
 
-                {/* 3 Sea-Wave Animated Floating Dots (Static on normal, sea-wave on hover / mobile click) */}
+                {/* 3 Sea-Wave Animated Floating Dots (Static on normal, sea-wave on hover / mobile click / preparing) */}
                 <motion.circle
                   cx="9.5"
                   cy="13.25"
                   r="1.45"
                   fill="#FFFFFF"
                   animate={
-                    prefersReducedMotion || (!isHovered && !isDragging)
+                    prefersReducedMotion || (!isHovered && !isDragging && !isPreparingTurnstile)
                       ? { y: 0 }
                       : {
                           y: [0, -3.2, 0],
                         }
                   }
                   transition={
-                    prefersReducedMotion || (!isHovered && !isDragging)
+                    prefersReducedMotion || (!isHovered && !isDragging && !isPreparingTurnstile)
                       ? { duration: 0.15 }
                       : {
                           duration: 0.7,
@@ -402,14 +470,14 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
                   r="1.45"
                   fill="#FFFFFF"
                   animate={
-                    prefersReducedMotion || (!isHovered && !isDragging)
+                    prefersReducedMotion || (!isHovered && !isDragging && !isPreparingTurnstile)
                       ? { y: 0 }
                       : {
                           y: [0, -3.2, 0],
                         }
                   }
                   transition={
-                    prefersReducedMotion || (!isHovered && !isDragging)
+                    prefersReducedMotion || (!isHovered && !isDragging && !isPreparingTurnstile)
                       ? { duration: 0.15 }
                       : {
                           duration: 0.7,
@@ -425,14 +493,14 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
                   r="1.45"
                   fill="#FFFFFF"
                   animate={
-                    prefersReducedMotion || (!isHovered && !isDragging)
+                    prefersReducedMotion || (!isHovered && !isDragging && !isPreparingTurnstile)
                       ? { y: 0 }
                       : {
                           y: [0, -3.2, 0],
                         }
                   }
                   transition={
-                    prefersReducedMotion || (!isHovered && !isDragging)
+                    prefersReducedMotion || (!isHovered && !isDragging && !isPreparingTurnstile)
                       ? { duration: 0.15 }
                       : {
                           duration: 0.7,

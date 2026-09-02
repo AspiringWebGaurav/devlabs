@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import {
   IoShieldCheckmark,
   IoClose,
@@ -52,7 +52,9 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
   forcedSubView,
   forcedFailureCount,
 }) => {
-  const [status, setStatus] = useState<TurnstileGateStatus>("LOADING");
+  const [status, setStatus] = useState<TurnstileGateStatus>(
+    typeof window !== "undefined" && window.turnstile ? "READY" : "LOADING"
+  );
   const [subView, setSubView] = useState<TurnstileGateSubView>("TURNSTILE");
   const [failureCount, setFailureCount] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -89,8 +91,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
   // 2. Render Turnstile Widget (Dark theme matching portfolio)
   const renderWidget = useCallback(() => {
     if (!containerRef.current || typeof window === "undefined" || !window.turnstile) return;
-
-    cleanupWidget();
+    if (widgetIdRef.current) return;
 
     try {
       setStatus("READY");
@@ -177,16 +178,11 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
     }
   }, [cleanupWidget, onVerified]);
 
-  // 3. Load Cloudflare Turnstile Script with Circuit Breaker Protection
+  // 3. Pre-render Cloudflare Turnstile in the background on mount
   useEffect(() => {
-    if (!isOpen) {
-      cleanupWidget();
-      return;
-    }
-
     if (typeof window === "undefined") return;
 
-    // Circuit Breaker: If Cloudflare is already known to be offline/blocked in this session, skip widget mounting!
+    // Circuit Breaker: If Cloudflare is already known to be offline/blocked in this session, switch to Fallback
     const isCircuitBroken = sessionStorage.getItem("gaurav_cf_circuit_broken") === "true";
     if (isCircuitBroken && activeSubView === "TURNSTILE" && !forcedStatus) {
       cleanupWidget();
@@ -195,14 +191,13 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
     }
 
     if (activeSubView !== "TURNSTILE") {
-      cleanupWidget();
       return;
     }
 
     if (window.turnstile) {
       scriptLoadedRef.current = true;
-      const timer = setTimeout(() => renderWidget(), 100);
-      return () => clearTimeout(timer);
+      renderWidget();
+      return;
     }
 
     const existingScript = document.getElementById("cf-turnstile-script");
@@ -241,15 +236,14 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
     }
 
     return () => cleanupWidget();
-  }, [isOpen, activeSubView, forcedStatus, renderWidget, cleanupWidget]);
+  }, [activeSubView, forcedStatus, renderWidget, cleanupWidget]);
 
-  // 4. Click outside to dismiss popover
+  // 4. Click outside to dismiss popover (active when open)
   useEffect(() => {
     if (!isOpen) return;
 
     const handlePointerDownOutside = (e: MouseEvent | TouchEvent) => {
       if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
-        cleanupWidget();
         onClose();
       }
     };
@@ -261,7 +255,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
       document.removeEventListener("mousedown", handlePointerDownOutside);
       document.removeEventListener("touchstart", handlePointerDownOutside);
     };
-  }, [isOpen, onClose, cleanupWidget]);
+  }, [isOpen, onClose]);
 
   // 5. Countdown timer for Fallback OTP
   useEffect(() => {
@@ -453,82 +447,84 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          ref={cardRef}
-          initial={{ opacity: 0, scale: 0.92, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 10 }}
-          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-          style={getPopoverStyle()}
-          className="z-[5000] w-[calc(100vw-1.5rem)] sm:w-[350px] max-w-[350px] bg-[#000319]/95 backdrop-blur-xl border border-white/[0.15] shadow-[0_16px_50px_rgba(0,0,0,0.7),0_0_24px_rgba(124,58,237,0.2)] rounded-2xl p-3 sm:p-3.5 select-none"
-        >
-          {/* Top Header */}
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.08]">
-            <div className="flex items-center gap-2 min-w-0">
-              {activeSubView !== "TURNSTILE" ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSubView("TURNSTILE");
-                    setFallbackError(null);
-                  }}
-                  className="w-7 h-7 sm:w-6 sm:h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/[0.1] transition-colors cursor-pointer"
-                  aria-label="Back to Cloudflare check"
-                >
-                  <IoArrowBack className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <div className="w-6 h-6 rounded-lg bg-[#f38020]/15 border border-[#f38020]/30 flex items-center justify-center text-[#f38020] shrink-0">
-                  <IoShieldCheckmark className="w-3.5 h-3.5" />
-                </div>
-              )}
-
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-xs font-bold text-white tracking-tight">
-                  {activeSubView === "TURNSTILE"
-                    ? "Quick Verification"
-                    : activeSubView === "FALLBACK_EMAIL"
-                    ? "Email Verification"
-                    : "Enter 6-Digit Code"}
-                </span>
-                <span className="text-[10px] text-neutral-400 font-mono tracking-wider uppercase">
-                  • {activeSubView === "TURNSTILE" ? "Fast Pass" : "Email Code"}
-                </span>
-              </div>
-            </div>
-
+    <motion.div
+      ref={cardRef}
+      initial={false}
+      animate={{
+        opacity: isOpen ? 1 : 0,
+        scale: isOpen ? 1 : 0.92,
+        y: isOpen ? 0 : 10,
+      }}
+      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+      style={{
+        ...getPopoverStyle(),
+        pointerEvents: isOpen ? "auto" : "none",
+        visibility: isOpen ? "visible" : "hidden",
+      }}
+      className="z-[5000] w-[calc(100vw-1.5rem)] sm:w-[350px] max-w-[350px] bg-[#000319]/95 backdrop-blur-xl border border-white/[0.15] shadow-[0_16px_50px_rgba(0,0,0,0.7),0_0_24px_rgba(124,58,237,0.2)] rounded-2xl p-3 sm:p-3.5 select-none"
+    >
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.08]">
+        <div className="flex items-center gap-2 min-w-0">
+          {activeSubView !== "TURNSTILE" ? (
             <button
               type="button"
               onClick={() => {
-                cleanupWidget();
-                onClose();
+                setSubView("TURNSTILE");
+                setFallbackError(null);
               }}
               className="w-7 h-7 sm:w-6 sm:h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/[0.1] transition-colors cursor-pointer"
-              aria-label="Close"
+              aria-label="Back to Cloudflare check"
             >
-              <IoClose className="w-3.5 h-3.5" />
+              <IoArrowBack className="w-3.5 h-3.5" />
             </button>
+          ) : (
+            <div className="w-6 h-6 rounded-lg bg-[#f38020]/15 border border-[#f38020]/30 flex items-center justify-center text-[#f38020] shrink-0">
+              <IoShieldCheckmark className="w-3.5 h-3.5" />
+            </div>
+          )}
+
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs font-bold text-white tracking-tight">
+              {activeSubView === "TURNSTILE"
+                ? "Quick Verification"
+                : activeSubView === "FALLBACK_EMAIL"
+                ? "Email Verification"
+                : "Enter 6-Digit Code"}
+            </span>
+            <span className="text-[10px] text-neutral-400 font-mono tracking-wider uppercase">
+              • {activeSubView === "TURNSTILE" ? "Fast Pass" : "Email Code"}
+            </span>
           </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-7 h-7 sm:w-6 sm:h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/[0.1] transition-colors cursor-pointer"
+          aria-label="Close"
+        >
+          <IoClose className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
           {/* VIEW 1: Standard Turnstile Popover View */}
           {activeSubView === "TURNSTILE" && (
-            <div className="flex flex-col items-center justify-center min-h-[66px]">
-              {activeStatus === "LOADING" && (
-                <div className="flex items-center gap-2 text-xs text-neutral-400 font-medium py-3">
-                  <CgSpinner className="w-4 h-4 animate-spin text-[#f38020]" />
-                  <span>Loading...</span>
-                </div>
-              )}
-
+            <div className="flex flex-col items-center justify-center min-h-[65px] w-full">
               {/* Turnstile Native Widget Container */}
               <div
                 ref={containerRef}
-                className={`flex justify-center transition-opacity duration-150 ${
-                  activeStatus === "READY" || activeStatus === "VERIFYING" ? "opacity-100" : "hidden opacity-0"
+                className={`flex justify-center items-center w-full min-h-[65px] transition-opacity duration-150 ${
+                  activeStatus === "ERROR" || activeStatus === "TIMEOUT" ? "hidden" : "opacity-100"
                 }`}
               />
+
+              {activeStatus === "LOADING" && !widgetIdRef.current && (
+                <div className="flex items-center gap-2 text-xs text-neutral-400 font-medium py-3">
+                  <CgSpinner className="w-4 h-4 animate-spin text-[#f38020]" />
+                  <span>Loading security check...</span>
+                </div>
+              )}
 
               {/* Robust Multi-Tier Error Lifecycle */}
               {(activeStatus === "ERROR" || activeStatus === "TIMEOUT") && (
@@ -734,8 +730,6 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
               </div>
             </div>
           )}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </motion.div>
   );
 };
