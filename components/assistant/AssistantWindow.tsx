@@ -7,6 +7,7 @@ import { AssistantHeader } from "./AssistantHeader";
 import { AssistantHomeView } from "./AssistantHomeView";
 import { AssistantQuestionsView } from "./AssistantQuestionsView";
 import { AssistantChatView } from "./AssistantChatView";
+import { AssistantWhatsAppView } from "./AssistantWhatsAppView";
 import type {
   AssistantWindowProps,
   AssistantView,
@@ -305,6 +306,14 @@ export const AssistantWindow: React.FC<AssistantWindowProps> = ({
                     avatarUrl={avatarUrl}
                     onAuthStateChange={setChatAuthState}
                     onRegisterSignOut={handleRegisterSignOut}
+                  />
+                )}
+                {currentView === "whatsapp" && (
+                  <AssistantWhatsAppView
+                    onNavigate={handleNavigate}
+                    onBack={handleBack}
+                    assistantName={assistantName}
+                    avatarUrl={avatarUrl}
                   />
                 )}
               </motion.div>

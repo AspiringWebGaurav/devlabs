@@ -2,7 +2,7 @@ import type { AssistantDocument, AssistantPositionMode } from "@/types/portfolio
 
 export type { AssistantPositionMode };
 
-export type AssistantView = "home" | "questions" | "chat";
+export type AssistantView = "home" | "questions" | "chat" | "whatsapp";
 
 export type AssistantLifecycleState =
   | "initializing"

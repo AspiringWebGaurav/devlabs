@@ -2,6 +2,7 @@
 
 import React from "react";
 import { IoHelpCircleOutline, IoChatbubblesOutline, IoChevronForward } from "react-icons/io5";
+import { FaWhatsapp } from "react-icons/fa";
 import type { AssistantViewProps } from "./types";
 
 export const AssistantHomeView: React.FC<AssistantViewProps> = ({
@@ -76,6 +77,29 @@ export const AssistantHomeView: React.FC<AssistantViewProps> = ({
             </div>
           </div>
           <IoChevronForward className="w-5 h-5 text-neutral-400 group-hover:text-[#7C3AED] group-hover:translate-x-0.5 transition-all shrink-0 ml-1.5" />
+        </button>
+
+        {/* Option 3: Continue on WhatsApp */}
+        <button
+          type="button"
+          onClick={() => onNavigate("whatsapp")}
+          className="w-full group p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-white hover:bg-neutral-50/80 border border-neutral-200/90 hover:border-emerald-500/50 transition-all duration-200 flex items-center justify-between text-left shadow-2xs hover:shadow-xs active:scale-[0.99] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+          aria-label="Continue on WhatsApp"
+        >
+          <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 shadow-2xs group-hover:scale-105 transition-all shrink-0">
+              <FaWhatsapp className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="block text-sm sm:text-[15px] font-semibold text-neutral-900 leading-tight">
+                Continue on WhatsApp
+              </span>
+              <span className="block text-[11.5px] sm:text-xs text-neutral-500 mt-1 font-normal group-hover:text-neutral-600 transition-colors leading-snug">
+                Official recruiter channel & opportunity intake
+              </span>
+            </div>
+          </div>
+          <IoChevronForward className="w-5 h-5 text-neutral-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-1.5" />
         </button>
       </div>
     </div>

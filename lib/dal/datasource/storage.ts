@@ -134,6 +134,36 @@ class StorageDataSource {
   }
 
   /**
+   * Downloads a physical file buffer from Firebase Storage.
+   */
+  public async getFileBuffer(storagePath: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+    const startTime = Date.now();
+    const bucket = this.getBucket();
+    if (!bucket) {
+      adminLogger.warn("StorageDataSource:getFileBuffer", "Firebase Storage Admin not configured", { storagePath });
+      throw new Error("Firebase Storage Admin not configured");
+    }
+
+    try {
+      const file = bucket.file(storagePath);
+      const [exists] = await file.exists();
+      if (!exists) return null;
+
+      const [metadata] = await file.getMetadata();
+      const [buffer] = await file.download();
+
+      adminLogger.latency("Storage:getFileBuffer", Date.now() - startTime, { storagePath, sizeBytes: buffer.length });
+      return {
+        buffer,
+        contentType: String(metadata.contentType || "application/octet-stream"),
+      };
+    } catch (err) {
+      adminLogger.error("Storage:getFileBuffer", err, `Failed to download file ${storagePath}`);
+      throw err;
+    }
+  }
+
+  /**
    * Lists physical files in the Storage bucket under a specified prefix.
    */
   public async listFiles(prefix?: string): Promise<StorageFileMetadata[]> {
