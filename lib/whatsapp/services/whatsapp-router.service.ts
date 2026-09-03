@@ -95,7 +95,30 @@ export class WhatsAppRouterService {
 
       await WhatsAppMetaClient.sendTextMessage(
         phone,
-        "You have successfully opted out of WhatsApp messages from Gaurav's Portfolio. No further messages will be sent. To reconnect later, visit https://devlabs.eu.cc.",
+        "You have successfully opted out of WhatsApp messages from Gaurav's Portfolio. No further messages will be sent. To reconnect later, reply 'START' or visit https://devlabs.eu.cc.",
+        thread
+      );
+      return;
+    }
+
+    // 3.1 Invariant 8.1: Opt-In Reconnect Check
+    const OPT_IN_KEYWORDS = ["START", "UNSTOP", "SUBSCRIBE", "RESTART"];
+    if (thread.optedOut && OPT_IN_KEYWORDS.includes(upperText)) {
+      thread.optedOut = false;
+      thread.status = "active";
+      thread.optedOutAt = undefined;
+      thread.currentFlowStep = "idle";
+      thread.draftLead = undefined;
+      await whatsappRepository.saveThread(thread);
+
+      await WhatsAppMetaClient.sendQuickReplyButtons(
+        phone,
+        `Welcome back${thread.recruiterName ? ` ${thread.recruiterName}` : ""}! You have re-subscribed to WhatsApp messages from Gaurav's Portfolio.\n\nHow can I help you today?`,
+        [
+          { id: "action_resume", title: "📄 Get Resume PDF" },
+          { id: "action_opportunity", title: "💼 Opportunity" },
+          { id: "action_human", title: "🤝 Talk to Gaurav" },
+        ],
         thread
       );
       return;
