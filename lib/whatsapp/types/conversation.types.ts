@@ -60,6 +60,8 @@ export interface WhatsAppConversation {
   unreadByAdmin: boolean;
   archived: boolean;
   leadSubmitted?: boolean;
+  hasReceivedResume?: boolean;
+  hasRequestedHuman?: boolean;
   createdAt: number;
   updatedAt: number;
 }

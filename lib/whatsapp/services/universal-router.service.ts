@@ -106,6 +106,49 @@ export class UniversalRouterService {
   }
 
   /**
+   * Computes state-aware adaptive quick reply buttons based on recruiter's session history.
+   * Consumed or completed options are suppressed or adapted so the recruiter only sees relevant, uncompleted actions.
+   */
+  public static getAdaptiveMenuButtons(
+    conversation: WhatsAppConversation,
+    activeFlow?: WhatsAppFlow | null
+  ): Array<{ id: string; title: string }> {
+    const buttons: Array<{ id: string; title: string }> = [];
+
+    // 1. Resume Option: Show if not yet requested
+    if (!conversation.hasReceivedResume) {
+      buttons.push({ id: "btn_resume", title: "📄 View Resume" });
+    }
+
+    // 2. Opportunity Option:
+    // If intake is active in progress, offer "Continue Intake"
+    if (conversation.currentState === "INTAKE_ACTIVE" && activeFlow && activeFlow.status === "ACTIVE") {
+      buttons.push({ id: "btn_continue_intake", title: "💼 Continue Intake" });
+    } else if (conversation.leadSubmitted) {
+      buttons.push({ id: "btn_opportunity", title: "💼 New Opportunity" });
+    } else {
+      buttons.push({ id: "btn_opportunity", title: "💼 Opportunities" });
+    }
+
+    // 3. Human Connection:
+    // If human handoff is NOT yet requested and not currently in HUMAN_PENDING
+    if (!conversation.humanRequested && conversation.currentState !== "HUMAN_PENDING") {
+      buttons.push({ id: "btn_human", title: "🤝 Talk to Gaurav" });
+    }
+
+    // Fallback Guarantee: Meta Cloud API requires at least 1 and max 3 buttons.
+    if (buttons.length === 0) {
+      buttons.push(
+        { id: "btn_resume", title: "📄 Re-send Resume" },
+        { id: "btn_opportunity", title: "💼 Opportunities" },
+        { id: "btn_human", title: "🤝 Contact Gaurav" }
+      );
+    }
+
+    return buttons.slice(0, 3);
+  }
+
+  /**
    * Deterministic Classifier (Zero DB writes).
    */
   public static classifyMessage(
@@ -352,6 +395,7 @@ export class UniversalRouterService {
       classification.commandType === "RESET" ||
       classification.commandType === "START"
     ) {
+      const menuButtons = UniversalRouterService.getAdaptiveMenuButtons(conversation, activeFlow);
       const menuOutbox: WhatsAppOutboxMessage = {
         outboxId: crypto.randomUUID(),
         operationId: outboxRepository.computeOperationId(phone, correlationId, "main_menu"),
@@ -363,11 +407,7 @@ export class UniversalRouterService {
             "🏠 *Main Menu — Gaurav Patil's Portfolio*\n\n" +
             "How can I assist you?",
           footerText: "Gaurav Portfolio • Type MENU anytime",
-          buttons: [
-            { id: "btn_resume", title: "📄 View Resume" },
-            { id: "btn_opportunity", title: "💼 Opportunities" },
-            { id: "btn_human", title: "🤝 Talk to Gaurav" },
-          ],
+          buttons: menuButtons,
         },
         correlationId,
         status: "PENDING",
@@ -382,7 +422,35 @@ export class UniversalRouterService {
     }
 
     // 3. HUMAN HANDOFF
-    if (classification.commandType === "HUMAN") {
+    if (classification.commandType === "HUMAN" || classification.extractedEntities?.buttonId === "btn_human") {
+      // Consumed Action Guard: Check if recruiter is already in HUMAN_PENDING or already requested human
+      if (conversation.currentState === "HUMAN_PENDING" || conversation.humanRequested) {
+        const alreadyConnectedOutbox: WhatsAppOutboxMessage = {
+          outboxId: crypto.randomUUID(),
+          operationId: outboxRepository.computeOperationId(phone, correlationId, "human_already_connected"),
+          conversationId: phone,
+          destinationPhone: phone,
+          messageType: "quick_reply",
+          payload: {
+            bodyText:
+              "🤝 *Direct Connection Active*\n\n" +
+              "Gaurav has already received an alert with your contact details and will reply directly here on WhatsApp as soon as he is online.\n\n" +
+              "Feel free to type your message, role details, or any questions right here in the chat.",
+            footerText: "Direct Mode • Type MENU to exit",
+            buttons: [{ id: "btn_menu", title: "🔄 Main Menu" }],
+          },
+          correlationId,
+          status: "PENDING",
+          attemptCount: 0,
+          maxAttempts: 5,
+          nextRetryAt: Date.now(),
+          reconciliationAttempts: 0,
+          createdAt: Date.now(),
+        };
+        await outboxRepository.enqueueMessage(alreadyConnectedOutbox);
+        return;
+      }
+
       const handoffOutbox: WhatsAppOutboxMessage = {
         outboxId: crypto.randomUUID(),
         operationId: outboxRepository.computeOperationId(phone, correlationId, "human_handoff_ack"),
@@ -427,7 +495,10 @@ export class UniversalRouterService {
       };
 
       await conversationRepository.initiateHumanHandoff(conversation, handoffOutbox, alertNotification);
-      await notificationRepository.processJob(alertNotification);
+      // Asynchronously process notification job to eliminate Brevo HTTP latency from WhatsApp reply path
+      void notificationRepository.processJob(alertNotification).catch((err) => {
+        adminLogger.error("WhatsApp:BrevoNotificationAsyncError", err, "Async Brevo notification failed");
+      });
       return;
     }
 
@@ -464,7 +535,35 @@ export class UniversalRouterService {
         await this.handleResumeRequest(conversation, correlationId);
         return;
       }
-      if (buttonId === "btn_opportunity") {
+      if (buttonId === "btn_opportunity" || buttonId === "btn_continue_intake") {
+        // Consumed Action Guard: If already actively in intake, continue smoothly without resetting
+        if (conversation.currentState === "INTAKE_ACTIVE" && activeFlow && activeFlow.status === "ACTIVE") {
+          const continueOutbox: WhatsAppOutboxMessage = {
+            outboxId: crypto.randomUUID(),
+            operationId: outboxRepository.computeOperationId(phone, correlationId, "continue_intake_prompt"),
+            conversationId: phone,
+            destinationPhone: phone,
+            messageType: "text",
+            payload: {
+              bodyText:
+                `💼 *Opportunity Intake In Progress*\n\n` +
+                `You're already sharing an opportunity! Let's continue where we left off:\n\n` +
+                `*${this.getStepPromptTitle(activeFlow.currentStep)}*\n` +
+                `_${this.getStepPromptText(activeFlow.currentStep)}_\n\n` +
+                `(Type CANCEL or MENU anytime if you'd like to return to the main menu).`,
+            },
+            correlationId,
+            status: "PENDING",
+            attemptCount: 0,
+            maxAttempts: 5,
+            nextRetryAt: Date.now(),
+            reconciliationAttempts: 0,
+            createdAt: Date.now(),
+          };
+          await outboxRepository.enqueueMessage(continueOutbox);
+          return;
+        }
+
         await this.handleStartOpportunity(conversation, correlationId);
         return;
       }
@@ -532,6 +631,7 @@ export class UniversalRouterService {
 
     // 9. Greeting when in IDLE
     if (classification.classification === "GREETING_ACKNOWLEDGEMENT") {
+      const greetingButtons = UniversalRouterService.getAdaptiveMenuButtons(conversation, activeFlow);
       const welcomeBackOutbox: WhatsAppOutboxMessage = {
         outboxId: crypto.randomUUID(),
         operationId: outboxRepository.computeOperationId(phone, correlationId, "greeting_ack"),
@@ -542,11 +642,7 @@ export class UniversalRouterService {
           bodyText:
             "👋 Hello! Great to connect. How can I help you today?",
           footerText: "Gaurav Portfolio • Type MENU anytime",
-          buttons: [
-            { id: "btn_resume", title: "📄 View Resume" },
-            { id: "btn_opportunity", title: "💼 Opportunities" },
-            { id: "btn_human", title: "🤝 Talk to Gaurav" },
-          ],
+          buttons: greetingButtons,
         },
         correlationId,
         status: "PENDING",
@@ -560,7 +656,8 @@ export class UniversalRouterService {
       return;
     }
 
-    // 10. Fallback explanation with Main Menu buttons
+    // 10. Fallback explanation with Adaptive Main Menu buttons
+    const fallbackButtons = UniversalRouterService.getAdaptiveMenuButtons(conversation, activeFlow);
     const fallbackOutbox: WhatsAppOutboxMessage = {
       outboxId: crypto.randomUUID(),
       operationId: outboxRepository.computeOperationId(phone, correlationId, "unknown_fallback"),
@@ -571,11 +668,7 @@ export class UniversalRouterService {
         bodyText:
           "I didn't quite catch that. You can view Gaurav's resume, share an open opportunity, or connect with Gaurav directly.",
         footerText: "Gaurav Portfolio • Type MENU anytime",
-        buttons: [
-          { id: "btn_resume", title: "📄 View Resume" },
-          { id: "btn_opportunity", title: "💼 Opportunities" },
-          { id: "btn_human", title: "🤝 Talk to Gaurav" },
-        ],
+        buttons: fallbackButtons,
       },
       correlationId,
       status: "PENDING",
@@ -616,6 +709,7 @@ export class UniversalRouterService {
     };
 
     await outboxRepository.enqueueMessage(resumeOutbox);
+    await conversationRepository.markResumeDelivered(phone);
   }
 
   /**
@@ -957,7 +1051,10 @@ export class UniversalRouterService {
       notificationJob
     );
 
-    await notificationRepository.processJob(notificationJob);
+    // Asynchronously process lead notification job so WhatsApp confirmation is not blocked by email latency
+    void notificationRepository.processJob(notificationJob).catch((err) => {
+      adminLogger.error("WhatsApp:BrevoNotificationAsyncError", err, "Async Brevo lead notification failed");
+    });
   }
 
   private static async handleLeadEdit(
@@ -1065,11 +1162,7 @@ export class UniversalRouterService {
       payload: {
         bodyText: "That button is from an earlier menu or completed session. Here is your current options menu:",
         footerText: "Gaurav Portfolio • Type MENU anytime",
-        buttons: [
-          { id: "btn_resume", title: "📄 View Resume" },
-          { id: "btn_opportunity", title: "💼 Opportunities" },
-          { id: "btn_human", title: "🤝 Talk to Gaurav" },
-        ],
+        buttons: UniversalRouterService.getAdaptiveMenuButtons(conversation),
       },
       correlationId,
       status: "PENDING",

@@ -462,6 +462,7 @@ export class ConversationRepository {
       tx.update(convRef, {
         currentState: "HUMAN_PENDING" as ConversationState,
         humanRequested: true,
+        hasRequestedHuman: true,
         humanRequestedAt: now,
         stateVersion: currentConv.stateVersion + 1,
         lastActivityAt: now,
@@ -574,6 +575,22 @@ export class ConversationRepository {
       normalizedId,
       {
         unreadByAdmin: false,
+        updatedAt: Date.now(),
+      },
+      true
+    );
+  }
+
+  /**
+   * Marks that the recruiter has received the resume document.
+   */
+  public async markResumeDelivered(conversationId: string): Promise<void> {
+    const normalizedId = normalizeE164(conversationId);
+    await firestoreDataSource.setDocument(
+      CONVERSATIONS_COLLECTION,
+      normalizedId,
+      {
+        hasReceivedResume: true,
         updatedAt: Date.now(),
       },
       true
