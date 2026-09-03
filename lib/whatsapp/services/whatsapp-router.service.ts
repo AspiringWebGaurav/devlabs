@@ -8,6 +8,7 @@
 import { WhatsAppMetaClient } from "../meta/client";
 import { whatsappRepository } from "../persistence/whatsapp.repository";
 import { LeadIntakeService } from "./lead-intake.service";
+import { getAdaptiveButtons } from "./button-helper";
 import { WhatsAppEmailAlerts } from "../notifications/whatsapp-email-alerts";
 import { adminLogger } from "@/lib/admin/logger";
 import { maskPhone } from "../security/sanitizer";
@@ -43,10 +44,13 @@ export class WhatsAppRouterService {
         currentFlowStep: "idle",
         unreadByAdmin: true,
         leadSubmitted: false,
+        hasReceivedResume: false,
+        hasRequestedHuman: false,
         createdAt: now,
         updatedAt: now,
       };
-      await WhatsAppEmailAlerts.notifyNewConversation(phone, inbound.senderName);
+      // Dispatch conversation started email in background (non-blocking)
+      void WhatsAppEmailAlerts.notifyNewConversation(phone, inbound.senderName);
     } else {
       // Update 24-hour customer service window on every inbound message
       thread.lastInboundMessageAt = now;
@@ -114,11 +118,7 @@ export class WhatsAppRouterService {
       await WhatsAppMetaClient.sendQuickReplyButtons(
         phone,
         `Welcome back${thread.recruiterName ? ` ${thread.recruiterName}` : ""}! You have re-subscribed to WhatsApp messages from Gaurav's Portfolio.\n\nHow can I help you today?`,
-        [
-          { id: "action_resume", title: "📄 Get Resume PDF" },
-          { id: "action_opportunity", title: "💼 Opportunity" },
-          { id: "action_human", title: "🤝 Talk to Gaurav" },
-        ],
+        getAdaptiveButtons(thread),
         thread
       );
       return;
@@ -145,16 +145,15 @@ export class WhatsAppRouterService {
       upperText === "GET RESUME" ||
       upperText.includes("RESUME")
     ) {
+      thread.hasReceivedResume = true;
       await whatsappRepository.saveThread(thread);
       const resumeUrl = process.env.RESUME_PUBLIC_URL || "https://devlabs.eu.cc";
+      const nextButtons = getAdaptiveButtons(thread);
 
       await WhatsAppMetaClient.sendQuickReplyButtons(
         phone,
         `Here is Gaurav's portfolio and technical background overview: ${resumeUrl}\n\nWould you like to discuss a specific job opportunity or speak directly with Gaurav?`,
-        [
-          { id: "action_opportunity", title: "💼 Opportunity" },
-          { id: "action_human", title: "🤝 Talk to Gaurav" },
-        ],
+        nextButtons,
         thread
       );
       return;
@@ -182,8 +181,8 @@ export class WhatsAppRouterService {
       upperText === "AGENT" ||
       upperText.includes("TALK")
     ) {
+      thread.hasRequestedHuman = true;
       await whatsappRepository.saveThread(thread);
-      await WhatsAppEmailAlerts.notifyHumanEscalation(phone, thread.recruiterName, rawText);
 
       await WhatsAppMetaClient.sendTextMessage(
         phone,
@@ -195,14 +194,11 @@ export class WhatsAppRouterService {
 
     // D. Default Welcome / Command Menu
     await whatsappRepository.saveThread(thread);
+    const defaultButtons = getAdaptiveButtons(thread);
     await WhatsAppMetaClient.sendQuickReplyButtons(
       phone,
       `Hello${thread.recruiterName ? ` ${thread.recruiterName}` : ""}! I am Gaurav's Portfolio Assistant on WhatsApp.\n\nHow can I help you today?`,
-      [
-        { id: "action_resume", title: "📄 Get Resume PDF" },
-        { id: "action_opportunity", title: "💼 Opportunity" },
-        { id: "action_human", title: "🤝 Talk to Gaurav" },
-      ],
+      defaultButtons,
       thread
     );
   }

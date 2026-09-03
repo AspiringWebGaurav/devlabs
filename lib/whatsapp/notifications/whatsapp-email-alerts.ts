@@ -1,11 +1,12 @@
 /**
  * WhatsApp Transactional Email Notification Dispatcher (Brevo)
  * 
- * Complies with Constitution Rule 2.7 (Central Email Identities & Text-First Format).
- * Senders: hello@gauravpatil.online -> gauravpatil5737@gmail.com
+ * Styled in compact, single-view Wasmer Pro aesthetic matching the portfolio design system.
+ * Complies with Central Email Identities (Rule 2.7) & 1-click WhatsApp deep-linking.
  */
 
-import { sendTransactionalEmail } from "@/lib/email/brevo";
+import { sendTransactionalEmail, escapeHtml, resolveAppUrl } from "@/lib/email/brevo";
+import { renderCompactEmailLayout } from "@/lib/email/layout";
 import { EMAIL_IDENTITIES } from "@/lib/email/identities";
 import { adminLogger } from "@/lib/admin/logger";
 import { maskPhone } from "../security/sanitizer";
@@ -15,35 +16,87 @@ const GAURAV_EMAIL = "gauravpatil5737@gmail.com";
 
 export class WhatsAppEmailAlerts {
   /**
-   * Dispatches text-first notification when a recruiter completes an opportunity lead.
+   * Dispatches a compact, single-view HTML email when a recruiter submits opportunity information.
    */
   public static async notifyNewLead(lead: WhatsAppOpportunityLead): Promise<void> {
     const maskedPhone = maskPhone(lead.recruiterPhone);
     const dateStr = new Date(lead.createdAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+    const cleanDigits = lead.recruiterPhone.replace(/\D/g, "");
+    const safeName = escapeHtml(lead.recruiterName || "Recruiter");
+    const safeCompany = escapeHtml(lead.company || "Unknown Company");
+    const safeRole = escapeHtml(lead.role || "General Inquiry");
+    const safePhone = escapeHtml(lead.recruiterPhone);
+    const safeNotes = lead.notes ? escapeHtml(lead.notes).replace(/\n/g, "<br />") : "";
+    const safeFileName = lead.mediaFileName ? escapeHtml(lead.mediaFileName) : "";
+
+    const baseUrl = resolveAppUrl();
+    const adminWhatsAppUrl = `${baseUrl}/admin/whatsapp`;
+
+    const bodyContentHtml = `
+      <div style="margin-bottom:10px;">
+        <span style="background-color:#EBFBF0;color:#059669;font-size:11px;font-weight:700;letter-spacing:0.5px;padding:3px 9px;border-radius:9999px;border:1px solid #A7F3D0;display:inline-block;">
+          WHATSAPP OPPORTUNITY
+        </span>
+      </div>
+
+      <p style="margin:0 0 10px 0;font-size:15px;font-weight:700;color:#111827;">
+        ${safeName} submitted opportunity information
+      </p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 12px 0;background-color:#F9FAFB;border-radius:8px;border:1px solid #E5E7EB;">
+        <tr>
+          <td style="padding:12px;font-size:13px;line-height:1.55;color:#374151;">
+            <div style="margin-bottom:4px;"><strong>Company:</strong> <span style="color:#111827;font-weight:600;">${safeCompany}</span></div>
+            <div style="margin-bottom:4px;"><strong>Role / Position:</strong> <span style="color:#111827;font-weight:600;">${safeRole}</span></div>
+            <div style="margin-bottom:4px;"><strong>Sender:</strong> ${safeName}</div>
+            <div style="margin-bottom:4px;"><strong>Phone:</strong> <a href="https://wa.me/${cleanDigits}" style="color:#059669;font-weight:600;text-decoration:none;">${safePhone}</a> <span style="color:#9CA3AF;font-size:11px;">(${maskedPhone})</span></div>
+            <div style="margin-bottom:4px;"><strong>Received:</strong> ${dateStr} IST</div>
+            ${safeNotes ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #E5E7EB;"><strong>Key Details / Stack:</strong><br/><span style="color:#111827;">${safeNotes}</span></div>` : ""}
+            ${safeFileName ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #E5E7EB;"><strong>Attachment:</strong> <a href="${adminWhatsAppUrl}" style="color:#2563EB;font-weight:600;text-decoration:none;">📄 ${safeFileName}</a> <span style="color:#6B7280;font-size:11px;">(Stored in Admin Panel)</span></div>` : ""}
+          </td>
+        </tr>
+      </table>
+
+      <div style="margin:12px 0 6px 0;">
+        <a href="https://wa.me/${cleanDigits}" style="background-color:#25D366;color:#ffffff;font-size:13px;font-weight:600;padding:9px 18px;border-radius:6px;text-decoration:none;display:inline-block;">
+          Reply on WhatsApp &rarr;
+        </a>
+        &nbsp;
+        <a href="${adminWhatsAppUrl}" style="background-color:#F3F4F6;color:#374151;font-size:13px;font-weight:600;padding:9px 16px;border-radius:6px;text-decoration:none;display:inline-block;border:1px solid #D1D5DB;">
+          Open in Admin Panel
+        </a>
+      </div>
+    `;
+
+    const htmlContent = renderCompactEmailLayout({
+      title: `${safeName} submitted opportunity information`,
+      bodyContentHtml,
+      footerType: "STANDARD",
+    });
 
     const textContent = [
-      "==================================================",
-      "NEW RECRUITER OPPORTUNITY VIA WHATSAPP",
-      "==================================================",
-      `Sender: ${lead.recruiterName || "Recruiter"}`,
-      `Role / Opportunity: ${lead.role}`,
+      `[WhatsApp] ${lead.recruiterName || "Recruiter"} submitted opportunity information`,
       `Company: ${lead.company}`,
+      `Role: ${lead.role}`,
+      `Sender: ${lead.recruiterName || "Recruiter"}`,
       `Phone: ${lead.recruiterPhone} (${maskedPhone})`,
       `Date: ${dateStr} IST`,
       lead.notes ? `Details: ${lead.notes}` : "",
-      lead.mediaFileName ? `Attachment: Stored privately in Admin Panel (${lead.mediaFileName})` : "",
-      "==================================================",
-      "ACTION: Reply directly to the recruiter on WhatsApp from your mobile device.",
-      "==================================================",
+      lead.mediaFileName ? `Attachment: ${lead.mediaFileName} (Stored in Admin Panel)` : "",
+      `Reply on WhatsApp: https://wa.me/${cleanDigits}`,
+      `Admin Panel: ${adminWhatsAppUrl}`,
     ]
       .filter(Boolean)
       .join("\n");
+
+    const emailSubject = `[WhatsApp] ${lead.recruiterName || "Recruiter"} submitted opportunity information (${lead.company} - ${lead.role})`;
 
     try {
       await sendTransactionalEmail({
         identity: EMAIL_IDENTITIES.HELLO,
         to: [{ email: GAURAV_EMAIL, name: "Gaurav Patil" }],
-        subject: `[WhatsApp Opportunity] ${lead.company} - ${lead.role} (${lead.recruiterName || "Recruiter"})`,
+        subject: emailSubject,
+        htmlContent,
         textContent,
         tags: ["whatsapp-lead", "recruiter-opportunity"],
       });
@@ -54,66 +107,66 @@ export class WhatsAppEmailAlerts {
   }
 
   /**
-   * Dispatches text-first alert when a recruiter explicitly requests human escalation.
-   */
-  public static async notifyHumanEscalation(phone: string, recruiterName?: string, lastMessage?: string): Promise<void> {
-    const maskedPhone = maskPhone(phone);
-    const dateStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
-
-    const textContent = [
-      "==================================================",
-      "RECRUITER REQUESTED HUMAN ESCALATION",
-      "==================================================",
-      `Sender: ${recruiterName || "Recruiter"}`,
-      `Phone: ${phone} (${maskedPhone})`,
-      `Date: ${dateStr} IST`,
-      lastMessage ? `Recent Message: "${lastMessage}"` : "",
-      "==================================================",
-      "STATUS: Recruiter was informed you will reply directly on WhatsApp.",
-      "ACTION: Open WhatsApp on your mobile phone to reply.",
-      "==================================================",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    try {
-      await sendTransactionalEmail({
-        identity: EMAIL_IDENTITIES.HELLO,
-        to: [{ email: GAURAV_EMAIL, name: "Gaurav Patil" }],
-        subject: `[WhatsApp Escalation] Recruiter wants to talk: ${recruiterName || phone}`,
-        textContent,
-        tags: ["whatsapp-escalation", "human-handoff"],
-      });
-      adminLogger.info("WhatsApp:EscalationAlertSent", "Human escalation alert sent to Gaurav", { phone: maskedPhone });
-    } catch (err) {
-      adminLogger.error("WhatsApp:EscalationAlertFailed", err, "Failed to send human escalation alert");
-    }
-  }
-
-  /**
-   * Dispatches text-first alert when a new recruiter starts their first conversation.
+   * Dispatches a compact, single-view HTML alert when a new recruiter starts a WhatsApp conversation.
    */
   public static async notifyNewConversation(phone: string, senderName?: string): Promise<void> {
     const maskedPhone = maskPhone(phone);
     const dateStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+    const cleanDigits = phone.replace(/\D/g, "");
+    const safeName = escapeHtml(senderName || "Recruiter");
+    const safePhone = escapeHtml(phone);
+
+    const bodyContentHtml = `
+      <div style="margin-bottom:10px;">
+        <span style="background-color:#EBFBF0;color:#059669;font-size:11px;font-weight:700;letter-spacing:0.5px;padding:3px 9px;border-radius:9999px;border:1px solid #A7F3D0;display:inline-block;">
+          WHATSAPP RECRUITER CHANNEL
+        </span>
+      </div>
+
+      <p style="margin:0 0 10px 0;font-size:15px;font-weight:700;color:#111827;">
+        New WhatsApp Chat Started
+      </p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 12px 0;background-color:#F9FAFB;border-radius:8px;border:1px solid #E5E7EB;">
+        <tr>
+          <td style="padding:12px;font-size:13px;line-height:1.55;color:#374151;">
+            <div style="margin-bottom:4px;"><strong>Contact:</strong> ${safeName}</div>
+            <div style="margin-bottom:4px;"><strong>Phone:</strong> <a href="https://wa.me/${cleanDigits}" style="color:#059669;font-weight:600;text-decoration:none;">${safePhone}</a> <span style="color:#9CA3AF;font-size:11px;">(${maskedPhone})</span></div>
+            <div style="margin-bottom:4px;"><strong>Started:</strong> ${dateStr} IST</div>
+            <div style="margin-top:6px;color:#6B7280;font-size:12px;">The automated portfolio guide is currently assisting this contact.</div>
+          </td>
+        </tr>
+      </table>
+
+      <div style="margin:12px 0 6px 0;">
+        <a href="https://wa.me/${cleanDigits}" style="background-color:#25D366;color:#ffffff;font-size:13px;font-weight:600;padding:9px 18px;border-radius:6px;text-decoration:none;display:inline-block;">
+          Open Chat on WhatsApp &rarr;
+        </a>
+      </div>
+    `;
+
+    const htmlContent = renderCompactEmailLayout({
+      title: "New WhatsApp Chat Started",
+      bodyContentHtml,
+      footerType: "STANDARD",
+    });
 
     const textContent = [
-      "==================================================",
-      "NEW RECRUITER WHATSAPP CONVERSATION STARTED",
-      "==================================================",
-      `Recruiter: ${senderName || "Unknown Recruiter"}`,
+      `[WhatsApp] ${senderName || safePhone} started a chat`,
+      `Contact: ${senderName || "Recruiter"}`,
       `Phone: ${phone} (${maskedPhone})`,
       `Date: ${dateStr} IST`,
-      "==================================================",
-      "The automated portfolio guide is handling intake.",
-      "==================================================",
+      `Open on WhatsApp: https://wa.me/${cleanDigits}`,
     ].join("\n");
+
+    const emailSubject = `[WhatsApp] ${senderName || maskedPhone} started a chat`;
 
     try {
       await sendTransactionalEmail({
         identity: EMAIL_IDENTITIES.HELLO,
         to: [{ email: GAURAV_EMAIL, name: "Gaurav Patil" }],
-        subject: `[WhatsApp Inbound] New conversation from ${senderName || maskedPhone}`,
+        subject: emailSubject,
+        htmlContent,
         textContent,
         tags: ["whatsapp-new-thread"],
       });

@@ -5,3 +5,4 @@
 export * from "./whatsapp-router.service";
 export * from "./lead-intake.service";
 export * from "./media-handler.service";
+export * from "./button-helper";

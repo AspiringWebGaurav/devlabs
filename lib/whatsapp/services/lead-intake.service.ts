@@ -8,6 +8,7 @@
 import { WhatsAppMetaClient } from "../meta/client";
 import { whatsappRepository } from "../persistence/whatsapp.repository";
 import { WhatsAppEmailAlerts } from "../notifications/whatsapp-email-alerts";
+import { getAdaptiveButtons } from "./button-helper";
 import { sanitizeText } from "../security/sanitizer";
 import type { WhatsAppThread, WhatsAppOpportunityLead } from "../types";
 
@@ -46,12 +47,8 @@ export class LeadIntakeService {
 
       await WhatsAppMetaClient.sendQuickReplyButtons(
         thread.recruiterPhone,
-        "Opportunity intake cancelled. You can request my resume, start an opportunity discussion again, or connect with Gaurav.",
-        [
-          { id: "action_resume", title: "📄 Get Resume PDF" },
-          { id: "action_opportunity", title: "💼 Opportunity" },
-          { id: "action_human", title: "🤝 Talk to Gaurav" },
-        ],
+        "Opportunity intake cancelled. How can I help you instead?",
+        getAdaptiveButtons(thread),
         thread
       );
       return true;
@@ -154,8 +151,8 @@ export class LeadIntakeService {
       thread.leadSubmitted = true;
       await whatsappRepository.saveThread(thread);
 
-      // Notify Gaurav via Brevo text-first email
-      await WhatsAppEmailAlerts.notifyNewLead(lead);
+      // Notify Gaurav via Brevo text-first email in background (non-blocking)
+      void WhatsAppEmailAlerts.notifyNewLead(lead);
 
       // Broadcast RTDB minimal change signal for Admin UI
       await whatsappRepository.broadcastSignal({
@@ -165,14 +162,12 @@ export class LeadIntakeService {
         unread: true,
       });
 
-      // Send confirmation to recruiter
+      // Send confirmation to recruiter with adaptive remaining buttons
+      const remainingButtons = getAdaptiveButtons(thread);
       await WhatsAppMetaClient.sendQuickReplyButtons(
         thread.recruiterPhone,
         `Thank you, ${lead.recruiterName}! I've saved the opportunity details for ${lead.company} and alerted Gaurav directly. He will review this and get back to you soon.\n\nCan I help you with anything else?`,
-        [
-          { id: "action_resume", title: "📄 Get Resume PDF" },
-          { id: "action_human", title: "🤝 Talk to Gaurav" },
-        ],
+        remainingButtons,
         thread
       );
       return true;

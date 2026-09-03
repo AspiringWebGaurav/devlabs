@@ -41,6 +41,8 @@ export interface WhatsAppThread {
 
   unreadByAdmin: boolean;
   leadSubmitted: boolean;
+  hasReceivedResume?: boolean;
+  hasRequestedHuman?: boolean;
   createdAt: number;
   updatedAt: number;
 }
