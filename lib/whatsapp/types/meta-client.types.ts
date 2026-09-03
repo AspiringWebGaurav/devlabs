@@ -20,8 +20,15 @@ export interface MetaSendInteractiveButtonsRequest {
   type: "interactive";
   interactive: {
     type: "button";
+    header?: {
+      type: "text";
+      text: string;
+    };
     body: {
       text: string;
+    };
+    footer?: {
+      text: string; // Meta max 60 characters
     };
     action: {
       buttons: Array<{

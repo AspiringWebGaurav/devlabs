@@ -67,13 +67,19 @@ export class MediaHandlerService {
       throw new Error(`Blocked potentially malicious media hostname: ${hostname}`);
     }
 
-    // 3. Block loopback, private, and internal addresses
+    // 3. Block loopback, private, and internal addresses (IPv4 & IPv6)
     if (
       hostname === "localhost" ||
       hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0" ||
+      hostname === "::1" ||
+      hostname === "[::1]" ||
       hostname === "169.254.169.254" ||
       hostname.startsWith("10.") ||
-      hostname.startsWith("192.168.")
+      hostname.startsWith("192.168.") ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      hostname.startsWith("fc00:") ||
+      hostname.startsWith("fe80:")
     ) {
       adminLogger.error("WhatsApp:SSRFBlocked", new Error("Private host blocked"), "Media URL resolved to internal/private host", { hostname });
       throw new Error("Internal or loopback media downloads are prohibited");

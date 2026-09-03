@@ -2,7 +2,6 @@
  * WhatsApp Services Module Barrel Export
  */
 
-export * from "./whatsapp-router.service";
-export * from "./lead-intake.service";
+export * from "./universal-router.service";
+export * from "./recruiter-faq-registry";
 export * from "./media-handler.service";
-export * from "./button-helper";

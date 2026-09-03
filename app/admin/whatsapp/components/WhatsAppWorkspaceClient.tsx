@@ -146,6 +146,7 @@ export const WhatsAppWorkspaceClient: React.FC<WhatsAppWorkspaceClientProps> = (
               thread={selectedThread}
               messages={messages}
               loading={loadingMessages}
+              onRefresh={handleRefresh}
             />
           </div>
         </div>

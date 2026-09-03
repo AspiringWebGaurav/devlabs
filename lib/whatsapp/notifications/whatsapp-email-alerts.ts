@@ -174,4 +174,84 @@ export class WhatsAppEmailAlerts {
       adminLogger.error("WhatsApp:NewConvAlertFailed", err, "Failed to send new conversation alert");
     }
   }
+
+  /**
+   * Dispatches a compact, single-view HTML alert when a recruiter sends a direct message to Gaurav.
+   */
+  public static async notifyDirectMessage(
+    phone: string,
+    recruiterName: string | undefined,
+    messageText: string
+  ): Promise<void> {
+    const maskedPhone = maskPhone(phone);
+    const dateStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+    const cleanDigits = phone.replace(/\D/g, "");
+    const safeName = escapeHtml(recruiterName || "Recruiter");
+    const safePhone = escapeHtml(phone);
+    const safeMsg = escapeHtml(messageText).replace(/\n/g, "<br />");
+    const preview = messageText.length > 50 ? `${messageText.slice(0, 47)}...` : messageText;
+
+    const bodyContentHtml = `
+      <div style="margin-bottom:10px;">
+        <span style="background-color:#EBFBF0;color:#059669;font-size:11px;font-weight:700;letter-spacing:0.5px;padding:3px 9px;border-radius:9999px;border:1px solid #A7F3D0;display:inline-block;">
+          WHATSAPP DIRECT MESSAGE
+        </span>
+      </div>
+
+      <p style="margin:0 0 10px 0;font-size:15px;font-weight:700;color:#111827;">
+        Direct message from ${safeName}
+      </p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 12px 0;background-color:#F9FAFB;border-radius:8px;border:1px solid #E5E7EB;">
+        <tr>
+          <td style="padding:12px;font-size:13px;line-height:1.55;color:#374151;">
+            <div style="margin-bottom:4px;"><strong>From:</strong> ${safeName}</div>
+            <div style="margin-bottom:4px;"><strong>Phone:</strong> <a href="https://wa.me/${cleanDigits}" style="color:#059669;font-weight:600;text-decoration:none;">${safePhone}</a> <span style="color:#9CA3AF;font-size:11px;">(${maskedPhone})</span></div>
+            <div style="margin-bottom:4px;"><strong>Received:</strong> ${dateStr} IST</div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #E5E7EB;">
+              <strong>Message:</strong><br/>
+              <span style="color:#111827;font-size:14px;">${safeMsg}</span>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <div style="margin:12px 0 6px 0;">
+        <a href="https://wa.me/${cleanDigits}" style="background-color:#25D366;color:#ffffff;font-size:13px;font-weight:600;padding:9px 18px;border-radius:6px;text-decoration:none;display:inline-block;">
+          Reply on WhatsApp &rarr;
+        </a>
+      </div>
+    `;
+
+    const htmlContent = renderCompactEmailLayout({
+      title: `Direct message from ${safeName}`,
+      bodyContentHtml,
+      footerType: "STANDARD",
+    });
+
+    const textContent = [
+      `[WhatsApp] Direct message from ${recruiterName || safePhone}`,
+      `From: ${recruiterName || "Recruiter"}`,
+      `Phone: ${phone} (${maskedPhone})`,
+      `Date: ${dateStr} IST`,
+      `Message: ${messageText}`,
+      `Reply on WhatsApp: https://wa.me/${cleanDigits}`,
+    ].join("\n");
+
+    const emailSubject = `[WhatsApp Message] ${recruiterName || maskedPhone}: "${preview}"`;
+
+    try {
+      await sendTransactionalEmail({
+        identity: EMAIL_IDENTITIES.HELLO,
+        to: [{ email: GAURAV_EMAIL, name: "Gaurav Patil" }],
+        subject: emailSubject,
+        htmlContent,
+        textContent,
+        tags: ["whatsapp-direct-message"],
+      });
+      adminLogger.info("WhatsApp:DirectMessageAlertSent", "Direct message alert sent to Gaurav", { phone: maskedPhone });
+    } catch (err) {
+      adminLogger.error("WhatsApp:DirectMessageAlertFailed", err, "Failed to send direct message alert");
+    }
+  }
 }

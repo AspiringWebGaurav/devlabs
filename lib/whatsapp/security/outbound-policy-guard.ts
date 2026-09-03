@@ -2,18 +2,30 @@
  * Centralized Outbound Policy Guard
  * 
  * Mandatory gatekeeper for every outbound WhatsApp operation.
- * Enforces all 17 outbound and reliability invariants before any network request.
+ * Enforces all outbound and reliability invariants before any network request.
+ * 
+ * Strictly decoupled from database entity schemas via OutboundPolicyContext.
  */
 
 import { adminLogger } from "@/lib/admin/logger";
 import { maskPhone } from "./sanitizer";
-import type { WhatsAppThread } from "../types";
+
+/**
+ * Minimal immutable policy context required to evaluate outbound message eligibility.
+ * Completely decouples the security guard from underlying database entity schemas.
+ */
+export interface OutboundPolicyContext {
+  /** Epoch milliseconds when the Meta 24-hour Customer Service Window expires */
+  readonly customerServiceWindowExpiresAt: number;
+  /** Whether the recruiter has opted out (sent STOP / UNSUBSCRIBE) */
+  readonly optedOut?: boolean;
+}
 
 export interface OutboundPolicyCheckParams {
   recipientPhone: string;
   messageType: "free_form" | "template";
   templateName?: string;
-  thread?: WhatsAppThread | null;
+  context?: OutboundPolicyContext | null;
 }
 
 export interface OutboundPolicyResult {
@@ -47,18 +59,38 @@ export class OutboundPolicyGuard {
       };
     }
 
+    // Fail-Closed Guard: Missing Conversation Context
+    if (!params.context) {
+      adminLogger.warn("WhatsApp:OutboundBlocked", "Missing conversation policy context", { phone: masked });
+      return {
+        allowed: false,
+        reason: "Missing conversation policy context: customer service window cannot be verified.",
+      };
+    }
+
     // Invariant 8: Strict Opt-Out Check
-    if (params.thread?.optedOut) {
+    if (params.context.optedOut) {
       adminLogger.warn("WhatsApp:OutboundBlocked", "Recipient has opted out", { phone: masked });
       return { allowed: false, reason: "Recipient has opted out of WhatsApp communication." };
     }
 
     // Invariant 7: 24-Hour Customer Service Window Boundary
     const now = Date.now();
-    const expiresAt = params.thread?.customerServiceWindowExpiresAt || 0;
-    const isWindowActive = expiresAt > now;
+    const expiresAt = params.context.customerServiceWindowExpiresAt;
 
-    if (!isWindowActive) {
+    if (typeof expiresAt !== "number" || !Number.isFinite(expiresAt)) {
+      adminLogger.warn("WhatsApp:OutboundBlocked", "Invalid customer service window expiry timestamp", {
+        phone: masked,
+        expiresAt,
+      });
+      return {
+        allowed: false,
+        reason: "Invalid customer service window expiry timestamp. Free-form messaging prohibited.",
+      };
+    }
+
+    // Strict boundary: now >= expiresAt is closed; strictly expiresAt > now is required
+    if (now >= expiresAt) {
       adminLogger.warn("WhatsApp:OutboundBlocked", "Customer service window expired (>24h)", {
         phone: masked,
         expiresAt,
@@ -73,3 +105,4 @@ export class OutboundPolicyGuard {
     return { allowed: true };
   }
 }
+

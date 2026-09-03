@@ -12,15 +12,16 @@ import type { MetaWebhookPayload } from "../types";
 export interface OwnershipValidationResult {
   valid: boolean;
   reason?: string;
+  wabaId?: string;
 }
 
 export function validateWebhookOwnership(payload: MetaWebhookPayload): OwnershipValidationResult {
   const config = getWhatsAppConfig();
+  const entryWabaId = payload.entry && payload.entry.length > 0 ? payload.entry[0].id : undefined;
 
   // 1. Verify WABA Account ID if present in payload entry
-  if (config.businessAccountId && payload.entry && payload.entry.length > 0) {
-    const entryWabaId = payload.entry[0].id;
-    if (entryWabaId && entryWabaId !== config.businessAccountId) {
+  if (config.businessAccountId && entryWabaId) {
+    if (entryWabaId !== config.businessAccountId) {
       adminLogger.warn("WhatsApp:OwnershipMismatch", "WABA Account ID mismatch", {
         receivedWabaId: entryWabaId,
         expectedWabaId: config.businessAccountId,
@@ -51,5 +52,5 @@ export function validateWebhookOwnership(payload: MetaWebhookPayload): Ownership
     }
   }
 
-  return { valid: true };
+  return { valid: true, wabaId: entryWabaId };
 }

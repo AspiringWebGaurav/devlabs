@@ -6,7 +6,7 @@
  */
 
 import type { MetaWebhookPayload, MetaInboundMessage, MetaMessageStatus } from "../types";
-import { normalizeE164, sanitizeText } from "../security/sanitizer";
+import { normalizeE164, isValidE164, sanitizeText } from "../security/sanitizer";
 
 export interface ParsedInboundMessage {
   id: string; // Meta wamid
@@ -26,6 +26,7 @@ export interface ParsedMessageStatus {
   status: "sent" | "delivered" | "read" | "failed";
   recipientPhone: string;
   timestamp: number;
+  error?: string;
 }
 
 export interface WebhookParseResult {
@@ -92,7 +93,7 @@ function parseSingleInboundMessage(
   msg: MetaInboundMessage,
   contactMap: Map<string, string>
 ): ParsedInboundMessage | null {
-  if (!msg.id || !msg.from) return null;
+  if (!msg.id || !msg.from || !isValidE164(msg.from)) return null;
 
   const fromPhone = normalizeE164(msg.from);
   const rawWaId = msg.from.replace(/[^0-9]/g, "");
@@ -181,10 +182,16 @@ function parseSingleInboundMessage(
 function parseSingleStatus(status: MetaMessageStatus): ParsedMessageStatus | null {
   if (!status.id || !status.status) return null;
 
+  const errStr =
+    status.errors && status.errors.length > 0
+      ? status.errors.map((e) => `${e.title || "Error"} (${e.code}): ${e.message || ""}`).join("; ")
+      : undefined;
+
   return {
     id: status.id,
     status: status.status,
     recipientPhone: normalizeE164(status.recipient_id || ""),
     timestamp: parseInt(status.timestamp, 10) * 1000 || Date.now(),
+    error: errStr,
   };
 }

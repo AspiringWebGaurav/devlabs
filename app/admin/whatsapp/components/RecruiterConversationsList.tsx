@@ -81,11 +81,18 @@ export const RecruiterConversationsList: React.FC<RecruiterConversationsListProp
 
             <div className="text-right shrink-0 ml-2">
               <span className="text-[10.5px] text-neutral-400 block">{lastActivityStr}</span>
-              {thread.leadSubmitted && (
-                <span className="mt-0.5 inline-block px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Lead
-                </span>
-              )}
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                {thread.leadSubmitted && (
+                  <span className="inline-block px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Lead
+                  </span>
+                )}
+                {thread.currentState && thread.currentState !== "IDLE" && (
+                  <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-50 text-purple-700 border border-purple-200">
+                    {thread.currentState.replace("INTAKE_", "")}
+                  </span>
+                )}
+              </div>
             </div>
           </button>
         );

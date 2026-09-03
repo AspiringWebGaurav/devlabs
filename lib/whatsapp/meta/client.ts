@@ -7,7 +7,7 @@
 
 import { fetchWithTimeout } from "@/lib/api/fetcher";
 import { getWhatsAppConfig } from "../config/whatsapp.config";
-import { OutboundPolicyGuard } from "../security/outbound-policy-guard";
+import { OutboundPolicyGuard, type OutboundPolicyContext } from "../security/outbound-policy-guard";
 import { adminLogger } from "@/lib/admin/logger";
 import { MetaApiError, type MetaErrorDetails } from "./errors";
 import type {
@@ -17,7 +17,6 @@ import type {
   MetaSendMessageResponse,
   MetaMediaMetadataResponse,
   MetaApiErrorResponse,
-  WhatsAppThread,
 } from "../types";
 
 export class WhatsAppMetaClient {
@@ -35,13 +34,13 @@ export class WhatsAppMetaClient {
   public static async sendTextMessage(
     toPhone: string,
     bodyText: string,
-    thread?: WhatsAppThread | null
+    context: OutboundPolicyContext
   ): Promise<string> {
     // 1. Mandatory Pre-Dispatch Gatekeeper
     const policy = OutboundPolicyGuard.evaluateOutbound({
       recipientPhone: toPhone,
       messageType: "free_form",
-      thread,
+      context,
     });
 
     if (!policy.allowed) {
@@ -76,12 +75,13 @@ export class WhatsAppMetaClient {
     toPhone: string,
     bodyText: string,
     buttons: Array<{ id: string; title: string }>,
-    thread?: WhatsAppThread | null
+    context: OutboundPolicyContext,
+    footerText = "Gaurav Portfolio • Type MENU anytime"
   ): Promise<string> {
     const policy = OutboundPolicyGuard.evaluateOutbound({
       recipientPhone: toPhone,
       messageType: "free_form",
-      thread,
+      context,
     });
 
     if (!policy.allowed) {
@@ -102,6 +102,7 @@ export class WhatsAppMetaClient {
         body: {
           text: bodyText,
         },
+        footer: footerText ? { text: footerText.slice(0, 60) } : undefined,
         action: {
           buttons: buttons.slice(0, 3).map((btn) => ({
             type: "reply",
@@ -125,13 +126,13 @@ export class WhatsAppMetaClient {
     toPhone: string,
     documentUrl: string,
     fileName: string,
-    caption?: string,
-    thread?: WhatsAppThread | null
+    caption: string | undefined,
+    context: OutboundPolicyContext
   ): Promise<string> {
     const policy = OutboundPolicyGuard.evaluateOutbound({
       recipientPhone: toPhone,
       messageType: "free_form",
-      thread,
+      context,
     });
 
     if (!policy.allowed) {

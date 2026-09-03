@@ -14,6 +14,15 @@ export function normalizeE164(phone: string): string {
 }
 
 /**
+ * Validates whether a phone number strictly conforms to canonical E.164 format (+[1-9][0-9]{6,14})
+ */
+export function isValidE164(phone: string): boolean {
+  if (!phone || typeof phone !== "string") return false;
+  const normalized = normalizeE164(phone);
+  return /^\+[1-9]\d{6,14}$/.test(normalized);
+}
+
+/**
  * Masks a phone number for safe observability logs (e.g. "+91 98765 ****0")
  */
 export function maskPhone(phone: string): string {
