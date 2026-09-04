@@ -296,12 +296,13 @@ export async function GET(req: NextRequest): Promise<Response> {
         };
       }
 
-      // Load messages subcollection ordered by creation time
+      // Load messages subcollection ordered by creation time (capped to protect heap memory during ZIP compilation)
       const messagesSnapshot = await db
         .collection("whatsapp_sessions")
         .doc(phone)
         .collection("messages")
         .orderBy("createdAt", "asc")
+        .limit(1000)
         .get();
 
       for (const doc of messagesSnapshot.docs) {

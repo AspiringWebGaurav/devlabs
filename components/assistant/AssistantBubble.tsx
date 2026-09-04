@@ -6,8 +6,9 @@ import { AssistantWindow } from "./AssistantWindow";
 import { AssistantTurnstileGate } from "./auth/AssistantTurnstileGate";
 import type { AssistantBubbleProps, AssistantPositionMode, AssistantView } from "./types";
 
-const DRAG_THRESHOLD_PX = 5;
-const STORAGE_KEY = "gaurav_assistant_drag_pos";
+const DRAG_THRESHOLD_PX = 6;
+const STORAGE_POS_KEY = "gaurav_assistant_drag_pos";
+const STORAGE_STATE_KEY = "gaurav_assistant_window_state";
 
 interface DragCoordinates {
   x: number;
@@ -27,6 +28,9 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const dragStartRef = useRef<{ pointerX: number; pointerY: number; bubbleX: number; bubbleY: number } | null>(null);
+  const pointerStartRef = useRef<{ clientX: number; clientY: number; scrollY: number; time: number } | null>(null);
+  const isScrollGestureRef = useRef(false);
+  const scrollListenerCleanupRef = useRef<(() => void) | null>(null);
   const prepIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasDraggedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
@@ -52,11 +56,15 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     }
   }, []);
 
-  // Clean up any preparation timers on unmount
+  // Clean up any preparation timers and scroll listeners on unmount
   useEffect(() => {
     return () => {
       if (prepIntervalRef.current) {
         clearInterval(prepIntervalRef.current);
+      }
+      if (scrollListenerCleanupRef.current) {
+        scrollListenerCleanupRef.current();
+        scrollListenerCleanupRef.current = null;
       }
     };
   }, []);
@@ -85,7 +93,7 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     if (positionMode !== "draggable" || typeof window === "undefined") return;
 
     try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
+      const saved = sessionStorage.getItem(STORAGE_POS_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as DragCoordinates;
         if (typeof parsed.x === "number" && typeof parsed.y === "number" && !isNaN(parsed.x) && !isNaN(parsed.y)) {
@@ -141,22 +149,38 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     }
   }, [isEnabled, isOpen]);
 
-  // 5. Detect ?chat=open on mount
+  // 5. Restore user session persistence & detect ?chat=open on mount (Zero surprise open)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const chatParam = urlParams.get("chat");
+      const savedState = sessionStorage.getItem(STORAGE_STATE_KEY);
 
-      if (chatParam === "open") {
+      // If URL explicitly requests chat=open and user hasn't explicitly dismissed it in this session
+      if (chatParam === "open" && savedState !== "closed") {
         setInitialView("chat");
         setIsWindowMounted(true);
         setIsOpen(true);
+        sessionStorage.setItem(STORAGE_STATE_KEY, "open");
 
         // Immediate address bar sanitization (clean URL)
         const cleanUrl = window.location.pathname + window.location.hash;
         window.history.replaceState({}, "", cleanUrl);
+        return;
+      }
+
+      // If URL had chat=open but user previously closed it in this session, sanitize URL without surprise opening
+      if (chatParam === "open") {
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, "", cleanUrl);
+      }
+
+      // If user had intentionally opened the assistant before reload/navigation in this session
+      if (savedState === "open") {
+        setIsWindowMounted(true);
+        setIsOpen(true);
       }
     } catch {
       // Safe fallback
@@ -179,6 +203,11 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const handleOpen = useCallback(() => {
     if (isPreparingTurnstile) return;
+
+    // Persist intentional open state
+    try {
+      sessionStorage.setItem(STORAGE_STATE_KEY, "open");
+    } catch {}
 
     if (isTurnstileSessionValid()) {
       setIsWindowMounted(true);
@@ -223,12 +252,20 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     setIsTurnstileGateOpen(false);
     setIsWindowMounted(true);
     setIsOpen(true);
+    try {
+      sessionStorage.setItem(STORAGE_STATE_KEY, "open");
+    } catch {}
   }, []);
 
   const handleClose = useCallback(() => {
     setIsHovered(false);
     setIsDragging(false);
     setIsOpen(false);
+
+    // Persist intentional closed state so it never surprise opens
+    try {
+      sessionStorage.setItem(STORAGE_STATE_KEY, "closed");
+    } catch {}
   }, []);
 
   // 6. Focus Restoration when Window finishes exit animation (Desktop only, prevents mobile sticky focus)
@@ -241,11 +278,37 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     }
   }, []);
 
-  // 6. Pointer Drag Controller (PointerDown / PointerMove / PointerUp)
+  // 7. Scroll-Safe Pointer Controller (Prevents surprise opening on page scroll)
   const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.pointerType === "mouse") {
       setIsHovered(true);
     }
+
+    // Clean up any stale scroll listener
+    if (scrollListenerCleanupRef.current) {
+      scrollListenerCleanupRef.current();
+      scrollListenerCleanupRef.current = null;
+    }
+
+    pointerStartRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      scrollY: typeof window !== "undefined" ? window.scrollY : 0,
+      time: Date.now(),
+    };
+    isScrollGestureRef.current = false;
+    hasDraggedRef.current = false;
+    setIsDragging(false);
+
+    // Actively detect if page scrolls while finger or pointer is on the bubble
+    const onWindowScroll = () => {
+      isScrollGestureRef.current = true;
+    };
+    window.addEventListener("scroll", onWindowScroll, { passive: true });
+    scrollListenerCleanupRef.current = () => {
+      window.removeEventListener("scroll", onWindowScroll);
+    };
+
     if (positionMode !== "draggable") return;
 
     const btn = triggerButtonRef.current;
@@ -258,24 +321,39 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
       bubbleX: customPosition ? customPosition.x : rect.left,
       bubbleY: customPosition ? customPosition.y : rect.top,
     };
-    hasDraggedRef.current = false;
-    setIsDragging(false);
 
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {}
+    // For mouse, capture pointer immediately; for touch, defer until drag threshold
+    // so native browser touch-scroll gestures are never blocked!
+    if (e.pointerType === "mouse") {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {}
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (positionMode !== "draggable" || !dragStartRef.current) return;
+    if (!pointerStartRef.current) return;
 
-    const dx = e.clientX - dragStartRef.current.pointerX;
-    const dy = e.clientY - dragStartRef.current.pointerY;
+    const dx = e.clientX - pointerStartRef.current.clientX;
+    const dy = e.clientY - pointerStartRef.current.clientY;
     const distance = Math.hypot(dx, dy);
 
     if (distance >= DRAG_THRESHOLD_PX) {
       hasDraggedRef.current = true;
+    }
+
+    if (typeof window !== "undefined" && Math.abs(window.scrollY - pointerStartRef.current.scrollY) > 4) {
+      isScrollGestureRef.current = true;
+    }
+
+    if (positionMode === "draggable" && dragStartRef.current && distance >= DRAG_THRESHOLD_PX) {
       setIsDragging(true);
+
+      try {
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }
+      } catch {}
 
       const targetX = dragStartRef.current.bubbleX + dx;
       const targetY = dragStartRef.current.bubbleY + dy;
@@ -285,34 +363,86 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
     setIsHovered(false);
-    if (positionMode !== "draggable") return;
+
+    if (scrollListenerCleanupRef.current) {
+      scrollListenerCleanupRef.current();
+      scrollListenerCleanupRef.current = null;
+    }
 
     try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
     } catch {}
 
-    if (hasDraggedRef.current && customPosition) {
+    if (pointerStartRef.current && typeof window !== "undefined") {
+      if (Math.abs(window.scrollY - pointerStartRef.current.scrollY) > 4) {
+        isScrollGestureRef.current = true;
+      }
+    }
+
+    if (positionMode === "draggable" && hasDraggedRef.current && customPosition) {
       try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(customPosition));
+        sessionStorage.setItem(STORAGE_POS_KEY, JSON.stringify(customPosition));
       } catch {}
-    } else if (!hasDraggedRef.current) {
-      // Clean tap/click without drag displacement
-      handleOpen();
     }
 
     dragStartRef.current = null;
-    hasDraggedRef.current = false;
     setIsDragging(false);
   };
 
   const handlePointerCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
     setIsHovered(false);
+    if (scrollListenerCleanupRef.current) {
+      scrollListenerCleanupRef.current();
+      scrollListenerCleanupRef.current = null;
+    }
     try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
     } catch {}
     dragStartRef.current = null;
+    pointerStartRef.current = null;
     hasDraggedRef.current = false;
+    isScrollGestureRef.current = false;
     setIsDragging(false);
+  };
+
+  // 8. Single, Unified Verified Click Trigger
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // A. Guard against drag displacement
+    if (hasDraggedRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      hasDraggedRef.current = false;
+      return;
+    }
+
+    // B. Guard against scroll gesture while touching
+    if (isScrollGestureRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      isScrollGestureRef.current = false;
+      return;
+    }
+
+    // C. Guard against delta scroll or displacement
+    if (pointerStartRef.current && typeof window !== "undefined") {
+      const scrollDelta = Math.abs(window.scrollY - pointerStartRef.current.scrollY);
+      const moveDistance = Math.hypot(
+        e.clientX - pointerStartRef.current.clientX,
+        e.clientY - pointerStartRef.current.clientY
+      );
+      if (scrollDelta > 4 || moveDistance >= DRAG_THRESHOLD_PX) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
+    // D. Legitimate user tap/click confirmed -> Open assistant
+    handleOpen();
   };
 
   // If assistant is disabled via admin config, render nothing
@@ -335,7 +465,7 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
           position: "fixed",
           bottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))",
           right: "calc(1.25rem + env(safe-area-inset-right, 0px))",
-          touchAction: positionMode === "draggable" ? "none" : "manipulation",
+          touchAction: "manipulation",
         };
 
   return (
@@ -346,13 +476,7 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
             key="assistant-launcher-btn"
             ref={triggerButtonRef}
             type="button"
-            onClick={(e) => {
-              if (positionMode === "fixed") {
-                handleOpen();
-              } else if (hasDraggedRef.current) {
-                e.stopPropagation();
-              }
-            }}
+            onClick={handleClick}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}

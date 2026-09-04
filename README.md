@@ -70,6 +70,13 @@ The application incorporates a tailored design language optimized for engagement
 * **Verified Live Communication**: Single-use 6-digit email passcode verification preventing automated spam.
 * **Session Persistence**: Encrypted, auto-expiring 4-hour session management with 1-click detachment.
 
+### 3.3 Meta WhatsApp Cloud API Channel
+* **Direct Communication Pipeline**: Official Meta WhatsApp Cloud API integration connecting recruiters and hiring managers directly with Gaurav Patil.
+* **Two-Bubble Sequenced Delivery**: Clean initial delivery acknowledgment followed sequentially (with a 350ms natural pause) by a dedicated, eye-catchy email prompt using bold and italic WhatsApp typography.
+* **1-Click Reply Notification Lifecycle**: Real-time inbound email alerts featuring cryptographic 1-click reply notification tokens (`/wa/notify/[token]`), dispatching instant visitor inbox alerts via Brevo with atomic transaction deduplication.
+* **Self-Service GDPR Portability (`/exportmydata`)**: End-to-end self-service data portability compiling cryptographically signed ZIP archives with visual HTML transcripts, machine-readable JSON, and 10-minute link security.
+* **Instant Data Erasure (`STOP`)**: Immediate opt-out and atomic message purge satisfying GDPR Article 17.
+
 ---
 
 ## 4. Performance & Reliability Standards
@@ -105,6 +112,7 @@ Official electronic communications, receipts, and alerts originate strictly from
 | **Styling** | [Tailwind CSS 3.4](https://tailwindcss.com/) & Tailwind Merge | Modern utility-first design system |
 | **3D Graphics** | [Three.js](https://threejs.org/) & [Three-Globe](https://github.com/vasturiano/three-globe) | Interactive WebGL globe visualization |
 | **Motion** | [Motion (Framer Motion)](https://motion.dev/) | Fluid layout animations, transitions, bento grids |
+| **Messaging** | [Meta WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api) | Two-bubble direct messaging, automated assistant, 10-min GDPR archive |
 | **Bot Mitigation** | [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) | Privacy-preserving, non-interactive CAPTCHA defense |
 | **Email Delivery** | [Brevo REST API](https://www.brevo.com/) | Verified transactional email infrastructure |
 | **Validation** | [Zod](https://zod.dev/) | Strict runtime data validation schemas |

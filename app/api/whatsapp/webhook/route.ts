@@ -20,6 +20,7 @@ import { getAdminFirestore } from "@/lib/admin/firebase-admin";
 import { adminLogger } from "@/lib/admin/logger";
 import { createExportSignature } from "@/lib/whatsapp/export/generator";
 import { getWhatsAppBaseUrl } from "@/lib/whatsapp/config/whatsapp.config";
+import { sanitizeText } from "@/lib/whatsapp/security/sanitizer";
 import type { MetaWebhookPayload } from "@/lib/whatsapp/types";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +35,74 @@ interface VisitorSession {
   lastActivityAt: number;
 }
 
-// In-memory L1 cache for fast hot-instance lookups
+// Bounded L1 Cache with LRU eviction and TTL cleanup to prevent heap memory leaks
+const MAX_SESSION_CACHE_SIZE = 500;
+const SESSION_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const memorySessionCache = new Map<string, VisitorSession>();
+
+function pruneSessionCache(): void {
+  const now = Date.now();
+  // 1. Evict expired entries
+  for (const [key, session] of memorySessionCache.entries()) {
+    if (now - session.lastActivityAt > SESSION_CACHE_TTL_MS) {
+      memorySessionCache.delete(key);
+    }
+  }
+  // 2. Enforce hard size ceiling (evict oldest entries if exceeded)
+  if (memorySessionCache.size > MAX_SESSION_CACHE_SIZE) {
+    const keysToDelete = Array.from(memorySessionCache.keys()).slice(
+      0,
+      memorySessionCache.size - MAX_SESSION_CACHE_SIZE
+    );
+    for (const k of keysToDelete) {
+      memorySessionCache.delete(k);
+    }
+  }
+}
+
+function setCachedSession(cleanKey: string, session: VisitorSession): void {
+  memorySessionCache.delete(cleanKey); // Refresh insertion order for LRU
+  memorySessionCache.set(cleanKey, session);
+  if (memorySessionCache.size > MAX_SESSION_CACHE_SIZE) {
+    pruneSessionCache();
+  }
+}
+
+// Sliding-window deduplication store for Meta msg.id (prevents retry double-counting & replay attacks)
+const MAX_DEDUP_CACHE_SIZE = 2000;
+const DEDUP_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const processedMessageIds = new Map<string, number>();
+
+function isDuplicateMessage(msgId: string): boolean {
+  if (!msgId) return false;
+  const processedAt = processedMessageIds.get(msgId);
+  if (processedAt && Date.now() - processedAt < DEDUP_TTL_MS) {
+    return true;
+  }
+  return false;
+}
+
+function markMessageProcessed(msgId: string): void {
+  if (!msgId) return;
+  processedMessageIds.set(msgId, Date.now());
+  if (processedMessageIds.size > MAX_DEDUP_CACHE_SIZE) {
+    const now = Date.now();
+    for (const [id, time] of processedMessageIds.entries()) {
+      if (now - time > DEDUP_TTL_MS) {
+        processedMessageIds.delete(id);
+      }
+    }
+    if (processedMessageIds.size > MAX_DEDUP_CACHE_SIZE) {
+      const keysToDrop = Array.from(processedMessageIds.keys()).slice(
+        0,
+        processedMessageIds.size - MAX_DEDUP_CACHE_SIZE
+      );
+      for (const k of keysToDrop) {
+        processedMessageIds.delete(k);
+      }
+    }
+  }
+}
 
 /**
  * Loads visitor session, checking in-memory cache first, then falling back to
@@ -95,7 +162,7 @@ async function getVisitorSession(from: string): Promise<VisitorSession> {
     session.chatModeActivatedAt = undefined;
   }
 
-  memorySessionCache.set(cleanKey, session);
+  setCachedSession(cleanKey, session);
   return session;
 }
 
@@ -105,7 +172,7 @@ async function getVisitorSession(from: string): Promise<VisitorSession> {
 async function saveVisitorSession(from: string, session: VisitorSession): Promise<void> {
   const cleanKey = from.replace(/[^0-9]/g, "");
   session.lastActivityAt = Date.now();
-  memorySessionCache.set(cleanKey, session);
+  setCachedSession(cleanKey, session);
 
   try {
     const db = getAdminFirestore();
@@ -256,6 +323,16 @@ export async function POST(req: NextRequest): Promise<Response> {
           const from = msg.from;
           if (!from) continue;
 
+          // Deduplication: Meta message ID check (prevents replay attacks & retry double-charging)
+          const msgId = msg.id;
+          if (msgId && isDuplicateMessage(msgId)) {
+            adminLogger.info("WhatsApp:DuplicateIgnored", "Ignored retried Meta message ID", { msgId, from });
+            continue;
+          }
+          if (msgId) {
+            markMessageProcessed(msgId);
+          }
+
           // Meta 24-Hour Customer Service Window check
           const msgTimestampSec = parseInt(msg.timestamp || "0", 10);
           if (msgTimestampSec > 0) {
@@ -273,7 +350,8 @@ export async function POST(req: NextRequest): Promise<Response> {
           const buttonId = msg.interactive?.button_reply?.id || msg.button?.payload || "";
           const buttonTitle = msg.interactive?.button_reply?.title || msg.button?.text || "";
           const textBody = msg.text?.body || "";
-          const rawInput = (buttonId || buttonTitle || textBody).trim();
+          const extracted = (buttonId || buttonTitle || textBody).trim();
+          const rawInput = sanitizeText(extracted, 4000);
 
           if (!rawInput) continue;
 

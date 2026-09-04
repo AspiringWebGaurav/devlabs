@@ -60,8 +60,14 @@ export function createWhatsAppReplyToken(params: {
 }
 
 /**
+ * Maximum token age: 14 days (1,209,600,000 ms).
+ * Prevents re-activation of leaked or old reply notification links.
+ */
+export const MAX_REPLY_TOKEN_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
  * Decrypts and validates the authentication tag of an incoming reply token.
- * Returns the decoded payload or null if the token is tampered, invalid, or corrupted.
+ * Returns the decoded payload or null if the token is tampered, invalid, or expired.
  */
 export function verifyAndDecodeWhatsAppReplyToken(token: string): WhatsAppReplyTokenPayload | null {
   try {
@@ -85,6 +91,12 @@ export function verifyAndDecodeWhatsAppReplyToken(token: string): WhatsAppReplyT
     const payload = JSON.parse(decrypted.toString("utf8")) as WhatsAppReplyTokenPayload;
 
     if (!payload.dispatchId || !payload.phone || !payload.email) {
+      return null;
+    }
+
+    // Enforce 14-day expiration ceiling
+    const now = Date.now();
+    if (!payload.createdAt || typeof payload.createdAt !== "number" || now - payload.createdAt > MAX_REPLY_TOKEN_AGE_MS) {
       return null;
     }
 

@@ -341,7 +341,7 @@ function TermsContentInner() {
               )}
             </div>
             <p>
-              All transactional emails, contact receipts, and security alerts are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono">gauravservices.eu.cc</span> preserved) via Brevo API. Official sender identities include <code className="text-purple font-mono">hello@gauravpatil.online</code> (inquiries and auto-replies), <code className="text-purple font-mono">security@gauravpatil.online</code> (authentication alerts), and <code className="text-purple font-mono">no-reply@gauravpatil.online</code> (system OTPs). We maintain a strict zero-spam guarantee: submitted contact emails are never enrolled in marketing sequences.
+              All transactional emails, contact receipts, and security alerts are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono">gauravservices.eu.cc</span> preserved) via Brevo API. Official sender identities include <code className="text-purple font-mono">hello@gauravpatil.online</code> (inquiries and auto-replies), <code className="text-purple font-mono">security@gauravpatil.online</code> (authentication alerts), and <code className="text-purple font-mono">no-reply@gauravpatil.online</code> (system OTPs). A strict zero-spam guarantee is maintained: submitted contact emails are never enrolled in marketing sequences.
             </p>
           </section>
 
@@ -384,14 +384,14 @@ function TermsContentInner() {
                 Live Chat Real-Time Dispatch &amp; Notification Architecture
               </h3>
               <p className="text-sm text-neutral-300 leading-relaxed">
-                When you initiate a conversation through <strong className="text-white">Live Chat with Gaurav</strong>, our backend operates a hybrid real-time communication pipeline:
+                When you initiate a conversation through <strong className="text-white">Live Chat with Gaurav</strong>, the backend operates a hybrid real-time communication pipeline:
               </p>
               <ul className="list-disc list-inside space-y-2 pl-2 text-sm text-neutral-300">
                 <li>
                   <strong className="text-white">Active Online Streaming:</strong> If Gaurav is actively online and connected to the session, incoming messages arrive instantly in real-time.
                 </li>
                 <li>
-                  <strong className="text-white">Automated Inbox Dispatch:</strong> If Gaurav is away or offline, our server instantaneously generates and dispatches an automated lead notification directly to Gaurav&apos;s private inbox containing your verified sender details and full message transcript with 1-click direct response routing.
+                  <strong className="text-white">Automated Inbox Dispatch:</strong> If Gaurav is away or offline, the server instantaneously generates and dispatches an automated lead notification directly to Gaurav&apos;s private inbox containing your verified sender details and full message transcript with 1-click direct response routing.
                 </li>
                 <li>
                   <strong className="text-white">Single-Use 6-Digit Email Verification:</strong> To eliminate spam and protect system resources, access to Live Chat requires a single-use 6-digit OTP code dispatched exclusively from <code className="text-purple font-mono">no-reply@gauravpatil.online</code>. Verification codes expire in 5 minutes.
@@ -504,7 +504,7 @@ function TermsContentInner() {
                     Unsubscribe &amp; Immediate Data Erasure
                   </h3>
                   <p className="text-xs text-neutral-400 leading-relaxed">
-                    You may opt out at any time by replying <code className="text-[#25D366] font-mono font-semibold">STOP</code>. Replying STOP immediately unsubscribes your number and permanently erases your conversation history from our database (GDPR Right to Erasure). You can resume anytime by replying <code className="text-[#25D366] font-mono font-semibold">START</code>.
+                    You may opt out at any time by replying <code className="text-[#25D366] font-mono font-semibold">STOP</code>. Replying STOP immediately unsubscribes your number and permanently erases your conversation history from the database (GDPR Right to Erasure). You can resume anytime by replying <code className="text-[#25D366] font-mono font-semibold">START</code>.
                   </p>
                 </div>
 
@@ -514,7 +514,7 @@ function TermsContentInner() {
                     Data Portability &amp; Self-Service Export
                   </h3>
                   <p className="text-xs text-neutral-400 leading-relaxed">
-                    Under GDPR Article 20, you retain full ownership of your conversation records. You can type <code className="text-[#25D366] font-mono font-semibold">/exportmydata</code> anytime in WhatsApp to instantly receive a cryptographically signed ZIP archive with your complete records.
+                    Under GDPR Article 20, you retain full ownership of your conversation records. You can type <code className="text-[#25D366] font-mono font-semibold">/exportmydata</code> anytime in WhatsApp to instantly receive a cryptographically signed ZIP archive with your complete records (links are strictly time-limited to 10 minutes for privacy).
                   </p>
                 </div>
               </div>

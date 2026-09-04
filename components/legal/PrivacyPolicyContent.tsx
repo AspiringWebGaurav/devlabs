@@ -242,8 +242,8 @@ function PrivacyContentInner() {
               <p>
                 Your privacy, autonomy, and security are non-negotiable. This Privacy Policy governs
                 how data is handled across <span className="text-purple font-semibold">Gaurav Portfolio</span>.
-                The architecture operates on strict data minimization principles: we only collect the minimum
-                information necessary to facilitate professional communication, with zero third-party data tracking,
+                The architecture operates on strict data minimization principles: only the minimum
+                information necessary to facilitate professional communication is collected, with zero third-party data tracking,
                 zero cookie profiling, and zero monetization of personal information.
               </p>
             </section>
@@ -308,7 +308,7 @@ function PrivacyContentInner() {
               )}
             </div>
             <p>
-              To protect public endpoints against automated spam and DDoS attacks, we utilize
+              To protect public endpoints against automated spam and DDoS attacks, the system utilizes
               <strong className="text-white"> Cloudflare Turnstile</strong>:
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
@@ -485,7 +485,7 @@ function PrivacyContentInner() {
               </h3>
               <ul className="list-disc list-inside space-y-2 pl-2 text-sm text-neutral-300">
                 <li>
-                  <strong className="text-white">Direct Message Routing:</strong> When you send a message in Live Chat, it is streamed immediately if Gaurav is connected. When away, our system triggers an instantaneous notification email to Gaurav&apos;s personal inbox with your message transcript and 1-click reply routing.
+                  <strong className="text-white">Direct Message Routing:</strong> When you send a message in Live Chat, it is streamed immediately if Gaurav is connected. When away, the automated system triggers an instantaneous notification email to Gaurav&apos;s personal inbox with your message transcript and 1-click reply routing.
                 </li>
                 <li>
                   <strong className="text-white">Zero Plaintext OTP Storage:</strong> 6-digit verification codes are hashed using salted HMAC-SHA256 before storage and destroyed immediately upon successful authentication or after 5 minutes.
@@ -510,7 +510,7 @@ function PrivacyContentInner() {
                   <strong className="text-white">Ephemeral Session Processing:</strong> Assistant interactions are evaluated in-memory strictly for real-time guidance during your active session.
                 </li>
                 <li>
-                  <strong className="text-white">Zero Third-Party Training or Data Selling:</strong> We guarantee 100% data integrity: your queries and live messages are never sold, rented, monetized, or fed into public generative model training pools.
+                  <strong className="text-white">Zero Third-Party Training or Data Selling:</strong> A 100% data integrity guarantee is maintained: queries and live messages are never sold, rented, monetized, or fed into public generative model training pools.
                 </li>
                 <li>
                   <strong className="text-white">No Persistent Tracking:</strong> The assistant functions completely without tracking cookies, behavioral tracking scripts, or persistent fingerprinting.
@@ -556,7 +556,7 @@ function PrivacyContentInner() {
                     <h3 className="text-sm font-semibold text-white">Instant ZIP Archive</h3>
                   </div>
                   <p className="text-xs text-neutral-400 leading-relaxed">
-                    Typing <code className="text-[#25D366] font-mono font-semibold">/exportmydata</code> in WhatsApp immediately triggers our server to compile an encrypted in-memory ZIP package containing your complete records with zero wait time.
+                    Typing <code className="text-[#25D366] font-mono font-semibold">/exportmydata</code> in WhatsApp immediately triggers the server to compile an encrypted in-memory ZIP package containing your complete records with zero wait time.
                   </p>
                 </div>
 
@@ -592,7 +592,7 @@ function PrivacyContentInner() {
                     In your active WhatsApp conversation with Gaurav Patil, send: <code className="text-[#25D366] font-mono font-semibold bg-black/50 px-2 py-0.5 rounded">/exportmydata</code> (or <code className="text-[#25D366] font-mono font-semibold bg-black/50 px-2 py-0.5 rounded">/export</code>).
                   </li>
                   <li>
-                    Our system will immediately confirm with a generation notice, followed by a cryptographically signed HMAC download link. Tap the link to download your <code className="text-[#CBACF9] font-mono">.zip</code> archive directly to your device.
+                    The automated system will immediately confirm with a generation notice, followed by a cryptographically signed HMAC download link (strictly valid for 10 minutes). Tap the link to download your <code className="text-[#CBACF9] font-mono">.zip</code> archive directly to your device.
                   </li>
                 </ol>
               </div>
@@ -604,7 +604,7 @@ function PrivacyContentInner() {
                   GDPR Article 17: Right to Immediate Erasure (STOP Command)
                 </h3>
                 <p className="text-sm text-neutral-300 leading-relaxed">
-                  You maintain full sovereignty over your information. At any point, simply reply <code className="text-red-400 font-mono font-semibold bg-black/50 px-2 py-0.5 rounded">STOP</code> to WhatsApp. Our server immediately unsubscribes your number and permanently erases all message documents and session data from our database in an atomic transaction.
+                  You maintain full sovereignty over your information. At any point, simply reply <code className="text-red-400 font-mono font-semibold bg-black/50 px-2 py-0.5 rounded">STOP</code> to WhatsApp. The server immediately unsubscribes your number and permanently erases all message documents and session data from the database in an atomic transaction.
                 </p>
               </div>
 
