@@ -13,6 +13,7 @@ import {
   FaShieldHalved,
   FaEye,
   FaBullseye,
+  FaWhatsapp,
 } from "react-icons/fa6";
 import { IoChatbubbleEllipses } from "react-icons/io5";
 
@@ -20,11 +21,19 @@ function TermsContentInner() {
   const searchParams = useSearchParams();
   const focusParam = searchParams.get("focus");
 
-  const [filterMode, setFilterMode] = useState<"all" | "contact" | "assistant">(
-    focusParam === "assistant" ? "assistant" : focusParam === "contact" ? "contact" : "all"
+  const [filterMode, setFilterMode] = useState<"all" | "contact" | "assistant" | "whatsapp">(
+    focusParam === "whatsapp"
+      ? "whatsapp"
+      : focusParam === "assistant"
+      ? "assistant"
+      : focusParam === "contact"
+      ? "contact"
+      : "all"
   );
   const [highlightedSection, setHighlightedSection] = useState<string | null>(
-    focusParam === "assistant"
+    focusParam === "whatsapp"
+      ? "whatsapp-terms"
+      : focusParam === "assistant"
       ? "assistant-terms"
       : focusParam === "contact"
       ? "anonymity"
@@ -37,7 +46,9 @@ function TermsContentInner() {
     const hash = window.location.hash.replace("#", "");
     const targetId =
       hash ||
-      (focusParam === "assistant"
+      (focusParam === "whatsapp"
+        ? "whatsapp-terms"
+        : focusParam === "assistant"
         ? "assistant-terms"
         : focusParam === "contact"
         ? "anonymity"
@@ -66,7 +77,7 @@ function TermsContentInner() {
     }
   }, [focusParam]);
 
-  const handleTabSelect = (mode: "all" | "contact" | "assistant", targetId?: string) => {
+  const handleTabSelect = (mode: "all" | "contact" | "assistant" | "whatsapp", targetId?: string) => {
     setFilterMode(mode);
     if (targetId) {
       setHighlightedSection(targetId);
@@ -131,7 +142,19 @@ function TermsContentInner() {
               }`}
             >
               <IoChatbubbleEllipses className="w-3 h-3 text-[#CBACF9]" />
-              <span>Personal Assistant &amp; AI Safety (Learn More)</span>
+              <span>Personal Assistant (AI)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabSelect("whatsapp", "whatsapp-terms")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                filterMode === "whatsapp"
+                  ? "bg-[#25D366] text-black font-semibold shadow-sm shadow-[#25D366]/40"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <FaWhatsapp className={`w-3.5 h-3.5 ${filterMode === "whatsapp" ? "text-black" : "text-[#25D366]"}`} />
+              <span>WhatsApp Terms</span>
             </button>
           </div>
         </div>
@@ -176,6 +199,24 @@ function TermsContentInner() {
                 <IoChatbubbleEllipses className="w-4 h-4 text-[#CBACF9] shrink-0" />
                 <span>
                   Filtering active: Spotlighting terms of service, AI accuracy disclaimer, and acceptable use standards for Gaurav Personal Assistant (Beta).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFilterMode("all")}
+                className="text-purple hover:text-white underline text-xs font-semibold whitespace-nowrap cursor-pointer"
+              >
+                View full terms
+              </button>
+            </div>
+          )}
+
+          {filterMode === "whatsapp" && (
+            <div className="mt-4 p-3 rounded-xl bg-[#25D366]/15 border border-[#25D366]/30 text-xs text-neutral-200 flex items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <FaWhatsapp className="w-4 h-4 text-[#25D366] shrink-0" />
+                <span>
+                  Filtering active: Spotlighting terms governing WhatsApp Recruiter Communication, Anti-Spam Quotas, and Instant Opt-Out Rights.
                 </span>
               </div>
               <button
@@ -410,12 +451,94 @@ function TermsContentInner() {
             </div>
           </section>
 
-          {/* Section 7: Administrative Subsystem Governance */}
+          {/* Section 7: WhatsApp Recruiter & Visitor Communication Channel */}
+          {(filterMode === "all" || filterMode === "whatsapp") && (
+            <section
+              id="whatsapp-terms"
+              className={`space-y-4 p-4 sm:p-6 rounded-xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
+                highlightedSection === "whatsapp-terms" || filterMode === "whatsapp"
+                  ? "bg-[#25D366]/10 border border-[#25D366]/50 shadow-[0_0_30px_rgba(37,211,102,0.15)] ring-1 ring-[#25D366]/50"
+                  : "border border-white/[0.06] bg-white/[0.02]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
+                  <FaWhatsapp className="w-5 h-5 text-[#25D366]" />
+                  <span>7. WhatsApp Recruiter &amp; Visitor Communication Channel</span>
+                </h2>
+                {(highlightedSection === "whatsapp-terms" || filterMode === "whatsapp") && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/40">
+                    WhatsApp Term
+                  </span>
+                )}
+              </div>
+
+              <p className="text-sm text-neutral-300 leading-relaxed">
+                Gaurav Portfolio provides an official Meta WhatsApp Business Cloud API integration allowing recruiters, hiring managers, and prospective clients to connect directly with Gaurav Patil. Use of this channel is subject to the following terms:
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-black/40 border border-white/[0.08] p-4 rounded-xl space-y-2">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#25D366]" />
+                    Authorized Professional Scope
+                  </h3>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    This WhatsApp channel is exclusively intended for professional recruitment discussions, job opportunities, engineering inquiries, and technical collaboration proposals. Promotional spam, harassment, or unsolicited marketing is strictly prohibited.
+                  </p>
+                </div>
+
+                <div className="bg-black/40 border border-white/[0.08] p-4 rounded-xl space-y-2">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#25D366]" />
+                    Message Quota &amp; Anti-Spam Safeguards
+                  </h3>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    To prevent spam and protect direct communication channels, sessions are allocated up to 3 direct inquiry message slots. Messages are delivered instantaneously to Gaurav Patil in real time with 1-click email response triggers.
+                  </p>
+                </div>
+
+                <div className="bg-black/40 border border-white/[0.08] p-4 rounded-xl space-y-2">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#25D366]" />
+                    Unsubscribe &amp; Immediate Data Erasure
+                  </h3>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    You may opt out at any time by replying <code className="text-[#25D366] font-mono font-semibold">STOP</code>. Replying STOP immediately unsubscribes your number and permanently erases your conversation history from our database (GDPR Right to Erasure). You can resume anytime by replying <code className="text-[#25D366] font-mono font-semibold">START</code>.
+                  </p>
+                </div>
+
+                <div className="bg-black/40 border border-white/[0.08] p-4 rounded-xl space-y-2">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#25D366]" />
+                    Data Portability &amp; Self-Service Export
+                  </h3>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Under GDPR Article 20, you retain full ownership of your conversation records. You can type <code className="text-[#25D366] font-mono font-semibold">/exportmydata</code> anytime in WhatsApp to instantly receive a cryptographically signed ZIP archive with your complete records.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-white/[0.03] border border-white/[0.08] flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-neutral-400">
+                  Looking for detailed data protection specifics?
+                </span>
+                <Link
+                  href="/privacy?focus=whatsapp#whatsapp-data-export"
+                  className="text-[#25D366] hover:underline font-semibold flex items-center gap-1"
+                >
+                  <span>View WhatsApp Privacy &amp; Data Export Policy</span> &rarr;
+                </Link>
+              </div>
+            </section>
+          )}
+
+          {/* Section 8: Administrative Subsystem Governance */}
           {filterMode === "all" && (
             <section id="admin-governance" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaShieldHalved className="w-4 h-4 text-purple" />
-                <span>7. Administrative Subsystem Isolation &amp; 2FA Governance</span>
+                <span>8. Administrative Subsystem Isolation &amp; 2FA Governance</span>
               </h2>
               <p>
                 The administrative panel (<code className="text-purple font-mono">/admin/*</code>) is an isolated workspace strictly restricted to authorized Superadmins. Administrative access requires Google OAuth 2.0 PKCE, salted HMAC-SHA256 Two-Factor Authentication (OTP), and zero-lockout IP security verification. Administrative access and data operations are governed separately under the <Link href="/admin/terms" className="text-purple hover:underline font-semibold">Administrator Terms of Service</Link>.
@@ -423,21 +546,21 @@ function TermsContentInner() {
             </section>
           )}
 
-          {/* Section 8: Limitation of Liability */}
+          {/* Section 9: Limitation of Liability */}
           <section id="liability" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
             <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
               <FaScaleBalanced className="w-4 h-4 text-purple" />
-              <span>8. Limitation of Liability &amp; Disclaimers</span>
+              <span>9. Limitation of Liability &amp; Disclaimers</span>
             </h2>
             <p>
               This website and its demonstrative artifacts are provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis. In no event shall Gaurav Patil be liable for indirect, incidental, or consequential damages resulting from the use of this website.
             </p>
           </section>
 
-          {/* Section 8: Legal Contact */}
+          {/* Section 10: Legal Contact */}
           <section id="legal-contact" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
             <h2 className="text-xl font-semibold text-white">
-              8. Inquiries &amp; Legal Notices
+              10. Inquiries &amp; Legal Notices
             </h2>
             <p>
               For legal inquiries, contract proposals, or engagement agreements:

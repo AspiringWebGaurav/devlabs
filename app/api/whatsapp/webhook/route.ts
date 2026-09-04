@@ -18,6 +18,7 @@ import { WhatsAppMetaClient } from "@/lib/whatsapp/meta/client";
 import { sendWhatsAppAdminAlert } from "@/lib/whatsapp/notifications";
 import { getAdminFirestore } from "@/lib/admin/firebase-admin";
 import { adminLogger } from "@/lib/admin/logger";
+import { createExportSignature } from "@/lib/whatsapp/export/generator";
 import type { MetaWebhookPayload } from "@/lib/whatsapp/types";
 
 export const dynamic = "force-dynamic";
@@ -115,6 +116,42 @@ async function saveVisitorSession(from: string, session: VisitorSession): Promis
   }
 }
 
+/**
+ * Appends a message to the visitor's Firestore message log for GDPR export capability.
+ */
+async function recordChatMessage(
+  from: string,
+  sender: "visitor" | "assistant",
+  text: string
+): Promise<void> {
+  const cleanPhone = from.replace(/[^0-9]/g, "");
+  if (!cleanPhone || !text) return;
+
+  try {
+    const db = getAdminFirestore();
+    if (db) {
+      const now = Date.now();
+      const timestampIST = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+      const msgId = `msg_${now}_${Math.random().toString(36).slice(2, 7)}`;
+
+      await db
+        .collection("whatsapp_sessions")
+        .doc(cleanPhone)
+        .collection("messages")
+        .doc(msgId)
+        .set({
+          id: msgId,
+          sender,
+          text,
+          timestamp: timestampIST,
+          createdAt: now,
+        });
+    }
+  } catch (err) {
+    adminLogger.warn("WhatsApp:RecordMessageFailed", "Could not persist chat message log", { error: err });
+  }
+}
+
 const GREETING_TEXT =
   "Hello! Thank you for reaching out.\n\n" +
   "I am Gaurav's automated assistant, built to connect you directly with him.\n\n" +
@@ -125,7 +162,7 @@ const GREETING_FOOTER = "Reply STOP to opt out • /guidelines for rules";
 const GUIDELINES_TEXT =
   "📜 *GAURAV PATIL PORTFOLIO — CHAT GUIDELINES & RULES*\n\n" +
   "1. 💬 *Direct Inquiries*\n" +
-  "   You can send up to 3 direct inquiries. Each message is delivered straight to Gaurav in real time with an instant email alert.\n\n" +
+  "   You can send up to 3 direct inquiries. Each message is delivered straight to Gaurav in real time with an instant alert.\n\n" +
   "2. 📄 *Verified Resume*\n" +
   "   Tap \"View Resume\" to receive Gaurav's verified official PDF resume directly in this chat.\n\n" +
   "3. 🛑 *Opt-Out & Opt-In*\n" +
@@ -133,8 +170,13 @@ const GUIDELINES_TEXT =
   "   • Type *START* or *HI* to restart the conversation anytime.\n\n" +
   "4. ✉️ *Reply Notifications*\n" +
   "   Share your email when prompted to receive an alert the moment Gaurav replies.\n\n" +
-  "5. 🔒 *Privacy Guarantee*\n" +
-  "   Your phone number and messages remain 100% confidential and are never shared.\n\n" +
+  "5. 📜 *Terms & Conditions*\n" +
+  "   Read our official WhatsApp Channel Terms:\n" +
+  "   👉 https://www.gauravpatil.online/terms?focus=whatsapp#whatsapp-terms\n\n" +
+  "6. 📦 *Data Portability & Export Rights*\n" +
+  "   Under GDPR Art. 20, you have the full right to export your entire chat data (.zip).\n" +
+  "   • Type */exportmydata* to download your complete archive\n" +
+  "   • Or visit our portal: https://www.gauravpatil.online/privacy?focus=whatsapp#whatsapp-data-export\n\n" +
   "💡 *Select an option below or send your message to begin:*";
 
 /**
@@ -220,6 +262,9 @@ export async function POST(req: NextRequest): Promise<Response> {
 
           if (!rawInput) continue;
 
+          // Record incoming visitor message to Firestore log for data portability archive
+          void recordChatMessage(from, "visitor", rawInput);
+
           // Normalize command: trim, uppercase, remove leading/trailing punctuation
           const normalized = rawInput
             .toUpperCase()
@@ -269,10 +314,27 @@ export async function POST(req: NextRequest): Promise<Response> {
             normalized === "INFO" ||
             normalized === "GUIDE";
 
+          const isExportAction =
+            normalized === "EXPORTMYDATA" ||
+            normalized === "EXPORT" ||
+            normalized === "MYDATA" ||
+            normalized === "EXPORTDATA" ||
+            normalized === "DOWNLOADMYDATA" ||
+            normalized === "DATAEXPORT";
+
+          const isTermsAction =
+            normalized === "TERMS" ||
+            normalized === "TOC" ||
+            normalized === "TERMSOFSERVICE" ||
+            normalized === "CONDITION" ||
+            normalized === "CONDITIONS";
+
           const isGreeting =
             !isResumeAction &&
             !isChatAction &&
             !isGuidelinesAction &&
+            !isExportAction &&
+            !isTermsAction &&
             (
               normalized === "HI" ||
               normalized === "HII" ||
@@ -283,20 +345,26 @@ export async function POST(req: NextRequest): Promise<Response> {
             );
 
           // -------------------------------------------------------------
-          // 1. "STOP" / "UNSUBSCRIBE" -> Clear session and unsubscribe
+          // 1. "STOP" / "UNSUBSCRIBE" -> Clear session and messages (Right to be Forgotten)
           // -------------------------------------------------------------
           if (normalized === "STOP" || normalized === "UNSUBSCRIBE") {
             const cleanKey = from.replace(/[^0-9]/g, "");
             memorySessionCache.delete(cleanKey);
             try {
               const db = getAdminFirestore();
-              if (db) await db.collection("whatsapp_sessions").doc(cleanKey).delete();
+              if (db) {
+                const msgsSnap = await db.collection("whatsapp_sessions").doc(cleanKey).collection("messages").get();
+                const batch = db.batch();
+                msgsSnap.docs.forEach((d) => batch.delete(d.ref));
+                batch.delete(db.collection("whatsapp_sessions").doc(cleanKey));
+                await batch.commit();
+              }
             } catch {}
 
-            await WhatsAppMetaClient.sendTextMessage(
-              from,
-              "You have been unsubscribed and your session has been cleared. Reply START or HI anytime to begin again."
-            );
+            const stopReply =
+              "You have been unsubscribed and your session and data have been cleared. Reply START or HI anytime to begin again.";
+            await WhatsAppMetaClient.sendTextMessage(from, stopReply);
+            void recordChatMessage(from, "assistant", stopReply);
           }
 
           // -------------------------------------------------------------
@@ -318,10 +386,59 @@ export async function POST(req: NextRequest): Promise<Response> {
               ],
               GREETING_FOOTER
             );
+            void recordChatMessage(from, "assistant", GREETING_TEXT);
           }
 
           // -------------------------------------------------------------
-          // 3. Discord-Style "/guidelines" or "/rules" or "/help"
+          // 3. /exportmydata -> Two-stage data export archive generation
+          // -------------------------------------------------------------
+          else if (isExportAction) {
+            // Stage 1: Immediate visual feedback
+            const waitMsg = "Please wait, generating your secure data export archive... 📦⏳";
+            await WhatsAppMetaClient.sendTextMessage(from, waitMsg);
+            void recordChatMessage(from, "assistant", waitMsg);
+
+            // Stage 2: Generate signed download link and dispatch archive details
+            const cleanKey = from.replace(/[^0-9]/g, "");
+            const sig = createExportSignature(from);
+            const baseUrl = (
+              process.env.NEXT_PUBLIC_APP_URL ||
+              process.env.APP_URL ||
+              "https://www.gauravpatil.online"
+            ).replace(/\/+$/, "");
+            const downloadUrl = `${baseUrl}/api/whatsapp/export?phone=${cleanKey}&sig=${sig}`;
+
+            const exportMessage =
+              "📦 *Your Official Data Archive is Ready!*\n\n" +
+              "Under GDPR Article 20 and global privacy standards, we have packaged your complete conversation data:\n" +
+              "• 📜 Visual Chat Transcript (HTML)\n" +
+              "• 💾 Machine-Readable JSON Export\n" +
+              "• 🛡️ Data Portability Certificate\n\n" +
+              `👉 *Tap to Download Your ZIP Archive:*\n${downloadUrl}\n\n` +
+              "🔒 *This link is cryptographically signed and strictly bound to your number.*";
+
+            await WhatsAppMetaClient.sendTextMessage(from, exportMessage);
+            void recordChatMessage(from, "assistant", exportMessage);
+          }
+
+          // -------------------------------------------------------------
+          // 4. /terms -> WhatsApp Channel Terms of Service
+          // -------------------------------------------------------------
+          else if (isTermsAction) {
+            const termsMessage =
+              "📜 *GAURAV PATIL PORTFOLIO — WHATSAPP CHANNEL TERMS*\n\n" +
+              "• Purpose: Direct professional networking & recruiter inquiries\n" +
+              "• Message Quota: Up to 3 direct inquiries per session\n" +
+              "• Opt-Out Anytime: Send STOP to unsubscribe & erase data\n\n" +
+              "👉 *Read Full Terms of Service:*\n" +
+              "https://www.gauravpatil.online/terms?focus=whatsapp#whatsapp-terms";
+
+            await WhatsAppMetaClient.sendTextMessage(from, termsMessage);
+            void recordChatMessage(from, "assistant", termsMessage);
+          }
+
+          // -------------------------------------------------------------
+          // 5. Discord-Style "/guidelines" or "/rules" or "/help"
           // -------------------------------------------------------------
           else if (isGuidelinesAction) {
             await WhatsAppMetaClient.sendQuickReplyButtons(
@@ -333,23 +450,23 @@ export async function POST(req: NextRequest): Promise<Response> {
               ],
               GREETING_FOOTER
             );
+            void recordChatMessage(from, "assistant", GUIDELINES_TEXT);
           }
 
           // -------------------------------------------------------------
-          // 4. Option 1: "View Resume" (Consumed once per session)
+          // 6. Option 1: "View Resume" (Consumed once per session)
           // -------------------------------------------------------------
           else if (isResumeAction) {
             if (session.hasReceivedResume) {
-              await WhatsAppMetaClient.sendTextMessage(
-                from,
-                "You have already received Gaurav's resume above! 📄\n\nTo connect directly, tap 'Chat with Gaurav' above ⬆️ or simply type your message here — I will deliver it directly to Gaurav in real time."
-              );
+              const alreadyMsg =
+                "You have already received Gaurav's resume above! 📄\n\nTo connect directly, tap 'Chat with Gaurav' above ⬆️ or simply type your message here — I will deliver it directly to Gaurav in real time.";
+              await WhatsAppMetaClient.sendTextMessage(from, alreadyMsg);
+              void recordChatMessage(from, "assistant", alreadyMsg);
             } else {
               // 1. Immediate visual feedback to the visitor
-              await WhatsAppMetaClient.sendTextMessage(
-                from,
-                "Please wait, sending Gaurav's resume... 📄⏳"
-              );
+              const waitMsg = "Please wait, sending Gaurav's resume... 📄⏳";
+              await WhatsAppMetaClient.sendTextMessage(from, waitMsg);
+              void recordChatMessage(from, "assistant", waitMsg);
 
               session.hasReceivedResume = true;
               await saveVisitorSession(from, session);
@@ -359,12 +476,15 @@ export async function POST(req: NextRequest): Promise<Response> {
                 process.env.WHATSAPP_RESUME_URL ||
                 "https://firebasestorage.googleapis.com/v0/b/gaurav-portfolio-improved.firebasestorage.app/o/whatsapp%2FGaurav_Patil_Resume.pdf?alt=media";
 
+              const caption =
+                "Here is Gaurav Patil's official resume! 📄\n\nFeel free to review it. To connect directly, tap 'Chat with Gaurav' above ⬆️ or simply type your message below — I will deliver it directly to Gaurav in real time.";
               const sendResult = await WhatsAppMetaClient.sendDocumentMessage(
                 from,
                 documentUrl,
                 "Gaurav_Patil_Resume.pdf",
-                "Here is Gaurav Patil's official resume! 📄\n\nFeel free to review it. To connect directly, tap 'Chat with Gaurav' above ⬆️ or simply type your message below — I will deliver it directly to Gaurav in real time."
+                caption
               );
+              void recordChatMessage(from, "assistant", caption);
 
               if (!sendResult.success) {
                 adminLogger.warn(
@@ -372,29 +492,28 @@ export async function POST(req: NextRequest): Promise<Response> {
                   "Document send failed; sending direct URL link fallback",
                   { error: sendResult.error }
                 );
-                await WhatsAppMetaClient.sendTextMessage(
-                  from,
-                  `Here is Gaurav Patil's resume: ${documentUrl}\n\nTo connect directly, tap 'Chat with Gaurav' above ⬆️ or send your message below.`
-                );
+                const fallbackMsg = `Here is Gaurav Patil's resume: ${documentUrl}\n\nTo connect directly, tap 'Chat with Gaurav' above ⬆️ or send your message below.`;
+                await WhatsAppMetaClient.sendTextMessage(from, fallbackMsg);
+                void recordChatMessage(from, "assistant", fallbackMsg);
               }
             }
           }
 
           // -------------------------------------------------------------
-          // 5. Option 2: "Chat with Gaurav" (Enables free-form chat mode)
+          // 7. Option 2: "Chat with Gaurav" (Enables free-form chat mode)
           // -------------------------------------------------------------
           else if (isChatAction) {
             session.inChatMode = true;
             await saveVisitorSession(from, session);
 
-            await WhatsAppMetaClient.sendTextMessage(
-              from,
-              "You're now connected with Gaurav! 💬\n\nPlease type your message, project idea, or role details below. Gaurav will be alerted in real time."
-            );
+            const chatMsg =
+              "You're now connected with Gaurav! 💬\n\nPlease type your message, project idea, or role details below. Gaurav will be alerted in real time.";
+            await WhatsAppMetaClient.sendTextMessage(from, chatMsg);
+            void recordChatMessage(from, "assistant", chatMsg);
           }
 
           // -------------------------------------------------------------
-          // 6. Greetings ("Hi", "hi", "Hii", or portfolio link) -> 2 buttons with footer
+          // 8. Greetings ("Hi", "hi", "Hii", or portfolio link) -> 2 buttons with footer
           // -------------------------------------------------------------
           else if (isGreeting) {
             await WhatsAppMetaClient.sendQuickReplyButtons(
@@ -406,6 +525,7 @@ export async function POST(req: NextRequest): Promise<Response> {
               ],
               GREETING_FOOTER
             );
+            void recordChatMessage(from, "assistant", GREETING_TEXT);
           }
 
           // -------------------------------------------------------------
@@ -432,10 +552,9 @@ export async function POST(req: NextRequest): Promise<Response> {
 
               if (isOnlyEmail) {
                 // SCENARIO 2: Late email registration (ZERO message slot penalty)
-                await WhatsAppMetaClient.sendTextMessage(
-                  from,
-                  `Got it! We've linked your email (${detectedEmail}) to your conversation. You will receive an email the moment Gaurav replies.\n\nYou can continue chatting here anytime or visit the portfolio: https://www.gauravpatil.online`
-                );
+                const linkedMsg = `Got it! We've linked your email (${detectedEmail}) to your conversation. You will receive an email the moment Gaurav replies.\n\nYou can continue chatting here anytime or visit the portfolio: https://www.gauravpatil.online`;
+                await WhatsAppMetaClient.sendTextMessage(from, linkedMsg);
+                void recordChatMessage(from, "assistant", linkedMsg);
 
                 // Send dedicated "Contact Update (Email Linked)" alert to Gaurav with 1-click reply button
                 void sendWhatsAppAdminAlert({
@@ -454,10 +573,9 @@ export async function POST(req: NextRequest): Promise<Response> {
                   await saveVisitorSession(from, session);
                 }
 
-                await WhatsAppMetaClient.sendTextMessage(
-                  from,
-                  `Thank you! Your message has been delivered to Gaurav and we've saved your email (${detectedEmail}) to notify you the moment he replies.`
-                );
+                const receivedEmailMsg = `Thank you! Your message has been delivered to Gaurav and we've saved your email (${detectedEmail}) to notify you the moment he replies.`;
+                await WhatsAppMetaClient.sendTextMessage(from, receivedEmailMsg);
+                void recordChatMessage(from, "assistant", receivedEmailMsg);
 
                 // Send full inquiry alert to Gaurav with visitorEmail attached
                 void sendWhatsAppAdminAlert({
@@ -470,10 +588,9 @@ export async function POST(req: NextRequest): Promise<Response> {
               }
             } else if (session.messageCount >= 3) {
               // Strict rate limit triggered on 4th message and beyond
-              await WhatsAppMetaClient.sendTextMessage(
-                from,
-                "⚠️ Message limit reached (maximum 3 messages). Gaurav has received all your messages and will reply directly to your WhatsApp as soon as he is online. Thank you for your patience!"
-              );
+              const rateLimitMsg = "⚠️ Message limit reached (maximum 3 messages). Gaurav has received all your messages and will reply directly to your WhatsApp as soon as he is online. Thank you for your patience!";
+              await WhatsAppMetaClient.sendTextMessage(from, rateLimitMsg);
+              void recordChatMessage(from, "assistant", rateLimitMsg);
             } else {
               // SCENARIO 1: Normal inquiry message (or user holding / replying without email)
               session.messageCount += 1;
@@ -484,16 +601,14 @@ export async function POST(req: NextRequest): Promise<Response> {
 
               // Offer optional email notification on 1st message if email not provided yet
               if (currentCount === 1 && !session.email) {
-                await WhatsAppMetaClient.sendTextMessage(
-                  from,
-                  "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.\n\nWant an email notification when Gaurav replies? Simply reply with your email address below (optional)."
-                );
+                const askEmailMsg = "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.\n\nWant an email notification when Gaurav replies? Simply reply with your email address below (optional).";
+                await WhatsAppMetaClient.sendTextMessage(from, askEmailMsg);
+                void recordChatMessage(from, "assistant", askEmailMsg);
               } else {
                 // Subsequent messages (messages 2 and 3) do NOT repeatedly nag for an email
-                await WhatsAppMetaClient.sendTextMessage(
-                  from,
-                  "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly."
-                );
+                const deliveredMsg = "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.";
+                await WhatsAppMetaClient.sendTextMessage(from, deliveredMsg);
+                void recordChatMessage(from, "assistant", deliveredMsg);
               }
 
               // Dispatch real-time text-first email alert to Gaurav (including visitorEmail if captured)

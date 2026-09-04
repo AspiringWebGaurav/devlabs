@@ -12,6 +12,8 @@ import {
   FaRobot,
   FaEye,
   FaBullseye,
+  FaWhatsapp,
+  FaDownload,
 } from "react-icons/fa6";
 import { IoChatbubbleEllipses } from "react-icons/io5";
 
@@ -19,11 +21,19 @@ function PrivacyContentInner() {
   const searchParams = useSearchParams();
   const focusParam = searchParams.get("focus");
 
-  const [filterMode, setFilterMode] = useState<"all" | "contact" | "assistant">(
-    focusParam === "assistant" ? "assistant" : focusParam === "contact" ? "contact" : "all"
+  const [filterMode, setFilterMode] = useState<"all" | "contact" | "assistant" | "whatsapp">(
+    focusParam === "whatsapp"
+      ? "whatsapp"
+      : focusParam === "assistant"
+      ? "assistant"
+      : focusParam === "contact"
+      ? "contact"
+      : "all"
   );
   const [highlightedSection, setHighlightedSection] = useState<string | null>(
-    focusParam === "assistant"
+    focusParam === "whatsapp"
+      ? "whatsapp-data-export"
+      : focusParam === "assistant"
       ? "assistant-privacy"
       : focusParam === "contact"
       ? "anonymity"
@@ -36,7 +46,9 @@ function PrivacyContentInner() {
     const hash = window.location.hash.replace("#", "");
     const targetId =
       hash ||
-      (focusParam === "assistant"
+      (focusParam === "whatsapp"
+        ? "whatsapp-data-export"
+        : focusParam === "assistant"
         ? "assistant-privacy"
         : focusParam === "contact"
         ? "anonymity"
@@ -65,7 +77,7 @@ function PrivacyContentInner() {
     }
   }, [focusParam]);
 
-  const handleTabSelect = (mode: "all" | "contact" | "assistant", targetId?: string) => {
+  const handleTabSelect = (mode: "all" | "contact" | "assistant" | "whatsapp", targetId?: string) => {
     setFilterMode(mode);
     if (targetId) {
       setHighlightedSection(targetId);
@@ -130,7 +142,19 @@ function PrivacyContentInner() {
               }`}
             >
               <IoChatbubbleEllipses className="w-3 h-3 text-[#CBACF9]" />
-              <span>Personal Assistant &amp; AI Safety (Learn More)</span>
+              <span>Personal Assistant (AI)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabSelect("whatsapp", "whatsapp-data-export")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                filterMode === "whatsapp"
+                  ? "bg-[#25D366] text-black font-semibold shadow-sm shadow-[#25D366]/40"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <FaWhatsapp className={`w-3.5 h-3.5 ${filterMode === "whatsapp" ? "text-black" : "text-[#25D366]"}`} />
+              <span>WhatsApp Data Export</span>
             </button>
           </div>
         </div>
@@ -175,6 +199,24 @@ function PrivacyContentInner() {
                 <IoChatbubbleEllipses className="w-4 h-4 text-[#CBACF9] shrink-0" />
                 <span>
                   Filtering active: Spotlighting privacy architecture, ephemeral interaction safety, and data governance for Gaurav Portfolio Assistant (Beta).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFilterMode("all")}
+                className="text-purple hover:text-white underline text-xs font-semibold whitespace-nowrap cursor-pointer"
+              >
+                View full policy
+              </button>
+            </div>
+          )}
+
+          {filterMode === "whatsapp" && (
+            <div className="mt-4 p-3 rounded-xl bg-[#25D366]/15 border border-[#25D366]/30 text-xs text-neutral-200 flex items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <FaWhatsapp className="w-4 h-4 text-[#25D366] shrink-0" />
+                <span>
+                  Filtering active: Spotlighting WhatsApp Recruiter Data Rights, GDPR Article 20 Portability, and Instant ZIP Export (`/exportmydata`).
                 </span>
               </div>
               <button
@@ -480,12 +522,112 @@ function PrivacyContentInner() {
             </div>
           </section>
 
-          {/* Section 7: Administrative Subsystem Privacy Governance */}
+          {/* Section 7: WhatsApp Recruiter Data Portability & GDPR Export */}
+          {(filterMode === "all" || filterMode === "whatsapp") && (
+            <section
+              id="whatsapp-data-export"
+              className={`space-y-6 p-4 sm:p-7 rounded-2xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
+                highlightedSection === "whatsapp-data-export" || filterMode === "whatsapp"
+                  ? "bg-[#25D366]/10 border border-[#25D366]/50 shadow-[0_0_35px_rgba(37,211,102,0.18)] ring-1 ring-[#25D366]/50"
+                  : "border border-white/[0.06] bg-white/[0.02]"
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-4">
+                <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2.5">
+                  <FaWhatsapp className="w-6 h-6 text-[#25D366]" />
+                  <span>7. WhatsApp Recruiter Data Portability &amp; Self-Service Export (GDPR Art. 20)</span>
+                </h2>
+                {(highlightedSection === "whatsapp-data-export" || filterMode === "whatsapp") && (
+                  <span className="px-3 py-1 rounded-full text-[10.5px] font-mono font-bold bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/40">
+                    WhatsApp Privacy &amp; Export
+                  </span>
+                )}
+              </div>
+
+              <p className="text-sm text-neutral-300 leading-relaxed">
+                In full compliance with <strong className="text-white">GDPR Article 20 (Right to Data Portability)</strong> and the <strong className="text-white">California Consumer Privacy Act (CCPA)</strong>, visitors and recruiters interacting with Gaurav Patil via the official WhatsApp Business channel maintain absolute ownership of their communication records.
+              </p>
+
+              {/* Export Features Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-black/40 border border-white/[0.08] p-4 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#25D366]" />
+                    <h3 className="text-sm font-semibold text-white">Instant ZIP Archive</h3>
+                  </div>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Typing <code className="text-[#25D366] font-mono font-semibold">/exportmydata</code> in WhatsApp immediately triggers our server to compile an encrypted in-memory ZIP package containing your complete records with zero wait time.
+                  </p>
+                </div>
+
+                <div className="bg-black/40 border border-white/[0.08] p-4 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#CBACF9]" />
+                    <h3 className="text-sm font-semibold text-white">Visual HTML Log</h3>
+                  </div>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Includes a standalone, beautifully styled Dark Luxury HTML transcript featuring verified timestamps, speaker badges, and Gaurav Portfolio branding readable offline on any browser.
+                  </p>
+                </div>
+
+                <div className="bg-black/40 border border-white/[0.08] p-4 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <h3 className="text-sm font-semibold text-white">GDPR Certificate</h3>
+                  </div>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Every export includes an official Data Portability Certificate detailing exact UTC generation timestamps, session identifiers, compliance guarantees, and SHA-256 integrity verification.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step-by-Step Guide */}
+              <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+                <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                  <FaDownload className="w-4 h-4 text-[#25D366]" />
+                  How to Export Your WhatsApp Chat Data (2 Simple Steps)
+                </h3>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-neutral-300">
+                  <li>
+                    In your active WhatsApp conversation with Gaurav Patil, send: <code className="text-[#25D366] font-mono font-semibold bg-black/50 px-2 py-0.5 rounded">/exportmydata</code> (or <code className="text-[#25D366] font-mono font-semibold bg-black/50 px-2 py-0.5 rounded">/export</code>).
+                  </li>
+                  <li>
+                    Our system will immediately confirm with a generation notice, followed by a cryptographically signed HMAC download link. Tap the link to download your <code className="text-[#CBACF9] font-mono">.zip</code> archive directly to your device.
+                  </li>
+                </ol>
+              </div>
+
+              {/* Right to Erasure */}
+              <div className="space-y-3 bg-white/[0.02] p-4 sm:p-5 rounded-xl border border-white/[0.06]">
+                <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-400" />
+                  GDPR Article 17: Right to Immediate Erasure (STOP Command)
+                </h3>
+                <p className="text-sm text-neutral-300 leading-relaxed">
+                  You maintain full sovereignty over your information. At any point, simply reply <code className="text-red-400 font-mono font-semibold bg-black/50 px-2 py-0.5 rounded">STOP</code> to WhatsApp. Our server immediately unsubscribes your number and permanently erases all message documents and session data from our database in an atomic transaction.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-white/[0.03] border border-white/[0.08] flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-neutral-400">
+                  Reviewing legal operating standards?
+                </span>
+                <Link
+                  href="/terms?focus=whatsapp#whatsapp-terms"
+                  className="text-[#25D366] hover:underline font-semibold flex items-center gap-1"
+                >
+                  <span>View WhatsApp Terms of Service</span> &rarr;
+                </Link>
+              </div>
+            </section>
+          )}
+
+          {/* Section 8: Administrative Subsystem Privacy Governance */}
           {filterMode === "all" && (
             <section id="admin-privacy" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaShieldHalved className="w-4 h-4 text-purple" />
-                <span>7. Administrative Subsystem Privacy Governance</span>
+                <span>8. Administrative Subsystem Privacy Governance</span>
               </h2>
               <p>
                 The administrative panel (<code className="text-purple font-mono">/admin/*</code>) maintains a strictly isolated data governance architecture. Administrative authentication is restricted to authorized Superadmins via Google OAuth 2.0 PKCE. 2FA One-Time Passcodes are stored in salted HMAC-SHA256 hashed representations, and security IP verification challenges operate under an immutable 15-minute TTL. Sign-out triggers a complete 5-step detachment that clears all cookies, tokens, and browser session storage. Detailed administrative privacy protocols are documented in the <Link href="/admin/privacy" className="text-purple hover:underline font-semibold">Administrator Privacy Policy</Link>.
@@ -493,10 +635,10 @@ function PrivacyContentInner() {
             </section>
           )}
 
-          {/* Section 8: Contact */}
+          {/* Section 9: Contact */}
           <section id="contact-requests" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
             <h2 className="text-xl font-semibold text-white">
-              8. Contact &amp; Data Requests
+              9. Contact &amp; Data Requests
             </h2>
             <p>
               For any privacy inquiries, data deletion requests, or security disclosures, reach out directly to:
