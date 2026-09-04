@@ -57,6 +57,8 @@ export interface SendTransactionalEmailOptions {
   purpose?: EmailPurpose;
   identity?: EmailIdentity;
   to: EmailRecipient[];
+  cc?: EmailRecipient[];
+  bcc?: EmailRecipient[];
   subject?: string;
   htmlContent?: string;
   textContent?: string;
@@ -228,6 +230,20 @@ export async function sendTransactionalEmail(
           name: senderIdentity.name,
         },
   };
+
+  if (options.cc && options.cc.length > 0) {
+    payload.cc = options.cc.map((rec) => ({
+      email: rec.email.trim().toLowerCase(),
+      name: rec.name?.trim() || undefined,
+    }));
+  }
+
+  if (options.bcc && options.bcc.length > 0) {
+    payload.bcc = options.bcc.map((rec) => ({
+      email: rec.email.trim().toLowerCase(),
+      name: rec.name?.trim() || undefined,
+    }));
+  }
 
   if (options.templateId) {
     payload.templateId = options.templateId;
