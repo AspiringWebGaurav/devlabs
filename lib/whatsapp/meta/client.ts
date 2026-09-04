@@ -43,7 +43,8 @@ export class WhatsAppMetaClient {
   public static async sendQuickReplyButtons(
     toPhone: string,
     bodyText: string,
-    buttons: QuickReplyButton[]
+    buttons: QuickReplyButton[],
+    footerText?: string
   ): Promise<SendMessageResult> {
     return this.postGraphMessage(toPhone, {
       type: "interactive",
@@ -52,6 +53,7 @@ export class WhatsAppMetaClient {
         body: {
           text: bodyText,
         },
+        ...(footerText ? { footer: { text: footerText.slice(0, 60) } } : {}),
         action: {
           buttons: buttons.slice(0, 3).map((btn) => ({
             type: "reply",

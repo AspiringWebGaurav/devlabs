@@ -22,6 +22,7 @@ export interface WhatsAppInboundAlertParams {
   messageText: string;
   messageCount: number; // e.g. 1, 2, 3
   visitorEmail?: string;
+  isEmailRegistrationOnly?: boolean;
 }
 
 /**
@@ -58,7 +59,9 @@ export async function sendWhatsAppAdminAlert(params: WhatsAppInboundAlertParams)
       "gauravpatil5737@gmail.com";
 
     // Clean, friendly subject line without phone number or heavy brackets
-    const subject = `${safeName} wants to talk to you on WhatsApp`;
+    const subject = params.isEmailRegistrationOnly
+      ? `${safeName} added email for WhatsApp chat`
+      : `${safeName} wants to talk to you on WhatsApp`;
 
     const baseUrl = (
       process.env.NEXT_PUBLIC_APP_URL ||
@@ -83,14 +86,17 @@ export async function sendWhatsAppAdminAlert(params: WhatsAppInboundAlertParams)
     // Plain text representation
     const textContent =
       `--------------------------------------------------\n` +
-      `WHATSAPP MESSAGE (${params.messageCount} of 3)\n` +
+      (params.isEmailRegistrationOnly
+        ? `WHATSAPP CONTACT UPDATE (Email Linked)\n`
+        : `WHATSAPP MESSAGE (${params.messageCount} of 3)\n`) +
       `--------------------------------------------------\n` +
       `Name:            ${params.senderName || "Visitor"}\n` +
       `Number:          +${cleanPhone}\n` +
       (params.visitorEmail ? `Email:           ${params.visitorEmail}\n` : "") +
       `TimeStamp (IST): ${rawTime}\n\n` +
-      `Message:\n` +
-      `"${params.messageText}"\n\n` +
+      (params.isEmailRegistrationOnly
+        ? `Status:          Visitor provided email for notification\n\n`
+        : `Message:\n"${params.messageText}"\n\n`) +
       `--------------------------------------------------\n` +
       `Chat on WhatsApp: ${waReplyUrl}\n` +
       (notifyVisitorUrl ? `Notify Visitor:   ${notifyVisitorUrl}\n` : "") +
@@ -102,11 +108,11 @@ export async function sendWhatsAppAdminAlert(params: WhatsAppInboundAlertParams)
         <!-- Responsive Header (HTML Table prevents float collision on mobile Gmail) -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #E2E8F0;padding-bottom:8px;margin-bottom:12px;">
           <tr>
-            <td align="left" style="font-size:12px;font-weight:700;color:#059669;letter-spacing:0.5px;text-transform:uppercase;">
-              WhatsApp Message
+            <td align="left" style="font-size:12px;font-weight:700;color:${params.isEmailRegistrationOnly ? "#7C3AED" : "#059669"};letter-spacing:0.5px;text-transform:uppercase;">
+              ${params.isEmailRegistrationOnly ? "Contact Update" : "WhatsApp Message"}
             </td>
             <td align="right" style="font-size:12px;color:#64748B;font-weight:500;">
-              ${params.messageCount} of 3
+              ${params.isEmailRegistrationOnly ? "Email Linked" : `${params.messageCount} of 3`}
             </td>
           </tr>
         </table>
@@ -142,9 +148,9 @@ export async function sendWhatsAppAdminAlert(params: WhatsAppInboundAlertParams)
 
         <!-- Message Body (Dynamically expands vertically with text length) -->
         <div style="font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">
-          Message
+          ${params.isEmailRegistrationOnly ? "Contact Note" : "Message"}
         </div>
-        <div style="padding:10px 12px;background:#FFFFFF;border:1px solid #E2E8F0;border-left:3px solid #059669;border-radius:6px;margin-bottom:14px;color:#0F172A;font-size:13.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${safeMessage}</div>
+        <div style="padding:10px 12px;background:#FFFFFF;border:1px solid #E2E8F0;border-left:3px solid ${params.isEmailRegistrationOnly ? "#7C3AED" : "#059669"};border-radius:6px;margin-bottom:14px;color:#0F172A;font-size:13.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${safeMessage}</div>
 
         <!-- Primary Action: Direct WhatsApp Chat -->
         <div style="text-align:center;">
