@@ -161,6 +161,9 @@ export async function POST(req: NextRequest): Promise<Response> {
             buttonTitle.toLowerCase().includes("resume") ||
             normalized === "RESUME" ||
             normalized === "VIEW RESUME" ||
+            normalized === "📄 VIEW RESUME" ||
+            normalized.includes("VIEW RESUME") ||
+            normalized === "GET RESUME" ||
             normalized === "1";
 
           const isChatAction =
@@ -168,6 +171,9 @@ export async function POST(req: NextRequest): Promise<Response> {
             buttonTitle.toLowerCase().includes("chat") ||
             normalized === "CHAT" ||
             normalized === "CHAT WITH GAURAV" ||
+            normalized === "💬 CHAT WITH GAURAV" ||
+            normalized.includes("CHAT WITH GAURAV") ||
+            normalized === "TALK TO GAURAV" ||
             normalized === "2";
 
           const isGreeting =
@@ -225,13 +231,18 @@ export async function POST(req: NextRequest): Promise<Response> {
                 "You have already received Gaurav's resume above! 📄\n\nIf you'd like to talk directly with Gaurav, tap '💬 Chat with Gaurav' or send your message here."
               );
             } else {
+              // 1. Immediate visual feedback to the visitor
+              await WhatsAppMetaClient.sendTextMessage(
+                from,
+                "Please wait, sending Gaurav's resume... 📄⏳"
+              );
+
               session.hasReceivedResume = true;
-              const baseUrl = (
-                process.env.NEXT_PUBLIC_APP_URL ||
-                process.env.APP_URL ||
-                "https://gauravpatil.online"
-              ).replace(/\/+$/, "");
-              const documentUrl = `${baseUrl}/dummy_pdf.pdf`;
+
+              // 2. Canonical, high-availability public PDF URL (HTTP 200 OK, zero redirects)
+              const documentUrl =
+                process.env.WHATSAPP_RESUME_URL ||
+                "https://firebasestorage.googleapis.com/v0/b/gaurav-portfolio-improved.firebasestorage.app/o/whatsapp%2FGaurav_Patil_Resume.pdf?alt=media";
 
               const sendResult = await WhatsAppMetaClient.sendDocumentMessage(
                 from,
@@ -248,7 +259,7 @@ export async function POST(req: NextRequest): Promise<Response> {
                 );
                 await WhatsAppMetaClient.sendTextMessage(
                   from,
-                  `Here is Gaurav Patil's official resume: ${documentUrl}\n\nTo connect directly with Gaurav, tap '💬 Chat with Gaurav' or send your message below.`
+                  `Here is Gaurav Patil's resume: ${documentUrl}\n\nTo connect directly with Gaurav, tap '💬 Chat with Gaurav' or send your message below.`
                 );
               }
             }
