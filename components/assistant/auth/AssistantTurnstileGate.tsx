@@ -118,7 +118,9 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
                 sessionStorage.removeItem("gaurav_cf_circuit_broken");
               }
               cleanupWidget();
-              onVerified();
+              if (isOpen) {
+                onVerified();
+              }
             } else {
               setFailureCount((c) => {
                 const next = c + 1;
@@ -176,11 +178,14 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
       setStatus("ERROR");
       setErrorMessage("Unable to connect to verification service.");
     }
-  }, [cleanupWidget, onVerified]);
+  }, [isOpen, cleanupWidget, onVerified]);
 
-  // 3. Pre-render Cloudflare Turnstile in the background on mount
+  // 3. Render Cloudflare Turnstile when popover opens
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!isOpen || typeof window === "undefined") {
+      cleanupWidget();
+      return;
+    }
 
     // Circuit Breaker: If Cloudflare is already known to be offline/blocked in this session, switch to Fallback
     const isCircuitBroken = sessionStorage.getItem("gaurav_cf_circuit_broken") === "true";
@@ -236,7 +241,7 @@ export const AssistantTurnstileGate: React.FC<AssistantTurnstileGateProps> = ({
     }
 
     return () => cleanupWidget();
-  }, [activeSubView, forcedStatus, renderWidget, cleanupWidget]);
+  }, [isOpen, activeSubView, forcedStatus, renderWidget, cleanupWidget]);
 
   // 4. Click outside to dismiss popover (active when open)
   useEffect(() => {

@@ -256,9 +256,13 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   }, [isTurnstileSessionValid, isPreparingTurnstile]);
 
   const handleTurnstileVerified = useCallback(() => {
-    setIsTurnstileGateOpen(false);
-    setIsWindowMounted(true);
-    setIsOpen(true);
+    setIsTurnstileGateOpen((wasGateOpen) => {
+      if (wasGateOpen) {
+        setIsWindowMounted(true);
+        setIsOpen(true);
+      }
+      return false;
+    });
   }, []);
 
   const handleClose = useCallback(() => {
@@ -741,13 +745,15 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
       />
 
       {/* Cloudflare Turnstile Verification Dynamic Popover */}
-      <AssistantTurnstileGate
-        isOpen={isTurnstileGateOpen}
-        onClose={() => setIsTurnstileGateOpen(false)}
-        onVerified={handleTurnstileVerified}
-        positionMode={positionMode}
-        customPosition={customPosition}
-      />
+      {isTurnstileGateOpen && (
+        <AssistantTurnstileGate
+          isOpen={isTurnstileGateOpen}
+          onClose={() => setIsTurnstileGateOpen(false)}
+          onVerified={handleTurnstileVerified}
+          positionMode={positionMode}
+          customPosition={customPosition}
+        />
+      )}
     </>
   );
 };
