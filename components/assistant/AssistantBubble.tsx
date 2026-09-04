@@ -14,6 +14,14 @@ interface DragCoordinates {
   y: number;
 }
 
+interface PointerOrigin {
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  scrollY: number;
+  time: number;
+}
+
 export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isWindowMounted, setIsWindowMounted] = useState(false);
@@ -28,8 +36,10 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const dragStartRef = useRef<{ pointerX: number; pointerY: number; bubbleX: number; bubbleY: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const isTouchScrollingRef = useRef(false);
+  const pointerOriginRef = useRef<PointerOrigin | null>(null);
+  const hasMovedPastThresholdRef = useRef(false);
+  const wasCanceledRef = useRef(false);
+  const lastScrollTimestampRef = useRef(0);
   const isPageScrollingRef = useRef(false);
   const scrollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const prepIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -56,19 +66,22 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     }
   }, []);
 
-  // Passive window scroll listener: tracks if page is currently actively scrolling
+  // Continuous scroll & wheel listener: tracks active scrolling and maintains 550ms lockout buffer
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onWindowScroll = () => {
+    const onScrollOrWheel = () => {
+      lastScrollTimestampRef.current = Date.now();
       isPageScrollingRef.current = true;
       if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
       scrollTimerRef.current = setTimeout(() => {
         isPageScrollingRef.current = false;
-      }, 300);
+      }, 550);
     };
-    window.addEventListener("scroll", onWindowScroll, { passive: true });
+    window.addEventListener("scroll", onScrollOrWheel, { passive: true });
+    window.addEventListener("wheel", onScrollOrWheel, { passive: true });
     return () => {
-      window.removeEventListener("scroll", onWindowScroll);
+      window.removeEventListener("scroll", onScrollOrWheel);
+      window.removeEventListener("wheel", onScrollOrWheel);
       if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     };
   }, []);
@@ -264,42 +277,70 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     }
   }, []);
 
-  // 7. Touch gesture separation (Differentiates between scrolling swipe and deliberate tap)
+  // 7. Touch gesture handling: tracks start coordinates & scrollY to filter out swipe-scrolling
   const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
     const touch = e.touches[0];
     if (touch) {
-      touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-      isTouchScrollingRef.current = false;
+      pointerOriginRef.current = {
+        pointerId: 0,
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        scrollY: typeof window !== "undefined" ? window.scrollY : 0,
+        time: Date.now(),
+      };
+      hasMovedPastThresholdRef.current = false;
+      wasCanceledRef.current = false;
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLButtonElement>) => {
-    if (!touchStartRef.current) return;
+    if (!pointerOriginRef.current) return;
     const touch = e.touches[0];
     if (touch) {
-      const dx = Math.abs(touch.clientX - touchStartRef.current.x);
-      const dy = Math.abs(touch.clientY - touchStartRef.current.y);
-      if (dx > 6 || dy > 6) {
-        isTouchScrollingRef.current = true;
+      const dx = Math.abs(touch.clientX - pointerOriginRef.current.clientX);
+      const dy = Math.abs(touch.clientY - pointerOriginRef.current.clientY);
+      if (dx >= DRAG_THRESHOLD_PX || dy >= DRAG_THRESHOLD_PX) {
+        hasMovedPastThresholdRef.current = true;
       }
+    }
+    if (
+      typeof window !== "undefined" &&
+      Math.abs(window.scrollY - pointerOriginRef.current.scrollY) > 1.5
+    ) {
+      hasMovedPastThresholdRef.current = true;
     }
   };
 
   const handleTouchEnd = () => {
-    touchStartRef.current = null;
-    if (isTouchScrollingRef.current) {
-      // Retain lockout briefly so trailing synthetic click is blocked
-      setTimeout(() => {
-        isTouchScrollingRef.current = false;
-      }, 300);
+    if (pointerOriginRef.current && typeof window !== "undefined") {
+      if (Math.abs(window.scrollY - pointerOriginRef.current.scrollY) > 1.5) {
+        hasMovedPastThresholdRef.current = true;
+      }
     }
   };
 
-  // 8. Pointer Drag Controller (Draggable mode only)
+  const handleTouchCancel = () => {
+    wasCanceledRef.current = true;
+    hasMovedPastThresholdRef.current = true;
+    pointerOriginRef.current = null;
+  };
+
+  // 8. Pointer Drag & Interaction Controller
   const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.pointerType === "mouse") {
       setIsHovered(true);
     }
+
+    pointerOriginRef.current = {
+      pointerId: e.pointerId,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      scrollY: typeof window !== "undefined" ? window.scrollY : 0,
+      time: Date.now(),
+    };
+    hasMovedPastThresholdRef.current = false;
+    wasCanceledRef.current = false;
+
     if (positionMode !== "draggable") return;
 
     const btn = triggerButtonRef.current;
@@ -321,11 +362,24 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (positionMode !== "draggable" || !dragStartRef.current) return;
+    if (!pointerOriginRef.current) return;
 
-    const dx = e.clientX - dragStartRef.current.pointerX;
-    const dy = e.clientY - dragStartRef.current.pointerY;
+    const dx = e.clientX - pointerOriginRef.current.clientX;
+    const dy = e.clientY - pointerOriginRef.current.clientY;
     const distance = Math.hypot(dx, dy);
+
+    if (distance >= DRAG_THRESHOLD_PX) {
+      hasMovedPastThresholdRef.current = true;
+    }
+
+    if (
+      typeof window !== "undefined" &&
+      Math.abs(window.scrollY - pointerOriginRef.current.scrollY) > 1.5
+    ) {
+      hasMovedPastThresholdRef.current = true;
+    }
+
+    if (positionMode !== "draggable" || !dragStartRef.current) return;
 
     if (distance >= DRAG_THRESHOLD_PX) {
       hasDraggedRef.current = true;
@@ -339,6 +393,14 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
     setIsHovered(false);
+
+    if (pointerOriginRef.current && typeof window !== "undefined") {
+      const scrollDelta = Math.abs(window.scrollY - pointerOriginRef.current.scrollY);
+      if (scrollDelta > 1.5) {
+        hasMovedPastThresholdRef.current = true;
+      }
+    }
+
     if (positionMode !== "draggable") return;
 
     try {
@@ -357,6 +419,9 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const handlePointerCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
     setIsHovered(false);
+    wasCanceledRef.current = true;
+    hasMovedPastThresholdRef.current = true;
+    pointerOriginRef.current = null;
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {}
@@ -365,28 +430,98 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     setIsDragging(false);
   };
 
-  // 9. Clean, Rock-Solid Click Handler: Only opens on intentional tap/click when NOT scrolling or dragging
+  // Passive wheel event handler: marks active scroll immediately
+  const handleWheel = () => {
+    lastScrollTimestampRef.current = Date.now();
+    isPageScrollingRef.current = true;
+  };
+
+  // Spacebar protection: prevents keyboard spacebar scrolling from activating button click
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+      if (typeof window !== "undefined") {
+        window.scrollBy({ top: window.innerHeight * 0.75, behavior: "smooth" });
+      }
+    }
+  };
+
+  // 9. Clean, Rock-Solid Click Handler: 9-Layer Defense
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    // Block if touch gesture was a scroll
-    if (isTouchScrollingRef.current) {
+    // Layer 1: Block untrusted / synthetic clicks
+    if (!e.isTrusted) {
       e.preventDefault();
       e.stopPropagation();
-      isTouchScrollingRef.current = false;
       return;
     }
 
-    // Block if page is actively scrolling
+    // Layer 2: Global Scroll Lockout: Reject clicks within 550ms of any window scroll or wheel
+    const timeSinceLastScroll = Date.now() - lastScrollTimestampRef.current;
+    if (timeSinceLastScroll < 550) {
+      e.preventDefault();
+      e.stopPropagation();
+      pointerOriginRef.current = null;
+      return;
+    }
+
+    // Layer 3: Block if page is actively scrolling
     if (isPageScrollingRef.current) {
       e.preventDefault();
       e.stopPropagation();
+      pointerOriginRef.current = null;
       return;
     }
 
-    // Block if draggable movement occurred
-    if (hasDraggedRef.current) {
+    // Layer 4: Block if gesture was canceled by the browser (touch/scroll takeover)
+    if (wasCanceledRef.current) {
       e.preventDefault();
       e.stopPropagation();
+      wasCanceledRef.current = false;
+      pointerOriginRef.current = null;
+      return;
+    }
+
+    // Layer 5: Block if pointer moved past displacement threshold or draggable displacement occurred
+    if (hasMovedPastThresholdRef.current || hasDraggedRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      hasMovedPastThresholdRef.current = false;
       hasDraggedRef.current = false;
+      pointerOriginRef.current = null;
+      return;
+    }
+
+    // Layer 6: Mandatory verified pointerdown origin requirement
+    if (!pointerOriginRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    const { clientX, clientY, scrollY, time } = pointerOriginRef.current;
+    pointerOriginRef.current = null; // Consume immediately
+
+    // Layer 7: Window scroll delta verification: if window scrolled by > 1.5px, it was a page scroll
+    const currentScrollY = typeof window !== "undefined" ? window.scrollY : 0;
+    if (Math.abs(currentScrollY - scrollY) > 1.5) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    // Layer 8: Physical distance moved verification
+    const distanceMoved = Math.hypot(e.clientX - clientX, e.clientY - clientY);
+    if (distanceMoved >= DRAG_THRESHOLD_PX) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    // Layer 9: Deliberate tap duration verification (30ms - 850ms)
+    const tapDuration = Date.now() - time;
+    if (tapDuration < 30 || tapDuration > 850) {
+      e.preventDefault();
+      e.stopPropagation();
       return;
     }
 
@@ -429,10 +564,13 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchCancel}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
+            onWheel={handleWheel}
+            onKeyDown={handleKeyDown}
             initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7, y: 16 }}
             animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
             exit={
