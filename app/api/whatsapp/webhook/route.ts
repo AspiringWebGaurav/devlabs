@@ -661,8 +661,8 @@ export async function POST(req: NextRequest): Promise<Response> {
                 await WhatsAppMetaClient.sendTextMessage(from, linkedMsg);
                 void recordChatMessage(from, "assistant", linkedMsg);
 
-                // Send dedicated "Contact Update (Email Linked)" alert to Gaurav with 1-click reply button
-                void sendWhatsAppAdminAlert({
+                // Send dedicated "Contact Update (Email Linked)" alert to Gaurav immediately
+                await sendWhatsAppAdminAlert({
                   senderName,
                   senderPhone: from,
                   messageText: `Visitor registered email for WhatsApp chat: ${detectedEmail}`,
@@ -683,8 +683,8 @@ export async function POST(req: NextRequest): Promise<Response> {
                 await WhatsAppMetaClient.sendTextMessage(from, receivedEmailMsg);
                 void recordChatMessage(from, "assistant", receivedEmailMsg);
 
-                // Send full inquiry alert to Gaurav with visitorEmail attached
-                void sendWhatsAppAdminAlert({
+                // Send full inquiry alert to Gaurav with visitorEmail attached immediately
+                await sendWhatsAppAdminAlert({
                   senderName,
                   senderPhone: from,
                   messageText: textBody || rawInput,
@@ -718,9 +718,9 @@ export async function POST(req: NextRequest): Promise<Response> {
                 void recordChatMessage(from, "assistant", deliveredMsg);
               }
 
-              // Dispatch real-time text-first email alert to Gaurav (including visitorEmail if captured)
+              // Dispatch real-time text-first email alert to Gaurav immediately
               const senderName = value.contacts?.[0]?.profile?.name || "WhatsApp Visitor";
-              void sendWhatsAppAdminAlert({
+              await sendWhatsAppAdminAlert({
                 senderName,
                 senderPhone: from,
                 messageText: textBody || rawInput,

@@ -10,6 +10,7 @@
 
 import { firestoreDataSource } from "@/lib/dal/datasource/firestore";
 import { adminLogger } from "@/lib/admin/logger";
+import { formatSubmissionTimestamp } from "@/lib/email";
 
 export interface WhatsAppNotificationRecord {
   id: string;
@@ -17,10 +18,16 @@ export interface WhatsAppNotificationRecord {
   visitorEmail: string;
   visitorName: string;
   subject: string;
-  status: "DELIVERED" | "FAILED";
+  status: "DELIVERED" | "FAILED" | "PROCESSING";
   timestamp: string; // ISO 8601 string
   createdAt: number; // Unix timestamp in milliseconds
   error?: string;
+}
+
+export interface AtomicNotificationDispatchResult {
+  shouldSend: boolean;
+  isAlreadySent: boolean;
+  record: WhatsAppNotificationRecord;
 }
 
 const COLLECTION_NAME = "whatsapp_notifications";
@@ -145,6 +152,147 @@ export class WhatsAppNotificationsRepository {
     } catch (err) {
       adminLogger.error("WhatsAppNotificationsRepository:recordNotificationWithId", err, "Failed to record notification with ID", { id });
       return newRecord;
+    }
+  }
+
+  /**
+   * Atomically claims a reply notification dispatch within a single Firestore transaction.
+   * Prevents race conditions from rapid multiple clicks (e.g. double or triple click)
+   * and blocks duplicate email sends for the same visitor session.
+   */
+  public async claimNotificationDispatch(
+    dispatchId: string,
+    phone: string,
+    email: string,
+    name: string
+  ): Promise<AtomicNotificationDispatchResult> {
+    const cleanPhone = phone.replace(/[^0-9]/g, "");
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = (name || "Visitor").trim();
+    const now = Date.now();
+    const nowTimestamp = formatSubmissionTimestamp();
+
+    try {
+      return await firestoreDataSource.runTransaction(async (transaction, db) => {
+        // 1. Direct dispatch ID check: Has this exact link already been processed?
+        const notifRef = db.collection(COLLECTION_NAME).doc(dispatchId);
+        const notifSnap = await transaction.get(notifRef);
+
+        if (notifSnap.exists) {
+          const data = notifSnap.data() as WhatsAppNotificationRecord;
+          return {
+            shouldSend: false,
+            isAlreadySent: true,
+            record: data,
+          };
+        }
+
+        // 2. Visitor session deduplication: Was this visitor notified within the last 15 minutes?
+        const sessionRef = db.collection("whatsapp_sessions").doc(cleanPhone);
+        const sessionSnap = await transaction.get(sessionRef);
+
+        if (sessionSnap.exists) {
+          const sessionData = sessionSnap.data() || {};
+          const lastRepliedAt = typeof sessionData.lastRepliedNotificationAt === "number"
+            ? sessionData.lastRepliedNotificationAt
+            : 0;
+
+          if (now - lastRepliedAt < 15 * 60 * 1000) {
+            const existingTs = sessionData.lastRepliedNotificationTimestamp || nowTimestamp;
+            const resolvedRecord: WhatsAppNotificationRecord = {
+              id: dispatchId,
+              visitorPhone: cleanPhone,
+              visitorEmail: cleanEmail,
+              visitorName: cleanName,
+              subject: "Gaurav Patil replied to your message on WhatsApp",
+              status: "DELIVERED",
+              timestamp: existingTs,
+              createdAt: lastRepliedAt,
+            };
+            transaction.set(notifRef, resolvedRecord);
+
+            return {
+              shouldSend: false,
+              isAlreadySent: true,
+              record: resolvedRecord,
+            };
+          }
+        }
+
+        // 3. First time! Claim the atomic lock right now inside the transaction!
+        const initialRecord: WhatsAppNotificationRecord = {
+          id: dispatchId,
+          visitorPhone: cleanPhone,
+          visitorEmail: cleanEmail,
+          visitorName: cleanName,
+          subject: "Gaurav Patil replied to your message on WhatsApp",
+          status: "PROCESSING",
+          timestamp: nowTimestamp,
+          createdAt: now,
+        };
+
+        transaction.set(notifRef, initialRecord);
+
+        // Update session timestamp atomically
+        transaction.set(
+          sessionRef,
+          {
+            lastRepliedNotificationAt: now,
+            lastRepliedNotificationTimestamp: nowTimestamp,
+          },
+          { merge: true }
+        );
+
+        return {
+          shouldSend: true,
+          isAlreadySent: false,
+          record: initialRecord,
+        };
+      });
+    } catch (err) {
+      adminLogger.error("WhatsAppNotificationsRepository:claimNotificationDispatch", err, "Atomic claim failed, falling back to read", { dispatchId });
+      const existing = await this.getNotificationById(dispatchId);
+      if (existing) {
+        return { shouldSend: false, isAlreadySent: true, record: existing };
+      }
+      return {
+        shouldSend: true,
+        isAlreadySent: false,
+        record: {
+          id: dispatchId,
+          visitorPhone: cleanPhone,
+          visitorEmail: cleanEmail,
+          visitorName: cleanName,
+          subject: "Gaurav Patil replied to your message on WhatsApp",
+          status: "PROCESSING",
+          timestamp: nowTimestamp,
+          createdAt: now,
+        },
+      };
+    }
+  }
+
+  /**
+   * Finalizes the notification dispatch status after Brevo delivery completes.
+   */
+  public async finalizeNotificationDispatch(
+    dispatchId: string,
+    success: boolean,
+    error?: string
+  ): Promise<void> {
+    try {
+      await firestoreDataSource.setDocument(
+        COLLECTION_NAME,
+        dispatchId,
+        {
+          status: success ? "DELIVERED" : "FAILED",
+          error: error || null,
+          updatedAt: Date.now(),
+        },
+        true
+      );
+    } catch (err) {
+      adminLogger.error("WhatsAppNotificationsRepository:finalizeNotificationDispatch", err, "Failed to finalize dispatch status", { dispatchId });
     }
   }
 }

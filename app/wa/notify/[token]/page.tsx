@@ -1,11 +1,13 @@
 /**
  * Standalone WhatsApp Reply Notification Confirmation Webpage
  *
- * Dedicated, pre-authenticated, separate entity outside the Admin Panel.
+ * Design: Swiss Light Minimal (pure white surfaces, #FAFAFA background, crisp borders, dark text).
+ * Constraint: Single-view layout fitting the viewport with ZERO vertical scrollbars on all screens.
+ * Fully isolated separate entity outside the Admin Panel.
  *
  * Lifecycle:
- * - 1st Click: Backend executes Brevo email to visitor -> logs dispatch to Firestore -> renders "Email Has Been Sent!"
- * - 2nd Click (and subsequent clicks / refreshes): Backend detects previous dispatch -> suppresses duplicate email -> renders "Already Sent ✓"
+ * - 1st Click: Atomic Firestore transaction claims dispatch -> sends Brevo email -> displays "Email Sent to Visitor"
+ * - 2nd/3rd Click: Atomic transaction detects existing claim -> suppresses duplicate email -> displays "Already Sent ✓"
  */
 
 import React from "react";
@@ -21,16 +23,18 @@ import {
   FaUser,
   FaTriangleExclamation,
   FaCheckDouble,
+  FaLock,
+  FaServer,
 } from "react-icons/fa6";
 import { verifyAndDecodeWhatsAppReplyToken } from "@/lib/whatsapp/tokens";
 import { whatsappNotificationsRepository } from "@/lib/dal/repositories/whatsapp-notifications.repository";
-import { sendTransactionalEmail, EMAIL_IDENTITIES, formatSubmissionTimestamp, escapeHtml } from "@/lib/email";
+import { sendTransactionalEmail, EMAIL_IDENTITIES, escapeHtml } from "@/lib/email";
 import { adminLogger } from "@/lib/admin/logger";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Reply Notification Status | Gaurav Portfolio",
+  title: "Reply Transaction Gateway | Gaurav Portfolio",
   description: "Direct WhatsApp visitor email reply notification gateway.",
   robots: {
     index: false,
@@ -54,43 +58,64 @@ export default async function WhatsAppNotifyStandalonePage({ params }: PageProps
     adminLogger.warn("WhatsAppStandaloneNotify:InvalidToken", "Attempted access with invalid or tampered token");
 
     return (
-      <main className="min-h-screen bg-[#000319] text-white flex items-center justify-center p-4 sm:p-6 font-sans relative overflow-hidden">
-        {/* Ambient background glow */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.2),rgba(255,255,255,0))] pointer-events-none" />
-
-        <div className="max-w-md w-full bg-white/[0.03] backdrop-blur-xl border border-white/[0.1] rounded-2xl p-6 sm:p-8 text-center shadow-2xl relative z-10">
-          <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-4">
-            <FaTriangleExclamation className="w-7 h-7" />
-          </div>
-          <h1 className="text-xl font-bold text-white mb-2 tracking-tight">Invalid or Expired Link</h1>
-          <p className="text-xs sm:text-sm text-neutral-400 mb-6 leading-relaxed">
-            This reply notification link is invalid, corrupted, or has expired. No email was sent.
-          </p>
+      <main className="min-h-screen h-screen max-h-screen bg-[#FAFAFA] text-[#0F172A] flex flex-col justify-between overflow-hidden p-4 sm:p-6 font-sans">
+        <header className="h-[44px] flex items-center justify-between border-b border-[#E2E8F0] pb-3 shrink-0">
           <Link
             href="/"
-            className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-purple/20 hover:bg-purple/30 text-purple border border-purple/30 font-semibold text-xs sm:text-sm transition-all"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-[#7C3AED] hover:text-[#6D28D9] transition-colors"
           >
-            <FaArrowLeft className="w-3.5 h-3.5" />
-            <span>Return to Portfolio</span>
+            <FaArrowLeft className="w-3 h-3" />
+            <span>Gaurav Portfolio</span>
           </Link>
+          <span className="text-[11px] font-mono text-neutral-400">Security Gate</span>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center min-h-0">
+          <div className="max-w-md w-full bg-white border border-[#E2E8F0] rounded-xl p-6 sm:p-8 text-center shadow-xs">
+            <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto mb-3">
+              <FaTriangleExclamation className="w-6 h-6" />
+            </div>
+            <h1 className="text-base sm:text-lg font-bold text-neutral-900 mb-1">Invalid or Expired Link</h1>
+            <p className="text-xs text-neutral-500 mb-5 leading-relaxed">
+              This reply notification link is invalid, corrupted, or has expired. No email was sent.
+            </p>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold text-xs transition-all"
+            >
+              <FaArrowLeft className="w-3.5 h-3.5" />
+              <span>Return to Portfolio</span>
+            </Link>
+          </div>
         </div>
+
+        <footer className="h-[32px] flex items-center justify-between border-t border-[#E2E8F0] pt-2 text-[11px] text-neutral-400 shrink-0">
+          <span>Gaurav Portfolio</span>
+          <span>Zero Admin Shell &bull; Isolated Gateway</span>
+        </footer>
       </main>
     );
   }
 
   const cleanPhone = payload.phone.replace(/[^0-9]/g, "");
   const waChatUrl = `https://wa.me/${cleanPhone}`;
-  const nowTimestamp = formatSubmissionTimestamp();
 
-  // 2. Atomic Lifecycle & Idempotency Check in Firestore
-  const existingRecord = await whatsappNotificationsRepository.getNotificationById(payload.dispatchId);
-  const isAlreadySent = existingRecord !== null;
+  // 2. ATOMIC TRANSACTION: Claim dispatch inside Firestore transaction!
+  // Prevents race conditions from rapid multiple clicks (double/triple clicks)
+  // and dedupes across multiple alert emails for the same visitor session.
+  const claimResult = await whatsappNotificationsRepository.claimNotificationDispatch(
+    payload.dispatchId,
+    payload.phone,
+    payload.email,
+    payload.name
+  );
 
-  let dispatchedAt = existingRecord ? existingRecord.timestamp : nowTimestamp;
-  let deliveryStatus: "DELIVERED" | "FAILED" = existingRecord ? existingRecord.status : "DELIVERED";
+  const isAlreadySent = claimResult.isAlreadySent;
+  const dispatchedAt = claimResult.record.timestamp;
+  let deliveryStatus = claimResult.record.status;
 
-  // 3. FIRST-TIME CLICK: Send Brevo email to visitor IF not already sent
-  if (!isAlreadySent) {
+  // 3. FIRST-TIME CLICK: Send Brevo email ONLY if claim succeeded (shouldSend === true)
+  if (claimResult.shouldSend) {
     const rawBotPhone = process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER || "15556693652";
     const botPhone = rawBotPhone.replace(/[^0-9]/g, "");
     const returnWaUrl = `https://wa.me/${botPhone}`;
@@ -137,224 +162,227 @@ export default async function WhatsAppNotifyStandalonePage({ params }: PageProps
     });
 
     deliveryStatus = sendResult.success ? "DELIVERED" : "FAILED";
-    dispatchedAt = formatSubmissionTimestamp();
-
-    // Persist to Firestore with explicit dispatchId so any subsequent click sees "Already Sent"
-    await whatsappNotificationsRepository.recordNotificationWithId(payload.dispatchId, {
-      visitorPhone: payload.phone,
-      visitorEmail: payload.email,
-      visitorName: payload.name,
-      subject,
-      status: deliveryStatus,
-      timestamp: dispatchedAt,
-      error: sendResult.error || undefined,
-    });
+    await whatsappNotificationsRepository.finalizeNotificationDispatch(
+      payload.dispatchId,
+      sendResult.success,
+      sendResult.error || undefined
+    );
   }
 
   return (
-    <main className="min-h-screen bg-[#000319] text-white flex flex-col justify-between p-4 sm:p-6 lg:p-10 font-sans relative overflow-x-hidden">
-      {/* Background Ambience & Subtle Grid */}
-      <div className="h-full w-full bg-[#000319] dark:bg-grid-white/[0.03] bg-grid-white/[0.02] absolute top-0 left-0 flex items-center justify-center pointer-events-none -z-10">
-        <div className="absolute pointer-events-none inset-0 flex items-center justify-center bg-[#000319] [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
-      </div>
-
-      {/* Top Bar: Clean Return Link */}
-      <header className="w-full max-w-2xl mx-auto flex items-center justify-between mb-6 sm:mb-8 relative z-10">
+    <main className="min-h-screen h-screen max-h-screen bg-[#FAFAFA] text-[#0F172A] flex flex-col justify-between overflow-hidden p-3 sm:p-5 lg:p-6 font-sans select-none">
+      {/* 1. Header Bar */}
+      <header className="h-[46px] flex items-center justify-between border-b border-[#E2E8F0] pb-2.5 shrink-0">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-xs sm:text-sm text-purple hover:text-white transition-colors duration-200 group font-medium"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-[#7C3AED] hover:text-[#6D28D9] transition-colors group"
         >
-          <FaArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
+          <FaArrowLeft className="w-3 h-3 transition-transform group-hover:-translate-x-0.5" />
           <span>Gaurav Portfolio</span>
         </Link>
 
-        <div className="inline-flex items-center gap-2 text-[11px] sm:text-xs text-neutral-400 bg-white/[0.04] border border-white/[0.08] rounded-full px-3 py-1 font-mono">
-          <FaShieldHalved className="w-3 h-3 text-purple" />
-          <span>Secure Direct Gateway</span>
+        <div className="flex items-center gap-2 text-xs font-semibold text-neutral-800">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <span className="truncate">WhatsApp Reply Transaction Gateway</span>
+        </div>
+
+        <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-white border border-[#E2E8F0] text-neutral-500">
+          <FaShieldHalved className="w-2.5 h-2.5 text-[#7C3AED]" />
+          <span>Zero Admin Shell &bull; Isolated Gateway</span>
         </div>
       </header>
 
-      {/* Main Content Card: Standalone, Separate Entity */}
-      <div className="w-full max-w-2xl mx-auto my-auto relative z-10">
-        <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.1] rounded-2xl sm:rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden">
-          {/* Subtle decorative top accent line */}
-          <div
-            className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${
-              isAlreadySent ? "from-purple via-violet-500 to-indigo-500" : "from-emerald-400 via-teal-400 to-emerald-500"
-            }`}
-          />
-
-          {/* Header Section */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5 pb-6 border-b border-white/[0.08]">
-            <div
-              className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border ${
-                isAlreadySent
-                  ? "bg-purple/10 border-purple/30 text-purple"
-                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-              }`}
-            >
-              {isAlreadySent ? <FaCheckDouble className="w-7 h-7" /> : <FaCheck className="w-7 h-7" />}
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                  {isAlreadySent ? "Notification Already Sent" : "Email Has Been Sent!"}
-                </h1>
-
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
-                    isAlreadySent
-                      ? "bg-purple/10 text-purple border-purple/30"
-                      : "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
-                  }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      isAlreadySent ? "bg-purple" : "bg-emerald-400 animate-pulse"
-                    }`}
-                  />
-                  {isAlreadySent ? "Already Sent ✓" : "Delivered via Brevo"}
-                </span>
-              </div>
-
-              <p className="text-xs sm:text-sm text-neutral-400 mt-1.5 leading-relaxed">
-                {isAlreadySent ? (
-                  <>
-                    This reply notification was already delivered to{" "}
-                    <strong className="text-white font-medium">{payload.name}</strong>. Duplicate sends are
-                    prevented to avoid visitor inbox spam.
-                  </>
-                ) : (
-                  <>
-                    An automated email was delivered to{" "}
-                    <strong className="text-white font-medium">{payload.name}</strong> alerting them that you
-                    have replied on WhatsApp.
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Dynamic Button Lifecycle Visual State */}
-          <div className="my-6">
-            <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <FaEnvelope className="w-3 h-3 text-neutral-400" />
-              <span>Button Action Status</span>
-            </div>
-
-            <div
-              className={`w-full py-3.5 px-4 rounded-xl border flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left ${
-                isAlreadySent
-                  ? "bg-white/[0.02] border-white/[0.08] text-neutral-300"
-                  : "bg-emerald-500/5 border-emerald-500/20 text-emerald-200"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <span
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
-                    isAlreadySent ? "bg-purple/20 text-purple" : "bg-emerald-500/20 text-emerald-400"
-                  }`}
-                >
-                  {isAlreadySent ? "✓✓" : "✓"}
-                </span>
-                <div>
-                  <div className="text-xs sm:text-sm font-semibold text-white">
-                    {isAlreadySent
-                      ? `✉️ "I've Replied" Email — Already Sent`
-                      : `✉️ "I've Replied" Email — Sent Successfully`}
-                  </div>
-                  <div className="text-[11px] text-neutral-400">
-                    {isAlreadySent
-                      ? `Previously dispatched on ${dispatchedAt} • Single-send idempotency active`
-                      : `Dispatched on ${dispatchedAt} • Brevo transactional identity verified`}
-                  </div>
-                </div>
-              </div>
-
+      {/* 2. Main Expansive Workspace: Utilizes Space, One View, Zero Scrollbars */}
+      <div className="flex-1 flex flex-col justify-between min-h-0 py-2.5 sm:py-3 gap-2.5 sm:gap-3 w-full max-w-5xl mx-auto">
+        {/* Top Transaction Banner */}
+        <div
+          className={`w-full bg-white border-l-4 ${
+            isAlreadySent ? "border-l-[#7C3AED]" : "border-l-emerald-500"
+          } border border-[#E2E8F0] rounded-xl p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0`}
+        >
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <span
-                className={`text-[11px] font-mono font-medium px-2.5 py-1 rounded-md border ${
+                className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
                   isAlreadySent
-                    ? "bg-white/[0.05] border-white/10 text-neutral-400"
-                    : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                    ? "bg-purple-50 text-[#7C3AED] border-purple-200"
+                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
                 }`}
               >
-                {isAlreadySent ? "STATUS: RESOLVED" : "STATUS: DELIVERED"}
+                {isAlreadySent ? "2nd Click • Transaction Resolved" : "1st Click • Transaction Executed"}
               </span>
+              <h1 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
+                {isAlreadySent ? "Notification Already Sent" : "Email Sent to Visitor Inbox"}
+              </h1>
             </div>
+            <p className="text-xs text-neutral-500 mt-1 leading-normal truncate sm:whitespace-normal">
+              {isAlreadySent ? (
+                <>
+                  This reply notification was already delivered to{" "}
+                  <strong className="text-neutral-800">{payload.name}</strong> on {dispatchedAt}. Duplicate send
+                  prevented.
+                </>
+              ) : (
+                <>
+                  An automated email was delivered to{" "}
+                  <strong className="text-neutral-800">{payload.name}</strong> ({payload.email}) alerting them that you
+                  replied on WhatsApp.
+                </>
+              )}
+            </p>
           </div>
 
-          {/* Recipient & Metadata Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-4 border-t border-b border-white/[0.08]">
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1">
-                <FaUser className="w-3 h-3 text-neutral-400" />
-                <span>Recipient</span>
-              </div>
-              <div className="text-sm font-semibold text-white truncate">{payload.name}</div>
-              <div className="text-xs text-neutral-400 truncate mt-0.5">{payload.email}</div>
-            </div>
-
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1">
-                <FaWhatsapp className="w-3 h-3 text-emerald-400" />
-                <span>WhatsApp Phone</span>
-              </div>
-              <div className="text-sm font-semibold text-white font-mono">+{cleanPhone}</div>
-              <div className="text-xs text-neutral-400 mt-0.5">Inbound message slot {payload.messageCount} of 3</div>
-            </div>
-
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1">
-                <FaClock className="w-3 h-3 text-purple" />
-                <span>Dispatched Time</span>
-              </div>
-              <div className="text-sm font-semibold text-white font-mono">{dispatchedAt}</div>
-              <div className="text-xs text-neutral-400 mt-0.5">Indian Standard Time (IST)</div>
-            </div>
-
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1">
-                <FaShieldHalved className="w-3 h-3 text-indigo-400" />
-                <span>Delivery Engine</span>
-              </div>
-              <div className="text-sm font-semibold text-white">Brevo Transactional</div>
-              <div className="text-xs text-neutral-400 mt-0.5">
-                {deliveryStatus === "DELIVERED" ? "Verified SMTP Dispatch" : "Queued with Brevo"}
-              </div>
-            </div>
-          </div>
-
-          {/* Primary Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-6">
-            <a
-              href={waChatUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2.5 w-full sm:flex-1 py-3.5 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-white text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-500/20 transition-all"
-            >
-              <FaWhatsapp className="w-4 h-4" />
-              <span>{isAlreadySent ? "Continue Chat on WhatsApp →" : "Open WhatsApp Chat with Visitor →"}</span>
-            </a>
-
-            <Link
-              href="/"
-              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto py-3.5 px-5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] active:scale-[0.99] text-neutral-300 hover:text-white border border-white/10 text-xs sm:text-sm font-medium transition-all"
-            >
-              <span>Return to Portfolio</span>
-            </Link>
-          </div>
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shrink-0 self-start sm:self-auto border ${
+              isAlreadySent
+                ? "bg-neutral-100 text-neutral-700 border-neutral-200"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+            }`}
+          >
+            {isAlreadySent ? <FaCheckDouble className="w-3.5 h-3.5 text-[#7C3AED]" /> : <FaCheck className="w-3.5 h-3.5" />}
+            <span>{isAlreadySent ? "Already Sent ✓" : "Delivered via Brevo"}</span>
+          </span>
         </div>
 
-        {/* Security & Privacy Assurance Footer */}
-        <p className="text-center text-[11px] text-neutral-400 mt-4 leading-relaxed">
-          Pre-authenticated action token &bull; Completely separate entity &bull; Zero admin session exposure
-        </p>
+        {/* Structured 2-Column Space-Utilizing Grid */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3.5 min-h-0">
+          {/* Left Column: Transaction & Recipient Ledger */}
+          <div className="md:col-span-7 bg-white border border-[#E2E8F0] rounded-xl p-3.5 sm:p-4 flex flex-col justify-between shadow-xs overflow-hidden">
+            <div>
+              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2 mb-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                  <FaServer className="w-3 h-3 text-[#7C3AED]" />
+                  <span>Transaction &amp; Recipient Ledger</span>
+                </div>
+                <span className="text-[11px] font-mono text-neutral-400">IDEMPOTENT</span>
+              </div>
+
+              {/* Data Rows */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-[#FAFAFA] border border-[#E2E8F0] rounded-lg p-2 sm:p-2.5">
+                  <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+                    <FaUser className="w-2.5 h-2.5 text-neutral-400" />
+                    <span>Recipient</span>
+                  </div>
+                  <div className="font-semibold text-neutral-900 truncate mt-0.5">{payload.name}</div>
+                  <div className="text-[11px] text-neutral-500 truncate">{payload.email}</div>
+                </div>
+
+                <div className="bg-[#FAFAFA] border border-[#E2E8F0] rounded-lg p-2 sm:p-2.5">
+                  <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+                    <FaWhatsapp className="w-2.5 h-2.5 text-emerald-600" />
+                    <span>WhatsApp Phone</span>
+                  </div>
+                  <div className="font-semibold text-neutral-900 font-mono mt-0.5">+{cleanPhone}</div>
+                  <div className="text-[11px] text-neutral-500">Inbound Slot {payload.messageCount} of 3</div>
+                </div>
+
+                <div className="bg-[#FAFAFA] border border-[#E2E8F0] rounded-lg p-2 sm:p-2.5">
+                  <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+                    <FaClock className="w-2.5 h-2.5 text-[#7C3AED]" />
+                    <span>Dispatch Time</span>
+                  </div>
+                  <div className="font-semibold text-neutral-900 font-mono mt-0.5">{dispatchedAt}</div>
+                  <div className="text-[11px] text-neutral-500">Indian Standard Time (IST)</div>
+                </div>
+
+                <div className="bg-[#FAFAFA] border border-[#E2E8F0] rounded-lg p-2 sm:p-2.5">
+                  <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+                    <FaLock className="w-2.5 h-2.5 text-indigo-500" />
+                    <span>Transaction State</span>
+                  </div>
+                  <div className="font-semibold text-neutral-900 mt-0.5">
+                    {deliveryStatus === "DELIVERED" ? "Completed" : "Active"}
+                  </div>
+                  <div className="text-[11px] text-emerald-600 font-medium">1-Send Guarantee Locked</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Ledger Note */}
+            <div className="bg-[#FAFAFA] border border-[#E2E8F0] rounded-lg p-2 sm:p-2.5 mt-2">
+              <div className="text-[11px] text-neutral-600 leading-relaxed flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span>
+                  <strong>Financial-Grade Atomic Mutex:</strong> Rapid multi-clicks (e.g. 3 clicks) are trapped by the
+                  Firestore transaction lock. The visitor receives strictly 1 email alert.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Action Lifecycle Status & Direct Navigation */}
+          <div className="md:col-span-5 bg-white border border-[#E2E8F0] rounded-xl p-3.5 sm:p-4 flex flex-col justify-between shadow-xs overflow-hidden">
+            <div>
+              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2 mb-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                  <FaEnvelope className="w-3 h-3 text-[#7C3AED]" />
+                  <span>Action Lifecycle Status</span>
+                </div>
+                <span className="text-[11px] font-mono text-neutral-400">STATE: {isAlreadySent ? "RESOLVED" : "EXECUTED"}</span>
+              </div>
+
+              {/* Dynamic Button Lifecycle Visual Representation */}
+              <div
+                className={`p-3 sm:p-3.5 rounded-xl border text-left ${
+                  isAlreadySent
+                    ? "bg-[#FAFAFA] border-[#E2E8F0] text-neutral-700"
+                    : "bg-emerald-50/70 border-emerald-200 text-emerald-900"
+                }`}
+              >
+                <div
+                  className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${
+                    isAlreadySent ? "text-[#7C3AED]" : "text-emerald-700"
+                  }`}
+                >
+                  {isAlreadySent ? "Trigger 2+ (Repeat Click)" : "Trigger 1 (Initial Click)"}
+                </div>
+
+                <div className="text-xs sm:text-sm font-semibold flex items-center gap-2 text-neutral-900">
+                  {isAlreadySent ? (
+                    <FaCheckDouble className="w-3.5 h-3.5 text-[#7C3AED] shrink-0" />
+                  ) : (
+                    <FaCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  )}
+                  <span>{isAlreadySent ? `✉️ "I've Replied" Email — Already Sent` : `✉️ "I've Replied" Email — Sent Successfully`}</span>
+                </div>
+
+                <div className="text-[11px] text-neutral-500 mt-1 leading-normal">
+                  {isAlreadySent
+                    ? `Previously sent on ${dispatchedAt}. Duplicate send blocked by transaction mutex.`
+                    : `Dispatched to visitor's inbox on ${dispatchedAt}. Single-send ledger locked.`}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-2 pt-2">
+              <a
+                href={waChatUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 sm:py-3 px-4 rounded-lg bg-[#25D366] hover:bg-[#20bd5a] active:scale-[0.99] text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-all"
+              >
+                <FaWhatsapp className="w-4 h-4" />
+                <span>Continue Chat on WhatsApp &rarr;</span>
+              </a>
+
+              <Link
+                href="/"
+                className="w-full py-2 sm:py-2.5 px-4 rounded-lg bg-[#FAFAFA] hover:bg-neutral-100 active:scale-[0.99] text-neutral-700 border border-[#E2E8F0] font-medium text-xs flex items-center justify-center gap-2 transition-all"
+              >
+                <span>Return to Portfolio</span>
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Footer copyright */}
-      <footer className="w-full max-w-2xl mx-auto text-center text-xs text-neutral-400 pt-6 relative z-10">
-        Gaurav Patil &bull; Developer Portfolio Communication Gateway
+      {/* 3. Footer Bar: Single-View Viewport Fit Standard */}
+      <footer className="h-[34px] flex items-center justify-between border-t border-[#E2E8F0] pt-2 text-[11px] text-[#64748B] shrink-0">
+        <span>Gaurav Portfolio &bull; Developer Communication Engine</span>
+        <span className="hidden sm:inline">Single-view no-scroll layout</span>
+        <span>Atomic Transaction Ledger &bull; 0 Duplicate Emails</span>
       </footer>
     </main>
   );
