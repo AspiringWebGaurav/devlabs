@@ -15,6 +15,7 @@
 import crypto from "crypto";
 import { sendTransactionalEmail, EMAIL_IDENTITIES, formatSubmissionTimestamp, escapeHtml } from "@/lib/email";
 import { adminLogger } from "@/lib/admin/logger";
+import { getWhatsAppBaseUrl } from "./config/whatsapp.config";
 
 export interface WhatsAppInboundAlertParams {
   senderName: string;
@@ -63,11 +64,7 @@ export async function sendWhatsAppAdminAlert(params: WhatsAppInboundAlertParams)
       ? `${safeName} added email for WhatsApp chat`
       : `${safeName} wants to talk to you on WhatsApp`;
 
-    const baseUrl = (
-      process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.APP_URL ||
-      "https://www.gauravpatil.online"
-    ).replace(/\/+$/, "");
+    const baseUrl = getWhatsAppBaseUrl();
 
     // Construct secure 1-click visitor email notification link IF visitor provided an email
     let notifyVisitorUrl = "";

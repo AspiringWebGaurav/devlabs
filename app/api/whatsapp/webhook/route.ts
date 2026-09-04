@@ -19,6 +19,7 @@ import { sendWhatsAppAdminAlert } from "@/lib/whatsapp/notifications";
 import { getAdminFirestore } from "@/lib/admin/firebase-admin";
 import { adminLogger } from "@/lib/admin/logger";
 import { createExportSignature } from "@/lib/whatsapp/export/generator";
+import { getWhatsAppBaseUrl } from "@/lib/whatsapp/config/whatsapp.config";
 import type { MetaWebhookPayload } from "@/lib/whatsapp/types";
 
 export const dynamic = "force-dynamic";
@@ -159,25 +160,29 @@ const GREETING_TEXT =
 
 const GREETING_FOOTER = "Reply STOP to opt out • /guidelines for rules";
 
-const GUIDELINES_TEXT =
-  "📜 *GAURAV PATIL PORTFOLIO — CHAT GUIDELINES & RULES*\n\n" +
-  "1. 💬 *Direct Inquiries*\n" +
-  "   You can send up to 3 direct inquiries. Each message is delivered straight to Gaurav in real time with an instant alert.\n\n" +
-  "2. 📄 *Verified Resume*\n" +
-  "   Tap \"View Resume\" to receive Gaurav's verified official PDF resume directly in this chat.\n\n" +
-  "3. 🛑 *Opt-Out & Opt-In*\n" +
-  "   • Type *STOP* to unsubscribe and clear your session anytime.\n" +
-  "   • Type *START* or *HI* to restart the conversation anytime.\n\n" +
-  "4. ✉️ *Reply Notifications*\n" +
-  "   Share your email when prompted to receive an alert the moment Gaurav replies.\n\n" +
-  "5. 📜 *Terms & Conditions*\n" +
-  "   Read our official WhatsApp Channel Terms:\n" +
-  "   👉 https://www.gauravpatil.online/terms?focus=whatsapp#whatsapp-terms\n\n" +
-  "6. 📦 *Data Portability & Export Rights*\n" +
-  "   Under GDPR Art. 20, you have the full right to export your entire chat data (.zip).\n" +
-  "   • Type */exportmydata* to download your complete archive\n" +
-  "   • Or visit our portal: https://www.gauravpatil.online/privacy?focus=whatsapp#whatsapp-data-export\n\n" +
-  "💡 *Select an option below or send your message to begin:*";
+function getGuidelinesText(): string {
+  const baseUrl = getWhatsAppBaseUrl();
+  return (
+    "📜 *GAURAV PATIL PORTFOLIO — CHAT GUIDELINES & RULES*\n\n" +
+    "1. 💬 *Direct Inquiries*\n" +
+    "   You can send up to 3 direct inquiries. Each message is delivered straight to Gaurav in real time with an instant alert.\n\n" +
+    "2. 📄 *Verified Resume*\n" +
+    "   Tap \"View Resume\" to receive Gaurav's verified official PDF resume directly in this chat.\n\n" +
+    "3. 🛑 *Opt-Out & Opt-In*\n" +
+    "   • Type *STOP* to unsubscribe and clear your session anytime.\n" +
+    "   • Type *START* or *HI* to restart the conversation anytime.\n\n" +
+    "4. ✉️ *Reply Notifications*\n" +
+    "   Share your email when prompted to receive an alert the moment Gaurav replies.\n\n" +
+    "5. 📜 *Terms & Conditions*\n" +
+    "   Read our official WhatsApp Channel Terms:\n" +
+    `   👉 ${baseUrl}/terms?focus=whatsapp#whatsapp-terms\n\n` +
+    "6. 📦 *Data Portability & Export Rights*\n" +
+    "   Under GDPR Art. 20, you have the full right to export your entire chat data (.zip).\n" +
+    "   • Type */exportmydata* to download your complete archive\n" +
+    `   • Or visit our portal: ${baseUrl}/privacy?focus=whatsapp#whatsapp-data-export\n\n` +
+    "💡 *Select an option below or send your message to begin:*"
+  );
+}
 
 /**
  * GET: Handles Meta's webhook subscription verification handshake
@@ -421,11 +426,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             // Stage 2: Generate signed download link and dispatch archive details
             const cleanKey = from.replace(/[^0-9]/g, "");
             const sig = createExportSignature(from);
-            const baseUrl = (
-              process.env.NEXT_PUBLIC_APP_URL ||
-              process.env.APP_URL ||
-              "https://www.gauravpatil.online"
-            ).replace(/\/+$/, "");
+            const baseUrl = getWhatsAppBaseUrl();
             const downloadUrl = `${baseUrl}/api/whatsapp/export?phone=${cleanKey}&sig=${sig}`;
 
             const exportMessage =
@@ -445,13 +446,14 @@ export async function POST(req: NextRequest): Promise<Response> {
           // 4. /terms -> WhatsApp Channel Terms of Service
           // -------------------------------------------------------------
           else if (isTermsAction) {
+            const baseUrl = getWhatsAppBaseUrl();
             const termsMessage =
               "📜 *GAURAV PATIL PORTFOLIO — WHATSAPP CHANNEL TERMS*\n\n" +
               "• Purpose: Direct professional networking & recruiter inquiries\n" +
               "• Message Quota: Up to 3 direct inquiries per session\n" +
               "• Opt-Out Anytime: Send STOP to unsubscribe & erase data\n\n" +
               "👉 *Read Full Terms of Service:*\n" +
-              "https://www.gauravpatil.online/terms?focus=whatsapp#whatsapp-terms";
+              `${baseUrl}/terms?focus=whatsapp#whatsapp-terms`;
 
             await WhatsAppMetaClient.sendTextMessage(from, termsMessage);
             void recordChatMessage(from, "assistant", termsMessage);
@@ -462,7 +464,8 @@ export async function POST(req: NextRequest): Promise<Response> {
           // Dispatches comprehensive guidelines text followed by quick-reply action buttons
           // -------------------------------------------------------------
           else if (isGuidelinesAction) {
-            await WhatsAppMetaClient.sendTextMessage(from, GUIDELINES_TEXT);
+            const guidelines = getGuidelinesText();
+            await WhatsAppMetaClient.sendTextMessage(from, guidelines);
             await WhatsAppMetaClient.sendQuickReplyButtons(
               from,
               "Select an option below to proceed:",
@@ -472,7 +475,7 @@ export async function POST(req: NextRequest): Promise<Response> {
               ],
               GREETING_FOOTER
             );
-            void recordChatMessage(from, "assistant", GUIDELINES_TEXT);
+            void recordChatMessage(from, "assistant", guidelines);
           }
 
           // -------------------------------------------------------------
@@ -603,7 +606,8 @@ export async function POST(req: NextRequest): Promise<Response> {
 
               if (isOnlyEmail) {
                 // SCENARIO 2: Late email registration (ZERO message slot penalty)
-                const linkedMsg = `Got it! We've linked your email (${detectedEmail}) to your conversation. You will receive an email the moment Gaurav replies.\n\nYou can continue chatting here anytime or visit the portfolio: https://www.gauravpatil.online`;
+                const baseUrl = getWhatsAppBaseUrl();
+                const linkedMsg = `Got it! We've linked your email (${detectedEmail}) to your conversation. You will receive an email the moment Gaurav replies.\n\nYou can continue chatting here anytime or visit the portfolio: ${baseUrl}`;
                 await WhatsAppMetaClient.sendTextMessage(from, linkedMsg);
                 void recordChatMessage(from, "assistant", linkedMsg);
 

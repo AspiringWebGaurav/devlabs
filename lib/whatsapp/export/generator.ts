@@ -10,6 +10,7 @@
 
 import crypto from "crypto";
 import { createZipArchive, type ZipFileEntry } from "./zip";
+import { getWhatsAppBaseUrl } from "../config/whatsapp.config";
 
 export interface ExportMessageRecord {
   id: string;
@@ -62,7 +63,7 @@ export function generateReadmeCertificate(session: ExportSessionData): string {
     `DATA CONTROLLER INFORMATION:\n` +
     `-----------------------------------------------------------------------\n` +
     `Data Controller:    Gaurav Patil (Full-Stack Engineer & System Architect)\n` +
-    `Official Website:   https://www.gauravpatil.online\n` +
+    `Official Website:   ${getWhatsAppBaseUrl()}\n` +
     `Security Contact:   security@gauravpatil.online\n` +
     `Legal Channel:      hello@gauravpatil.online\n\n` +
     `DATA SUBJECT DETAILS:\n` +
@@ -325,7 +326,7 @@ export function generateHtmlTranscript(
     </div>
 
     <div class="footer">
-      Official Portfolio Communication &bull; <a href="https://www.gauravpatil.online" target="_blank" rel="noopener noreferrer">gauravpatil.online</a> &bull; Data Controller: Gaurav Patil
+      Official Portfolio Communication &bull; <a href="${getWhatsAppBaseUrl()}" target="_blank" rel="noopener noreferrer">${getWhatsAppBaseUrl().replace(/^https?:\/\//, "")}</a> &bull; Data Controller: Gaurav Patil
     </div>
   </div>
 </body>
