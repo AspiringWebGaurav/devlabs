@@ -184,12 +184,12 @@ function getGuidelinesText(): string {
     "4. ✉️ *Reply Notifications*\n" +
     "   Share your email when prompted to receive an alert the moment Gaurav replies.\n\n" +
     "5. 📜 *Terms & Conditions*\n" +
-    "   Read our official WhatsApp Channel Terms:\n" +
+    "   Read the official WhatsApp Channel Terms:\n" +
     `   👉 ${baseUrl}/terms?focus=whatsapp#whatsapp-terms\n\n` +
     "6. 📦 *Data Portability & Export Rights*\n" +
     "   Under GDPR Art. 20, you have the full right to export your entire chat data (.zip).\n" +
     "   • Type */exportmydata* to download your complete archive\n" +
-    `   • Or visit our portal: ${baseUrl}/privacy?focus=whatsapp#whatsapp-data-export\n\n` +
+    `   • Or visit the portfolio portal: ${baseUrl}/privacy?focus=whatsapp#whatsapp-data-export\n\n` +
     "💡 *Select an option below or send your message to begin:*"
   );
 }
@@ -458,7 +458,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
             const exportMessage =
               "📦 *Your Official Data Archive is Ready!*\n\n" +
-              "Under GDPR Article 20 and global privacy standards, we have packaged your complete conversation data:\n" +
+              "Under GDPR Article 20 and global privacy standards, your complete conversation data has been packaged by the automated system:\n" +
               "• 📁 Self-Contained Folder (clean unzipping)\n" +
               "• 📜 Visual Chat Transcript (HTML)\n" +
               "• 💾 Machine-Readable JSON Export\n" +
@@ -533,8 +533,8 @@ export async function POST(req: NextRequest): Promise<Response> {
             const documentUrl = process.env.WHATSAPP_RESUME_URL || directResumeUrl;
 
             const caption = isReSend
-              ? "Here is Gaurav Patil's official resume again! 📄\n\nFeel free to review or download it. To connect directly, tap 'Chat with Gaurav' or type your message below — I will deliver it directly to Gaurav in real time."
-              : "Here is Gaurav Patil's official resume! 📄\n\nFeel free to review it. To connect directly, tap 'Chat with Gaurav' or type your message below — I will deliver it directly to Gaurav in real time.";
+              ? "Here is Gaurav Patil's official resume again! 📄\n\nFeel free to review or download it. To connect directly, tap 'Chat with Gaurav' or type your message below — the automated system will deliver it directly to Gaurav in real time."
+              : "Here is Gaurav Patil's official resume! 📄\n\nFeel free to review it. To connect directly, tap 'Chat with Gaurav' or type your message below — the automated system will deliver it directly to Gaurav in real time.";
 
             const sendResult = await WhatsAppMetaClient.sendDocumentMessage(
               from,
@@ -657,7 +657,10 @@ export async function POST(req: NextRequest): Promise<Response> {
               if (isOnlyEmail) {
                 // SCENARIO 2: Late email registration (ZERO message slot penalty)
                 const baseUrl = getWhatsAppBaseUrl();
-                const linkedMsg = `Got it! We've linked your email (${detectedEmail}) to your conversation. You will receive an email the moment Gaurav replies.\n\nYou can continue chatting here anytime or visit the portfolio: ${baseUrl}`;
+                const linkedMsg =
+                  `✅ *Email Linked Successfully!*\n\n` +
+                  `*_${detectedEmail}_* is saved in the automated system. You will receive an instant email alert the moment Gaurav replies.\n\n` +
+                  `Feel free to continue chatting here anytime, or explore the portfolio:\n${baseUrl}`;
                 await WhatsAppMetaClient.sendTextMessage(from, linkedMsg);
                 void recordChatMessage(from, "assistant", linkedMsg);
 
@@ -679,7 +682,9 @@ export async function POST(req: NextRequest): Promise<Response> {
                   await saveVisitorSession(from, session);
                 }
 
-                const receivedEmailMsg = `Thank you! Your message has been delivered to Gaurav and we've saved your email (${detectedEmail}) to notify you the moment he replies.`;
+                const receivedEmailMsg =
+                  `Thank you! Your message has been delivered directly to *Gaurav*.\n\n` +
+                  `✅ *_${detectedEmail}_* is saved in the automated system to notify your inbox the moment he replies.`;
                 await WhatsAppMetaClient.sendTextMessage(from, receivedEmailMsg);
                 void recordChatMessage(from, "assistant", receivedEmailMsg);
 
@@ -706,16 +711,24 @@ export async function POST(req: NextRequest): Promise<Response> {
 
               const currentCount = session.messageCount;
 
-              // Offer optional email notification on 1st message if email not provided yet
+              // 1. First: Send clean message delivery confirmation
+              const deliveredMsg =
+                "Thank you! Your message has been delivered directly to *Gaurav*. He will review it and reply to your WhatsApp shortly.";
+              await WhatsAppMetaClient.sendTextMessage(from, deliveredMsg);
+              void recordChatMessage(from, "assistant", deliveredMsg);
+
+              // 2. Second: Send separate, eye-catchy email submission prompt (ONLY on message 1 if email not provided yet)
               if (currentCount === 1 && !session.email) {
-                const askEmailMsg = "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.\n\nWant an email notification when Gaurav replies? Simply reply with your email address below (optional).";
-                await WhatsAppMetaClient.sendTextMessage(from, askEmailMsg);
-                void recordChatMessage(from, "assistant", askEmailMsg);
-              } else {
-                // Subsequent messages (messages 2 and 3) do NOT repeatedly nag for an email
-                const deliveredMsg = "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.";
-                await WhatsAppMetaClient.sendTextMessage(from, deliveredMsg);
-                void recordChatMessage(from, "assistant", deliveredMsg);
+                // Short 350ms delay to ensure Meta delivers bubble 1 first, then bubble 2 in chronological sequence
+                await new Promise((resolve) => setTimeout(resolve, 350));
+
+                const eyeCatchyEmailPrompt =
+                  "🔔 *Want an instant email alert when Gaurav replies?*\n\n" +
+                  "If you might step away from WhatsApp, simply reply with *your email address below* (e.g. _name@example.com_).\n\n" +
+                  "⚡ *The automated system will notify your inbox the moment Gaurav responds!* _(Optional)_";
+
+                await WhatsAppMetaClient.sendTextMessage(from, eyeCatchyEmailPrompt);
+                void recordChatMessage(from, "assistant", eyeCatchyEmailPrompt);
               }
 
               // Dispatch real-time text-first email alert to Gaurav immediately
