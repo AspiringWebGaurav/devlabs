@@ -355,6 +355,8 @@ export async function POST(req: NextRequest): Promise<Response> {
             normalized.includes("TERMS");
 
           const isGreeting =
+            !session.inChatMode &&
+            session.messageCount === 0 &&
             !isResumeAction &&
             !isChatAction &&
             !isGuidelinesAction &&
@@ -393,9 +395,14 @@ export async function POST(req: NextRequest): Promise<Response> {
           }
 
           // -------------------------------------------------------------
-          // 2. "START" -> Reset session and show greeting with footer
+          // 2. "START" / "CLEAR" / "RESET" -> Reset session and show fresh greeting
           // -------------------------------------------------------------
-          else if (normalized === "START") {
+          else if (
+            normalized === "START" ||
+            normalized === "CLEAR" ||
+            normalized === "RESET" ||
+            normalized === "RESTART"
+          ) {
             session.hasReceivedResume = false;
             session.messageCount = 0;
             session.inChatMode = false;
@@ -423,20 +430,23 @@ export async function POST(req: NextRequest): Promise<Response> {
             await WhatsAppMetaClient.sendTextMessage(from, waitMsg);
             void recordChatMessage(from, "assistant", waitMsg);
 
-            // Stage 2: Generate signed download link and dispatch archive details
+            // Stage 2: Generate signed 10-minute ephemeral download link and dispatch archive details
             const cleanKey = from.replace(/[^0-9]/g, "");
-            const sig = createExportSignature(from);
+            const expires = Date.now() + 10 * 60 * 1000; // 10 minutes expiry window
+            const sig = createExportSignature(from, expires);
             const baseUrl = getWhatsAppBaseUrl();
-            const downloadUrl = `${baseUrl}/api/whatsapp/export?phone=${cleanKey}&sig=${sig}`;
+            const downloadUrl = `${baseUrl}/api/whatsapp/export?phone=${cleanKey}&expires=${expires}&sig=${sig}`;
 
             const exportMessage =
               "📦 *Your Official Data Archive is Ready!*\n\n" +
               "Under GDPR Article 20 and global privacy standards, we have packaged your complete conversation data:\n" +
+              "• 📁 Self-Contained Folder (clean unzipping)\n" +
               "• 📜 Visual Chat Transcript (HTML)\n" +
               "• 💾 Machine-Readable JSON Export\n" +
-              "• 🛡️ Data Portability Certificate\n\n" +
+              "• 🛡️ Data Portability Certificate\n" +
+              "• 🔒 Telemetry & Security Audit\n\n" +
               `👉 *Tap to Download Your ZIP Archive:*\n${downloadUrl}\n\n` +
-              "🔒 *This link is cryptographically signed and strictly bound to your number.*";
+              "⏳ *Security Notice: This link expires in 10 minutes (strictly bound to your number).* If it expires, simply type */exportmydata* to generate a fresh link.";
 
             await WhatsAppMetaClient.sendTextMessage(from, exportMessage);
             void recordChatMessage(from, "assistant", exportMessage);
@@ -479,45 +489,65 @@ export async function POST(req: NextRequest): Promise<Response> {
           }
 
           // -------------------------------------------------------------
-          // 6. Option 1: "View Resume" (Consumed once per session)
+          // 6. Option 1: "View Resume" (Always delivers verified PDF)
+          // Dynamically acknowledges whether it's the first delivery or a re-send
           // -------------------------------------------------------------
           else if (isResumeAction) {
-            if (session.hasReceivedResume) {
-              const alreadyMsg =
-                "You have already received Gaurav's resume above! 📄\n\nTo connect directly, tap 'Chat with Gaurav' above ⬆️ or simply type your message here — I will deliver it directly to Gaurav in real time.";
-              await WhatsAppMetaClient.sendTextMessage(from, alreadyMsg);
-              void recordChatMessage(from, "assistant", alreadyMsg);
-            } else {
-              // 1. Immediate visual feedback to the visitor
-              const waitMsg = "Please wait, sending Gaurav's resume... 📄⏳";
-              await WhatsAppMetaClient.sendTextMessage(from, waitMsg);
-              void recordChatMessage(from, "assistant", waitMsg);
+            const isReSend = Boolean(session.hasReceivedResume);
 
-              session.hasReceivedResume = true;
-              await saveVisitorSession(from, session);
+            // 1. Immediate dynamic feedback to the visitor
+            const waitMsg = isReSend
+              ? "Please wait, re-sending Gaurav's verified resume... 📄⏳"
+              : "Please wait, sending Gaurav's verified resume... 📄⏳";
+            await WhatsAppMetaClient.sendTextMessage(from, waitMsg);
+            void recordChatMessage(from, "assistant", waitMsg);
 
-              // 2. Canonical, high-availability public PDF URL (HTTP 200 OK, zero redirects)
-              const documentUrl =
-                process.env.WHATSAPP_RESUME_URL ||
-                "https://firebasestorage.googleapis.com/v0/b/gaurav-portfolio-improved.firebasestorage.app/o/whatsapp%2FGaurav_Patil_Resume.pdf?alt=media";
+            session.hasReceivedResume = true;
+            session.lastActivityAt = Date.now();
+            await saveVisitorSession(from, session);
 
-              const caption =
-                "Here is Gaurav Patil's official resume! 📄\n\nFeel free to review it. To connect directly, tap 'Chat with Gaurav' above ⬆️ or simply type your message below — I will deliver it directly to Gaurav in real time.";
-              const sendResult = await WhatsAppMetaClient.sendDocumentMessage(
+            // 2. Canonical, high-availability public PDF URL
+            const baseUrl = getWhatsAppBaseUrl();
+            const directResumeUrl = `${baseUrl}/resume.pdf`;
+            const firebaseResumeUrl =
+              "https://firebasestorage.googleapis.com/v0/b/gaurav-portfolio-improved.firebasestorage.app/o/whatsapp%2FGaurav_Patil_Resume.pdf?alt=media";
+            const documentUrl = process.env.WHATSAPP_RESUME_URL || directResumeUrl;
+
+            const caption = isReSend
+              ? "Here is Gaurav Patil's official resume again! 📄\n\nFeel free to review or download it. To connect directly, tap 'Chat with Gaurav' or type your message below — I will deliver it directly to Gaurav in real time."
+              : "Here is Gaurav Patil's official resume! 📄\n\nFeel free to review it. To connect directly, tap 'Chat with Gaurav' or type your message below — I will deliver it directly to Gaurav in real time.";
+
+            const sendResult = await WhatsAppMetaClient.sendDocumentMessage(
+              from,
+              documentUrl,
+              "Gaurav_Patil_Resume.pdf",
+              caption
+            );
+            void recordChatMessage(from, "assistant", caption);
+
+            if (!sendResult.success) {
+              adminLogger.warn(
+                "WhatsApp:ResumeSendFallback",
+                "Primary document send failed, attempting secondary document source",
+                { error: sendResult.error, primaryUrl: documentUrl }
+              );
+
+              // Attempt secondary document source
+              const secondaryUrl = documentUrl === directResumeUrl ? firebaseResumeUrl : directResumeUrl;
+              const secondaryResult = await WhatsAppMetaClient.sendDocumentMessage(
                 from,
-                documentUrl,
+                secondaryUrl,
                 "Gaurav_Patil_Resume.pdf",
                 caption
               );
-              void recordChatMessage(from, "assistant", caption);
 
-              if (!sendResult.success) {
+              if (!secondaryResult.success) {
                 adminLogger.warn(
-                  "WhatsApp:ResumeSendFallback",
-                  "Document send failed; sending direct URL link fallback",
-                  { error: sendResult.error }
+                  "WhatsApp:ResumeSendDirectLinkFallback",
+                  "Both document sources failed; sending direct URL link fallback",
+                  { error: secondaryResult.error }
                 );
-                const fallbackMsg = `Here is Gaurav Patil's resume: ${documentUrl}\n\nTo connect directly, tap 'Chat with Gaurav' above ⬆️ or send your message below.`;
+                const fallbackMsg = `Here is Gaurav Patil's resume: ${directResumeUrl}\n\nTo connect directly, tap 'Chat with Gaurav' or send your message below.`;
                 await WhatsAppMetaClient.sendTextMessage(from, fallbackMsg);
                 void recordChatMessage(from, "assistant", fallbackMsg);
               }

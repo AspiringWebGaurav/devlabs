@@ -35,20 +35,24 @@ export function createZipArchive(files: ZipFileEntry[]): Buffer {
     (now.getDate() & 0x1f);
 
   for (const file of files) {
+    const isDir = Boolean(file.name.endsWith("/"));
     const nameBuf = Buffer.from(file.name, "utf8");
-    const contentBuf = Buffer.isBuffer(file.content)
+    const contentBuf = isDir
+      ? Buffer.alloc(0)
+      : Buffer.isBuffer(file.content)
       ? file.content
       : Buffer.from(file.content, "utf8");
 
-    const crc = zlib.crc32(contentBuf);
-    const compressed = zlib.deflateRawSync(contentBuf);
+    const crc = isDir ? 0 : zlib.crc32(contentBuf);
+    const compressed = isDir ? Buffer.alloc(0) : zlib.deflateRawSync(contentBuf);
+    const compMethod = isDir ? 0 : 8; // 0 = Stored (directory), 8 = Deflate (file)
 
     // 1. Local File Header (30 bytes + filename)
     const localHeader = Buffer.alloc(30 + nameBuf.length);
     localHeader.writeUInt32LE(0x04034b50, 0); // Local header signature (PK\x03\x04)
     localHeader.writeUInt16LE(20, 4); // Version needed (2.0)
     localHeader.writeUInt16LE(0x0800, 6); // General purpose bit flag (UTF-8 filename enabled)
-    localHeader.writeUInt16LE(8, 8); // Compression method (8 = Deflate)
+    localHeader.writeUInt16LE(compMethod, 8); // Compression method
     localHeader.writeUInt16LE(dosTime, 10); // Last mod file time
     localHeader.writeUInt16LE(dosDate, 12); // Last mod file date
     localHeader.writeUInt32LE(crc, 14); // CRC-32
@@ -66,7 +70,7 @@ export function createZipArchive(files: ZipFileEntry[]): Buffer {
     centralHeader.writeUInt16LE(20, 4); // Version made by
     centralHeader.writeUInt16LE(20, 6); // Version needed
     centralHeader.writeUInt16LE(0x0800, 8); // Flags (UTF-8 enabled)
-    centralHeader.writeUInt16LE(8, 10); // Compression method
+    centralHeader.writeUInt16LE(compMethod, 10); // Compression method
     centralHeader.writeUInt16LE(dosTime, 12); // Last mod time
     centralHeader.writeUInt16LE(dosDate, 14); // Last mod date
     centralHeader.writeUInt32LE(crc, 16); // CRC-32
@@ -77,7 +81,12 @@ export function createZipArchive(files: ZipFileEntry[]): Buffer {
     centralHeader.writeUInt16LE(0, 32); // File comment length
     centralHeader.writeUInt16LE(0, 34); // Disk number start
     centralHeader.writeUInt16LE(0, 36); // Internal file attributes
-    centralHeader.writeUInt32LE(0, 38); // External file attributes
+    // External file attributes: 0x10 is MS-DOS directory attribute, (0x41ed << 16) is Unix drwxr-xr-x
+    // For files: 0x20 is MS-DOS archive attribute, (0x81a4 << 16) is Unix -rw-r--r--
+    const externalAttr = isDir
+      ? (((0x41ed * 65536) | 0x10) >>> 0)
+      : (((0x81a4 * 65536) | 0x20) >>> 0);
+    centralHeader.writeUInt32LE(externalAttr, 38); // External file attributes
     centralHeader.writeUInt32LE(offset, 42); // Relative offset of local header
     nameBuf.copy(centralHeader, 46);
 
