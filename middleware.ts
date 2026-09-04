@@ -13,10 +13,14 @@ export async function middleware(request: NextRequest) {
     const sessionCookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
     const verifiedSession = sessionCookie ? await verifyAdminSession(sessionCookie) : null;
     const isAuthenticated = verifiedSession !== null;
+    const isSignedWhatsAppNotify =
+      pathname === "/admin/whatsapp/notify" && Boolean(request.nextUrl.searchParams.get("sig"));
+
     const isPublicAdminRoute =
       pathname === "/admin/login" ||
       pathname === "/admin/terms" ||
-      pathname === "/admin/privacy";
+      pathname === "/admin/privacy" ||
+      isSignedWhatsAppNotify;
 
     const isOtpRoute = pathname === "/admin/otp";
     const otpChallengeCookie = request.cookies.get("admin_otp_challenge")?.value;

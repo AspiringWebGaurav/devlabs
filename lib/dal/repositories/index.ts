@@ -10,3 +10,4 @@ export * from "./mail.repository";
 export * from "./live-chat-challenges.repository";
 export * from "./live-chat-sessions.repository";
 export * from "./purge.repository";
+export * from "./whatsapp-notifications.repository";

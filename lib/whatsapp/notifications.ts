@@ -63,7 +63,7 @@ export async function sendWhatsAppAdminAlert(params: WhatsAppInboundAlertParams)
     const baseUrl = (
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.APP_URL ||
-      "https://gauravpatil.online"
+      "https://www.gauravpatil.online"
     ).replace(/\/+$/, "");
 
     // Construct secure 1-click visitor email notification link IF visitor provided an email
@@ -77,7 +77,7 @@ export async function sendWhatsAppAdminAlert(params: WhatsAppInboundAlertParams)
         name: params.senderName || "Visitor",
         sig,
       });
-      notifyVisitorUrl = `${baseUrl}/api/whatsapp/notify-visitor?${searchParams.toString()}`;
+      notifyVisitorUrl = `${baseUrl}/admin/whatsapp/notify?${searchParams.toString()}`;
     }
 
     // Plain text representation
