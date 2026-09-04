@@ -6,8 +6,9 @@
  * - POST: HMAC-SHA256 signature verification and direct message replies.
  * - In-memory session tracking with zero Redis, zero DB, and zero circuit breakers.
  * - 2-button interactive menu: [ 📄 View Resume ] (consumed once) & [ 💬 Chat with Gaurav ].
- * - Free-form messaging up to 3 messages with real-time text-first email alert to Gaurav.
- * - Strict rate limit on 4th message and beyond.
+ * - Free-form messaging up to 3 messages with real-time email alert to Gaurav.
+ * - Optional visitor email capture for "I've Replied" notifications.
+ * - Strict rate limit on 4th message and beyond (counters concealed from visitor).
  */
 
 import { NextRequest } from "next/server";
@@ -25,6 +26,7 @@ interface VisitorSession {
   hasReceivedResume: boolean;
   messageCount: number; // 0, 1, 2, 3
   inChatMode: boolean;
+  email?: string;
   lastActivityAt: number;
 }
 
@@ -55,6 +57,11 @@ function getVisitorSession(from: string): VisitorSession {
 
   return session;
 }
+
+const GREETING_TEXT =
+  "Hello! Thank you for reaching out.\n\n" +
+  "I am Gaurav's automated assistant, built to connect you directly with him.\n\n" +
+  "How would you like to proceed? Please select an option below:";
 
 /**
  * GET: Handles Meta's webhook subscription verification handshake
@@ -210,10 +217,11 @@ export async function POST(req: NextRequest): Promise<Response> {
             session.hasReceivedResume = false;
             session.messageCount = 0;
             session.inChatMode = false;
+            session.email = undefined;
 
             await WhatsAppMetaClient.sendQuickReplyButtons(
               from,
-              "Hello! Thanks for reaching out. 👋\n\nI am Gaurav's Automated Assistant, built by Gaurav to help you connect instantly.\n\nHow would you like to proceed? Please tap an option below:",
+              GREETING_TEXT,
               [
                 { id: "btn_resume", title: "📄 View Resume" },
                 { id: "btn_chat", title: "💬 Chat with Gaurav" },
@@ -228,7 +236,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             if (session.hasReceivedResume) {
               await WhatsAppMetaClient.sendTextMessage(
                 from,
-                "You have already received Gaurav's resume above! 📄\n\nIf you'd like to talk directly with Gaurav, tap '💬 Chat with Gaurav' or send your message here."
+                "You have already received Gaurav's resume above! 📄\n\nTo connect directly, tap 'Chat with Gaurav' above ⬆️ or simply type your message here — I will deliver it directly to Gaurav in real time."
               );
             } else {
               // 1. Immediate visual feedback to the visitor
@@ -248,7 +256,7 @@ export async function POST(req: NextRequest): Promise<Response> {
                 from,
                 documentUrl,
                 "Gaurav_Patil_Resume.pdf",
-                "Here is Gaurav Patil's official resume! 📄\n\nFeel free to review it. To connect directly with Gaurav, tap '💬 Chat with Gaurav' or type your message below."
+                "Here is Gaurav Patil's official resume! 📄\n\nFeel free to review it. To connect directly, tap 'Chat with Gaurav' above ⬆️ or simply type your message below — I will deliver it directly to Gaurav in real time."
               );
 
               if (!sendResult.success) {
@@ -259,7 +267,7 @@ export async function POST(req: NextRequest): Promise<Response> {
                 );
                 await WhatsAppMetaClient.sendTextMessage(
                   from,
-                  `Here is Gaurav Patil's resume: ${documentUrl}\n\nTo connect directly with Gaurav, tap '💬 Chat with Gaurav' or send your message below.`
+                  `Here is Gaurav Patil's resume: ${documentUrl}\n\nTo connect directly, tap 'Chat with Gaurav' above ⬆️ or send your message below.`
                 );
               }
             }
@@ -272,7 +280,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             session.inChatMode = true;
             await WhatsAppMetaClient.sendTextMessage(
               from,
-              "You're now connected with Gaurav! 💬\n\nPlease type your message, project idea, or role details below. Gaurav will be alerted in real time. (You can send up to 3 messages)"
+              "You're now connected with Gaurav! 💬\n\nPlease type your message, project idea, or role details below. Gaurav will be alerted in real time."
             );
           }
 
@@ -282,7 +290,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           else if (isGreeting) {
             await WhatsAppMetaClient.sendQuickReplyButtons(
               from,
-              "Hello! Thanks for reaching out. 👋\n\nI am Gaurav's Automated Assistant, built by Gaurav to help you connect instantly.\n\nHow would you like to proceed? Please tap an option below:",
+              GREETING_TEXT,
               [
                 { id: "btn_resume", title: "📄 View Resume" },
                 { id: "btn_chat", title: "💬 Chat with Gaurav" },
@@ -291,7 +299,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           }
 
           // -------------------------------------------------------------
-          // 6. Free-form text / Chat messages (Max 3 messages)
+          // 6. Free-form text / Chat messages & Email capture
           // -------------------------------------------------------------
           else {
             const isEngaged =
@@ -300,7 +308,28 @@ export async function POST(req: NextRequest): Promise<Response> {
               session.hasReceivedResume;
 
             if (isEngaged) {
-              if (session.messageCount >= 3) {
+              // Check if the message contains an email address (visitor providing contact email)
+              const emailMatch = rawInput.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+
+              if (emailMatch) {
+                const detectedEmail = emailMatch[0].toLowerCase();
+                session.email = detectedEmail;
+
+                await WhatsAppMetaClient.sendTextMessage(
+                  from,
+                  `Got it! We've saved your email (${detectedEmail}). You will receive an email the moment Gaurav replies.\n\nYou can continue chatting here anytime or visit the portfolio: https://gauravpatil.online`
+                );
+
+                // Dispatch updated alert to Gaurav so he gets the email and the 1-click notification button
+                const senderName = value.contacts?.[0]?.profile?.name || "WhatsApp Visitor";
+                void sendWhatsAppAdminAlert({
+                  senderName,
+                  senderPhone: from,
+                  messageText: rawInput,
+                  messageCount: session.messageCount || 1,
+                  visitorEmail: detectedEmail,
+                });
+              } else if (session.messageCount >= 3) {
                 // Strict rate limit triggered on 4th message and beyond
                 await WhatsAppMetaClient.sendTextMessage(
                   from,
@@ -311,19 +340,27 @@ export async function POST(req: NextRequest): Promise<Response> {
                 session.inChatMode = true;
                 const currentCount = session.messageCount;
 
-                // Acknowledge receipt to visitor
-                await WhatsAppMetaClient.sendTextMessage(
-                  from,
-                  `Thank you! Your message (${currentCount}/3) has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.`
-                );
+                // Offer optional email notification on 1st message if email not provided yet
+                if (currentCount === 1 && !session.email) {
+                  await WhatsAppMetaClient.sendTextMessage(
+                    from,
+                    "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.\n\nWant an email notification when Gaurav replies? Simply reply with your email address below (optional)."
+                  );
+                } else {
+                  await WhatsAppMetaClient.sendTextMessage(
+                    from,
+                    "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly."
+                  );
+                }
 
-                // Dispatch real-time text-first email alert to Gaurav
+                // Dispatch real-time text-first email alert to Gaurav (including visitorEmail if captured)
                 const senderName = value.contacts?.[0]?.profile?.name || "WhatsApp Visitor";
                 void sendWhatsAppAdminAlert({
                   senderName,
                   senderPhone: from,
                   messageText: textBody || rawInput,
                   messageCount: currentCount,
+                  visitorEmail: session.email,
                 });
               }
             } else {
