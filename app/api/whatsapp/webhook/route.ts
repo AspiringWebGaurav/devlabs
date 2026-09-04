@@ -1,23 +1,60 @@
 /**
  * Meta WhatsApp Cloud API Webhook Handler
- * 
+ *
  * Clean, baseline implementation:
  * - GET: Webhook verification handshake with Meta.
  * - POST: HMAC-SHA256 signature verification and direct message replies.
- * - No Redis, no queues, no complex state machines.
+ * - In-memory session tracking with zero Redis, zero DB, and zero circuit breakers.
+ * - 2-button interactive menu: [ 📄 View Resume ] (consumed once) & [ 💬 Chat with Gaurav ].
+ * - Free-form messaging up to 3 messages with real-time text-first email alert to Gaurav.
+ * - Strict rate limit on 4th message and beyond.
  */
 
 import { NextRequest } from "next/server";
 import { verifyWebhookChallenge, verifyWebhookSignature } from "@/lib/whatsapp/webhook";
 import { WhatsAppMetaClient } from "@/lib/whatsapp/meta/client";
+import { sendWhatsAppAdminAlert } from "@/lib/whatsapp/notifications";
 import { adminLogger } from "@/lib/admin/logger";
 import type { MetaWebhookPayload } from "@/lib/whatsapp/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Ephemeral in-memory session tracker (per process instance, zero backend/database)
-const activeChatSessions = new Set<string>();
+// Ephemeral in-memory visitor session tracker (per process instance, zero backend/database)
+interface VisitorSession {
+  hasReceivedResume: boolean;
+  messageCount: number; // 0, 1, 2, 3
+  inChatMode: boolean;
+  lastActivityAt: number;
+}
+
+const visitorSessions = new Map<string, VisitorSession>();
+
+function getVisitorSession(from: string): VisitorSession {
+  let session = visitorSessions.get(from);
+  if (!session) {
+    session = {
+      hasReceivedResume: false,
+      messageCount: 0,
+      inChatMode: false,
+      lastActivityAt: Date.now(),
+    };
+    visitorSessions.set(from, session);
+  }
+  session.lastActivityAt = Date.now();
+
+  // Housekeeping: purge inactive sessions older than 24h if map exceeds 500 entries
+  if (visitorSessions.size > 500) {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    for (const [key, s] of visitorSessions.entries()) {
+      if (s.lastActivityAt < cutoff) {
+        visitorSessions.delete(key);
+      }
+    }
+  }
+
+  return session;
+}
 
 /**
  * GET: Handles Meta's webhook subscription verification handshake
@@ -41,7 +78,7 @@ export async function GET(req: NextRequest): Promise<Response> {
 }
 
 /**
- * POST: Ingests authentic Meta WhatsApp events and sends immediate replies
+ * POST: Ingests authentic Meta WhatsApp events and dispatches dynamic responses
  */
 export async function POST(req: NextRequest): Promise<Response> {
   try {
@@ -82,7 +119,6 @@ export async function POST(req: NextRequest): Promise<Response> {
           if (!from) continue;
 
           // Meta 24-Hour Customer Service Window check
-          // If the message is older than 24 hours, free-form messages cannot be delivered
           const msgTimestampSec = parseInt(msg.timestamp || "0", 10);
           if (msgTimestampSec > 0) {
             const nowSec = Math.floor(Date.now() / 1000);
@@ -95,58 +131,197 @@ export async function POST(req: NextRequest): Promise<Response> {
             }
           }
 
-          // Extract message text
-          const rawText = (msg.text?.body || msg.button?.text || "").trim();
-          if (!rawText) continue;
+          // Extract message contents: interactive button clicks, button replies, or regular text
+          const buttonId = msg.interactive?.button_reply?.id || msg.button?.payload || "";
+          const buttonTitle = msg.interactive?.button_reply?.title || msg.button?.text || "";
+          const textBody = msg.text?.body || "";
+          const rawInput = (buttonId || buttonTitle || textBody).trim();
+
+          if (!rawInput) continue;
 
           // Normalize command: trim, uppercase, remove leading/trailing punctuation
-          const normalized = rawText
+          const normalized = rawInput
             .toUpperCase()
             .replace(/^[/#.!]+|[.!?]+$/g, "")
             .trim();
 
+          const session = getVisitorSession(from);
+
           adminLogger.info("WhatsApp:InboundReceived", "Inbound message received", {
             from,
-            text: rawText,
+            rawInput,
             normalized,
+            buttonId,
+            sessionMessageCount: session.messageCount,
           });
 
-          // 1. "STOP" -> Exact STOP response & clear session
+          // Action matchers
+          const isResumeAction =
+            buttonId === "btn_resume" ||
+            buttonTitle.toLowerCase().includes("resume") ||
+            normalized === "RESUME" ||
+            normalized === "VIEW RESUME" ||
+            normalized === "1";
+
+          const isChatAction =
+            buttonId === "btn_chat" ||
+            buttonTitle.toLowerCase().includes("chat") ||
+            normalized === "CHAT" ||
+            normalized === "CHAT WITH GAURAV" ||
+            normalized === "2";
+
+          const isGreeting =
+            !isResumeAction &&
+            !isChatAction &&
+            (
+              normalized === "HI" ||
+              normalized === "HII" ||
+              normalized === "HIII" ||
+              normalized === "HELLO" ||
+              normalized === "HEY" ||
+              normalized.includes("PORTFOLIO") ||
+              (!session.inChatMode &&
+                (normalized.startsWith("HI ") ||
+                  normalized.startsWith("HELLO ") ||
+                  normalized.startsWith("HEY ")))
+            );
+
+          // -------------------------------------------------------------
+          // 1. "STOP" / "UNSUBSCRIBE" -> Clear session and unsubscribe
+          // -------------------------------------------------------------
           if (normalized === "STOP" || normalized === "UNSUBSCRIBE") {
-            activeChatSessions.delete(from);
+            visitorSessions.delete(from);
             await WhatsAppMetaClient.sendTextMessage(
               from,
-              "You have been unsubscribed. Feel free to START again anytime."
+              "You have been unsubscribed. Feel free to send Hi anytime to start again."
             );
           }
-          // 2. "START" -> If already in ready session, show no need to send START; otherwise welcome
+
+          // -------------------------------------------------------------
+          // 2. "START" -> Reset session and show 2 interactive options
+          // -------------------------------------------------------------
           else if (normalized === "START") {
-            if (activeChatSessions.has(from)) {
+            session.hasReceivedResume = false;
+            session.messageCount = 0;
+            session.inChatMode = false;
+
+            await WhatsAppMetaClient.sendQuickReplyButtons(
+              from,
+              "Hello! Thanks for reaching out. 👋\n\nI am Gaurav's Automated Assistant, built by Gaurav to help you connect instantly.\n\nHow would you like to proceed? Please tap an option below:",
+              [
+                { id: "btn_resume", title: "📄 View Resume" },
+                { id: "btn_chat", title: "💬 Chat with Gaurav" },
+              ]
+            );
+          }
+
+          // -------------------------------------------------------------
+          // 3. Option 1: "View Resume" (Consumed once per session)
+          // -------------------------------------------------------------
+          else if (isResumeAction) {
+            if (session.hasReceivedResume) {
               await WhatsAppMetaClient.sendTextMessage(
                 from,
-                "You're already in a ready session! You can chat directly—no need to send START. How can I assist you today?"
+                "You have already received Gaurav's resume above! 📄\n\nIf you'd like to talk directly with Gaurav, tap '💬 Chat with Gaurav' or send your message here."
               );
             } else {
-              activeChatSessions.add(from);
-              await WhatsAppMetaClient.sendTextMessage(
+              session.hasReceivedResume = true;
+              const baseUrl = (
+                process.env.NEXT_PUBLIC_APP_URL ||
+                process.env.APP_URL ||
+                "https://gauravpatil.online"
+              ).replace(/\/+$/, "");
+              const documentUrl = `${baseUrl}/dummy_pdf.pdf`;
+
+              const sendResult = await WhatsAppMetaClient.sendDocumentMessage(
                 from,
-                "You're all set! You can chat directly—no need to send START. How can I assist you today? (Reply STOP anytime to unsubscribe)"
+                documentUrl,
+                "Gaurav_Patil_Resume.pdf",
+                "Here is Gaurav Patil's official resume! 📄\n\nFeel free to review it. To connect directly with Gaurav, tap '💬 Chat with Gaurav' or type your message below."
               );
+
+              if (!sendResult.success) {
+                adminLogger.warn(
+                  "WhatsApp:ResumeSendFallback",
+                  "Document send failed; sending direct URL link fallback",
+                  { error: sendResult.error }
+                );
+                await WhatsAppMetaClient.sendTextMessage(
+                  from,
+                  `Here is Gaurav Patil's official resume: ${documentUrl}\n\nTo connect directly with Gaurav, tap '💬 Chat with Gaurav' or send your message below.`
+                );
+              }
             }
           }
-          // 3. "Hii" / "Hi" / "Hello" / Portfolio referral -> Warm reply & mark session ready
-          else if (
-            normalized === "HII" ||
-            normalized.startsWith("HI") ||
-            normalized.startsWith("HELLO") ||
-            normalized.startsWith("HEY") ||
-            normalized.includes("PORTFOLIO")
-          ) {
-            activeChatSessions.add(from);
+
+          // -------------------------------------------------------------
+          // 4. Option 2: "Chat with Gaurav" (Enables free-form chat mode)
+          // -------------------------------------------------------------
+          else if (isChatAction) {
+            session.inChatMode = true;
             await WhatsAppMetaClient.sendTextMessage(
               from,
-              "Hi! Thanks for reaching out through my portfolio. I've received your message and will get back to you directly here shortly! Feel free to share any details in the meantime."
+              "You're now connected with Gaurav! 💬\n\nPlease type your message, project idea, or role details below. Gaurav will be alerted in real time. (You can send up to 3 messages)"
             );
+          }
+
+          // -------------------------------------------------------------
+          // 5. Greetings ("Hi", "hi", "Hii", or portfolio link) -> 2 buttons
+          // -------------------------------------------------------------
+          else if (isGreeting) {
+            await WhatsAppMetaClient.sendQuickReplyButtons(
+              from,
+              "Hello! Thanks for reaching out. 👋\n\nI am Gaurav's Automated Assistant, built by Gaurav to help you connect instantly.\n\nHow would you like to proceed? Please tap an option below:",
+              [
+                { id: "btn_resume", title: "📄 View Resume" },
+                { id: "btn_chat", title: "💬 Chat with Gaurav" },
+              ]
+            );
+          }
+
+          // -------------------------------------------------------------
+          // 6. Free-form text / Chat messages (Max 3 messages)
+          // -------------------------------------------------------------
+          else {
+            const isEngaged =
+              session.inChatMode ||
+              session.messageCount > 0 ||
+              session.hasReceivedResume;
+
+            if (isEngaged) {
+              if (session.messageCount >= 3) {
+                // Strict rate limit triggered on 4th message and beyond
+                await WhatsAppMetaClient.sendTextMessage(
+                  from,
+                  "⚠️ Message limit reached (maximum 3 messages). Gaurav has received all your messages and will reply directly to your WhatsApp as soon as he is online. Thank you for your patience!"
+                );
+              } else {
+                session.messageCount += 1;
+                session.inChatMode = true;
+                const currentCount = session.messageCount;
+
+                // Acknowledge receipt to visitor
+                await WhatsAppMetaClient.sendTextMessage(
+                  from,
+                  `Thank you! Your message (${currentCount}/3) has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.`
+                );
+
+                // Dispatch real-time text-first email alert to Gaurav
+                const senderName = value.contacts?.[0]?.profile?.name || "WhatsApp Visitor";
+                void sendWhatsAppAdminAlert({
+                  senderName,
+                  senderPhone: from,
+                  messageText: textBody || rawInput,
+                  messageCount: currentCount,
+                });
+              }
+            } else {
+              // Unrecognized message before greeting or selecting an option
+              await WhatsAppMetaClient.sendTextMessage(
+                from,
+                'Hi there! Please send "Hi" to start.'
+              );
+            }
           }
         }
       }

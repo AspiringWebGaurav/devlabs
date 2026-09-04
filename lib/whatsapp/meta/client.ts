@@ -1,8 +1,11 @@
 /**
  * Meta Graph API Client
  * 
- * Minimal, direct HTTP client for WhatsApp Cloud API.
- * Dispatches text messages directly to Meta's endpoint without database or Redis queues.
+ * Direct HTTP client for WhatsApp Cloud API:
+ * - Text messages
+ * - Interactive Quick-Reply buttons
+ * - Document (PDF) dispatching
+ * Zero Redis, zero database queues, sub-second latency.
  */
 
 import { getWhatsAppConfig } from "../config/whatsapp.config";
@@ -15,11 +18,79 @@ export interface SendMessageResult {
   error?: string;
 }
 
+export interface QuickReplyButton {
+  id: string;
+  title: string;
+}
+
 export class WhatsAppMetaClient {
   /**
    * Dispatches a free-form text message directly to recipient phone via Meta Cloud API.
    */
   public static async sendTextMessage(toPhone: string, bodyText: string): Promise<SendMessageResult> {
+    return this.postGraphMessage(toPhone, {
+      type: "text",
+      text: {
+        preview_url: false,
+        body: bodyText,
+      },
+    });
+  }
+
+  /**
+   * Dispatches interactive quick-reply buttons (up to 3 clickable buttons).
+   */
+  public static async sendQuickReplyButtons(
+    toPhone: string,
+    bodyText: string,
+    buttons: QuickReplyButton[]
+  ): Promise<SendMessageResult> {
+    return this.postGraphMessage(toPhone, {
+      type: "interactive",
+      interactive: {
+        type: "button",
+        body: {
+          text: bodyText,
+        },
+        action: {
+          buttons: buttons.slice(0, 3).map((btn) => ({
+            type: "reply",
+            reply: {
+              id: btn.id,
+              title: btn.title.slice(0, 20), // Meta 20 character title limit
+            },
+          })),
+        },
+      },
+    });
+  }
+
+  /**
+   * Dispatches an actual document file (e.g. PDF Resume) directly into WhatsApp.
+   */
+  public static async sendDocumentMessage(
+    toPhone: string,
+    documentUrl: string,
+    fileName: string,
+    caption?: string
+  ): Promise<SendMessageResult> {
+    return this.postGraphMessage(toPhone, {
+      type: "document",
+      document: {
+        link: documentUrl,
+        filename: fileName,
+        caption: caption || undefined,
+      },
+    });
+  }
+
+  /**
+   * Internal helper executing direct POST to Meta Graph API.
+   */
+  private static async postGraphMessage(
+    toPhone: string,
+    payloadDetails: Record<string, unknown>
+  ): Promise<SendMessageResult> {
     try {
       const config = getWhatsAppConfig();
 
@@ -42,11 +113,7 @@ export class WhatsAppMetaClient {
           messaging_product: "whatsapp",
           recipient_type: "individual",
           to: formattedRecipient,
-          type: "text",
-          text: {
-            preview_url: false,
-            body: bodyText,
-          },
+          ...payloadDetails,
         }),
       });
 
