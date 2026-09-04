@@ -48,23 +48,23 @@ export const AssistantWhatsAppView: React.FC<AssistantViewProps> = ({ onBack }) 
         {/* 3. Feature Capabilities */}
         <div className="space-y-2 mb-4">
           <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white border border-neutral-200/80 shadow-2xs">
-            <IoDocumentTextOutline className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+            <IoPersonOutline className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
             <div className="text-xs text-neutral-700 leading-snug">
-              <strong className="font-semibold text-neutral-900">Instant Resume Overview:</strong> Request background summary and resume document.
+              <strong className="font-semibold text-neutral-900">Direct Chat:</strong> Message directly with Gaurav for quick discussions, inquiries, or introductions.
             </div>
           </div>
 
           <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white border border-neutral-200/80 shadow-2xs">
             <IoBriefcaseOutline className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
             <div className="text-xs text-neutral-700 leading-snug">
-              <strong className="font-semibold text-neutral-900">Structured Opportunity Intake:</strong> Submit role, tech stack, and attach JDs safely.
+              <strong className="font-semibold text-neutral-900">Share Roles &amp; Projects:</strong> Send job specs, contracts, or details straight to WhatsApp.
             </div>
           </div>
 
           <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white border border-neutral-200/80 shadow-2xs">
-            <IoPersonOutline className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+            <IoDocumentTextOutline className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
             <div className="text-xs text-neutral-700 leading-snug">
-              <strong className="font-semibold text-neutral-900">Human Direct Escalation:</strong> Request 1-on-1 human conversation with Gaurav.
+              <strong className="font-semibold text-neutral-900">Personal Reply:</strong> Gaurav reviews and responds directly from his personal device.
             </div>
           </div>
         </div>

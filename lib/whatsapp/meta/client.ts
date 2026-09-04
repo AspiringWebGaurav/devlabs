@@ -1,235 +1,87 @@
 /**
  * Meta Graph API Client
  * 
- * Secure HTTP client for WhatsApp Cloud API.
- * Embeds OutboundPolicyGuard checks, timeout guards, and bounded media downloads.
+ * Minimal, direct HTTP client for WhatsApp Cloud API.
+ * Dispatches text messages directly to Meta's endpoint without database or Redis queues.
  */
 
-import { fetchWithTimeout } from "@/lib/api/fetcher";
 import { getWhatsAppConfig } from "../config/whatsapp.config";
-import { OutboundPolicyGuard, type OutboundPolicyContext } from "../security/outbound-policy-guard";
 import { adminLogger } from "@/lib/admin/logger";
-import { MetaApiError, type MetaErrorDetails } from "./errors";
-import type {
-  MetaSendTextRequest,
-  MetaSendInteractiveButtonsRequest,
-  MetaSendDocumentRequest,
-  MetaSendMessageResponse,
-  MetaMediaMetadataResponse,
-  MetaApiErrorResponse,
-} from "../types";
+import type { MetaSendMessageResponse, MetaApiErrorResponse } from "../types";
+
+export interface SendMessageResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
 
 export class WhatsAppMetaClient {
-  private static getHeaders(accessToken: string): Record<string, string> {
-    return {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    };
-  }
-
   /**
-   * Dispatches a free-form text message to the recipient phone.
-   * Mandatorily verifies OutboundPolicyGuard before network dispatch.
+   * Dispatches a free-form text message directly to recipient phone via Meta Cloud API.
    */
-  public static async sendTextMessage(
-    toPhone: string,
-    bodyText: string,
-    context: OutboundPolicyContext
-  ): Promise<string> {
-    // 1. Mandatory Pre-Dispatch Gatekeeper
-    const policy = OutboundPolicyGuard.evaluateOutbound({
-      recipientPhone: toPhone,
-      messageType: "free_form",
-      context,
-    });
+  public static async sendTextMessage(toPhone: string, bodyText: string): Promise<SendMessageResult> {
+    try {
+      const config = getWhatsAppConfig();
 
-    if (!policy.allowed) {
-      throw new Error(`Outbound dispatch blocked: ${policy.reason}`);
-    }
-
-    const config = getWhatsAppConfig();
-    const url = `${config.graphBaseUrl}/${config.phoneNumberId}/messages`;
-
-    // Recipient format without leading '+' per Meta Cloud API format
-    const formattedRecipient = toPhone.replace(/[^0-9]/g, "");
-
-    const payload: MetaSendTextRequest = {
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: formattedRecipient,
-      type: "text",
-      text: {
-        preview_url: false,
-        body: bodyText,
-      },
-    };
-
-    const response = await this.postGraphApi<MetaSendMessageResponse>(url, payload, config.accessToken);
-    return response.messages?.[0]?.id || `wamid_sim_${Date.now()}`;
-  }
-
-  /**
-   * Dispatches interactive quick-reply buttons (up to 3 buttons).
-   */
-  public static async sendQuickReplyButtons(
-    toPhone: string,
-    bodyText: string,
-    buttons: Array<{ id: string; title: string }>,
-    context: OutboundPolicyContext,
-    footerText = "Gaurav Portfolio • Type MENU anytime"
-  ): Promise<string> {
-    const policy = OutboundPolicyGuard.evaluateOutbound({
-      recipientPhone: toPhone,
-      messageType: "free_form",
-      context,
-    });
-
-    if (!policy.allowed) {
-      throw new Error(`Outbound dispatch blocked: ${policy.reason}`);
-    }
-
-    const config = getWhatsAppConfig();
-    const url = `${config.graphBaseUrl}/${config.phoneNumberId}/messages`;
-    const formattedRecipient = toPhone.replace(/[^0-9]/g, "");
-
-    const payload: MetaSendInteractiveButtonsRequest = {
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: formattedRecipient,
-      type: "interactive",
-      interactive: {
-        type: "button",
-        body: {
-          text: bodyText,
-        },
-        footer: footerText ? { text: footerText.slice(0, 60) } : undefined,
-        action: {
-          buttons: buttons.slice(0, 3).map((btn) => ({
-            type: "reply",
-            reply: {
-              id: btn.id,
-              title: btn.title.slice(0, 20), // Meta 20 char title ceiling
-            },
-          })),
-        },
-      },
-    };
-
-    const response = await this.postGraphApi<MetaSendMessageResponse>(url, payload, config.accessToken);
-    return response.messages?.[0]?.id || `wamid_sim_${Date.now()}`;
-  }
-
-  /**
-   * Dispatches a document (e.g. PDF Resume) to the recipient.
-   */
-  public static async sendDocumentMessage(
-    toPhone: string,
-    documentUrl: string,
-    fileName: string,
-    caption: string | undefined,
-    context: OutboundPolicyContext
-  ): Promise<string> {
-    const policy = OutboundPolicyGuard.evaluateOutbound({
-      recipientPhone: toPhone,
-      messageType: "free_form",
-      context,
-    });
-
-    if (!policy.allowed) {
-      throw new Error(`Outbound dispatch blocked: ${policy.reason}`);
-    }
-
-    const config = getWhatsAppConfig();
-    const url = `${config.graphBaseUrl}/${config.phoneNumberId}/messages`;
-    const formattedRecipient = toPhone.replace(/[^0-9]/g, "");
-
-    const payload: MetaSendDocumentRequest = {
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: formattedRecipient,
-      type: "document",
-      document: {
-        link: documentUrl,
-        filename: fileName,
-        caption: caption || undefined,
-      },
-    };
-
-    const response = await this.postGraphApi<MetaSendMessageResponse>(url, payload, config.accessToken);
-    return response.messages?.[0]?.id || `wamid_sim_${Date.now()}`;
-  }
-
-  /**
-   * Retrieves temporary media download URL and metadata from Meta Graph API.
-   */
-  public static async getMediaMetadata(mediaId: string): Promise<MetaMediaMetadataResponse> {
-    const config = getWhatsAppConfig();
-    const url = `${config.graphBaseUrl}/${mediaId}`;
-
-    const res = await fetchWithTimeout(
-      url,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${config.accessToken}`,
-        },
-      },
-      4000
-    );
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new MetaApiError({
-        message: `Failed to retrieve media metadata: ${res.statusText} (${errText})`,
-        code: res.status,
-      });
-    }
-
-    return (await res.json()) as MetaMediaMetadataResponse;
-  }
-
-  /**
-   * Helper executing POST requests against Graph API with sanitized error handling.
-   */
-  private static async postGraphApi<T>(url: string, payload: unknown, accessToken: string): Promise<T> {
-    const res = await fetchWithTimeout(
-      url,
-      {
-        method: "POST",
-        headers: this.getHeaders(accessToken),
-        body: JSON.stringify(payload),
-      },
-      4000
-    );
-
-    if (!res.ok) {
-      let errorDetails: MetaErrorDetails = {
-        message: `HTTP ${res.status}: ${res.statusText}`,
-        code: res.status,
-      };
-
-      try {
-        const errorJson = (await res.json()) as MetaApiErrorResponse;
-        if (errorJson.error) {
-          errorDetails = {
-            message: errorJson.error.message,
-            code: errorJson.error.code,
-            errorSubcode: errorJson.error.error_subcode,
-            type: errorJson.error.type,
-            fbtraceId: errorJson.error.fbtrace_id,
-          };
-        }
-      } catch {
-        // Fall back to status text
+      if (!config.phoneNumberId || !config.accessToken) {
+        adminLogger.error("WhatsApp:MissingConfig", new Error("Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN"));
+        return { success: false, error: "Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN" };
       }
 
-      adminLogger.error("WhatsApp:MetaApiError", new Error(errorDetails.message), "Meta Graph API call failed", {
-        code: errorDetails.code,
+      // Format recipient: digits only (no leading plus) per Meta Cloud API format
+      const formattedRecipient = toPhone.replace(/[^0-9]/g, "");
+      const url = `${config.graphBaseUrl}/${config.phoneNumberId}/messages`;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: formattedRecipient,
+          type: "text",
+          text: {
+            preview_url: false,
+            body: bodyText,
+          },
+        }),
       });
 
-      throw new MetaApiError(errorDetails);
-    }
+      if (!response.ok) {
+        let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorJson = (await response.json()) as MetaApiErrorResponse;
+          if (errorJson.error?.message) {
+            errorMsg = errorJson.error.message;
+          }
+        } catch {
+          // Fall back to status text
+        }
 
-    return (await res.json()) as T;
+        adminLogger.error("WhatsApp:MetaApiSendFailed", new Error(errorMsg), "Meta Graph API send error", {
+          status: response.status,
+          recipient: formattedRecipient,
+        });
+
+        return { success: false, error: errorMsg };
+      }
+
+      const data = (await response.json()) as MetaSendMessageResponse;
+      const messageId = data.messages?.[0]?.id || `wamid_${Date.now()}`;
+
+      adminLogger.info("WhatsApp:MessageSent", "Message successfully dispatched via Meta API", {
+        to: formattedRecipient,
+        messageId,
+      });
+
+      return { success: true, messageId };
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      adminLogger.error("WhatsApp:MetaApiError", err, "Network error calling Meta API");
+      return { success: false, error: errorMsg };
+    }
   }
 }
