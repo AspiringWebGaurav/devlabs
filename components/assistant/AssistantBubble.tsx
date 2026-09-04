@@ -28,9 +28,10 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const dragStartRef = useRef<{ pointerX: number; pointerY: number; bubbleX: number; bubbleY: number } | null>(null);
-  const pointerStartRef = useRef<{ clientX: number; clientY: number; scrollY: number; time: number } | null>(null);
-  const isScrollGestureRef = useRef(false);
-  const scrollListenerCleanupRef = useRef<(() => void) | null>(null);
+  const pointerStartRef = useRef<{ pointerId: number; clientX: number; clientY: number; scrollY: number; time: number } | null>(null);
+  const wasPointerCanceledRef = useRef(false);
+  const wasScrollDuringPointerRef = useRef(false);
+  const lastScrollTimestampRef = useRef<number>(0);
   const prepIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasDraggedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
@@ -56,15 +57,21 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     }
   }, []);
 
-  // Clean up any preparation timers and scroll listeners on unmount
+  // Continuous passive window scroll monitor: guarantees zero clicks/taps can fire during or right after scroll
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleWindowScroll = () => {
+      lastScrollTimestampRef.current = Date.now();
+    };
+    window.addEventListener("scroll", handleWindowScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleWindowScroll);
+  }, []);
+
+  // Clean up any preparation timers on unmount
   useEffect(() => {
     return () => {
       if (prepIntervalRef.current) {
         clearInterval(prepIntervalRef.current);
-      }
-      if (scrollListenerCleanupRef.current) {
-        scrollListenerCleanupRef.current();
-        scrollListenerCleanupRef.current = null;
       }
     };
   }, []);
@@ -149,38 +156,26 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     }
   }, [isEnabled, isOpen]);
 
-  // 5. Restore user session persistence & detect ?chat=open on mount (Zero surprise open)
+  // 5. Zero surprise open: clean legacy session storage on mount & handle explicit ?chat=open query only
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     try {
+      // Proactively purge any stale 'open' flag from browser session storage to prevent ghost popups
+      sessionStorage.removeItem(STORAGE_STATE_KEY);
+
       const urlParams = new URLSearchParams(window.location.search);
       const chatParam = urlParams.get("chat");
-      const savedState = sessionStorage.getItem(STORAGE_STATE_KEY);
 
-      // If URL explicitly requests chat=open and user hasn't explicitly dismissed it in this session
-      if (chatParam === "open" && savedState !== "closed") {
+      // Only open if the URL explicitly requests ?chat=open from an external direct link
+      if (chatParam === "open") {
         setInitialView("chat");
         setIsWindowMounted(true);
         setIsOpen(true);
-        sessionStorage.setItem(STORAGE_STATE_KEY, "open");
 
-        // Immediate address bar sanitization (clean URL)
+        // Immediate address bar sanitization (clean URL so reload never repeats open)
         const cleanUrl = window.location.pathname + window.location.hash;
         window.history.replaceState({}, "", cleanUrl);
-        return;
-      }
-
-      // If URL had chat=open but user previously closed it in this session, sanitize URL without surprise opening
-      if (chatParam === "open") {
-        const cleanUrl = window.location.pathname + window.location.hash;
-        window.history.replaceState({}, "", cleanUrl);
-      }
-
-      // If user had intentionally opened the assistant before reload/navigation in this session
-      if (savedState === "open") {
-        setIsWindowMounted(true);
-        setIsOpen(true);
       }
     } catch {
       // Safe fallback
@@ -203,11 +198,6 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const handleOpen = useCallback(() => {
     if (isPreparingTurnstile) return;
-
-    // Persist intentional open state
-    try {
-      sessionStorage.setItem(STORAGE_STATE_KEY, "open");
-    } catch {}
 
     if (isTurnstileSessionValid()) {
       setIsWindowMounted(true);
@@ -252,20 +242,12 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     setIsTurnstileGateOpen(false);
     setIsWindowMounted(true);
     setIsOpen(true);
-    try {
-      sessionStorage.setItem(STORAGE_STATE_KEY, "open");
-    } catch {}
   }, []);
 
   const handleClose = useCallback(() => {
     setIsHovered(false);
     setIsDragging(false);
     setIsOpen(false);
-
-    // Persist intentional closed state so it never surprise opens
-    try {
-      sessionStorage.setItem(STORAGE_STATE_KEY, "closed");
-    } catch {}
   }, []);
 
   // 6. Focus Restoration when Window finishes exit animation (Desktop only, prevents mobile sticky focus)
@@ -280,33 +262,28 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   // 7. Scroll-Safe Pointer Controller (Prevents surprise opening on page scroll)
   const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    // A. Reject pointerdown immediately if page was scrolled within the last 350ms
+    if (Date.now() - lastScrollTimestampRef.current < 350) {
+      wasPointerCanceledRef.current = true;
+      pointerStartRef.current = null;
+      return;
+    }
+
     if (e.pointerType === "mouse") {
       setIsHovered(true);
     }
 
-    // Clean up any stale scroll listener
-    if (scrollListenerCleanupRef.current) {
-      scrollListenerCleanupRef.current();
-      scrollListenerCleanupRef.current = null;
-    }
+    wasPointerCanceledRef.current = false;
+    wasScrollDuringPointerRef.current = false;
+    hasDraggedRef.current = false;
+    setIsDragging(false);
 
     pointerStartRef.current = {
+      pointerId: e.pointerId,
       clientX: e.clientX,
       clientY: e.clientY,
       scrollY: typeof window !== "undefined" ? window.scrollY : 0,
       time: Date.now(),
-    };
-    isScrollGestureRef.current = false;
-    hasDraggedRef.current = false;
-    setIsDragging(false);
-
-    // Actively detect if page scrolls while finger or pointer is on the bubble
-    const onWindowScroll = () => {
-      isScrollGestureRef.current = true;
-    };
-    window.addEventListener("scroll", onWindowScroll, { passive: true });
-    scrollListenerCleanupRef.current = () => {
-      window.removeEventListener("scroll", onWindowScroll);
     };
 
     if (positionMode !== "draggable") return;
@@ -342,8 +319,8 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
       hasDraggedRef.current = true;
     }
 
-    if (typeof window !== "undefined" && Math.abs(window.scrollY - pointerStartRef.current.scrollY) > 4) {
-      isScrollGestureRef.current = true;
+    if (typeof window !== "undefined" && Math.abs(window.scrollY - pointerStartRef.current.scrollY) > 2) {
+      wasScrollDuringPointerRef.current = true;
     }
 
     if (positionMode === "draggable" && dragStartRef.current && distance >= DRAG_THRESHOLD_PX) {
@@ -364,11 +341,6 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
   const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
     setIsHovered(false);
 
-    if (scrollListenerCleanupRef.current) {
-      scrollListenerCleanupRef.current();
-      scrollListenerCleanupRef.current = null;
-    }
-
     try {
       if (e.currentTarget.hasPointerCapture(e.pointerId)) {
         e.currentTarget.releasePointerCapture(e.pointerId);
@@ -376,8 +348,8 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
     } catch {}
 
     if (pointerStartRef.current && typeof window !== "undefined") {
-      if (Math.abs(window.scrollY - pointerStartRef.current.scrollY) > 4) {
-        isScrollGestureRef.current = true;
+      if (Math.abs(window.scrollY - pointerStartRef.current.scrollY) > 2) {
+        wasScrollDuringPointerRef.current = true;
       }
     }
 
@@ -393,55 +365,98 @@ export const AssistantBubble: React.FC<AssistantBubbleProps> = ({ config }) => {
 
   const handlePointerCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
     setIsHovered(false);
-    if (scrollListenerCleanupRef.current) {
-      scrollListenerCleanupRef.current();
-      scrollListenerCleanupRef.current = null;
-    }
     try {
       if (e.currentTarget.hasPointerCapture(e.pointerId)) {
         e.currentTarget.releasePointerCapture(e.pointerId);
       }
     } catch {}
-    dragStartRef.current = null;
+    wasPointerCanceledRef.current = true;
     pointerStartRef.current = null;
+    dragStartRef.current = null;
     hasDraggedRef.current = false;
-    isScrollGestureRef.current = false;
     setIsDragging(false);
   };
 
-  // 8. Single, Unified Verified Click Trigger
+  // 8. Single, Unified Verified Click Trigger with Complete Scroll Immunity
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    // A. Guard against drag displacement
+    // A. Untrusted or synthetic click guard
+    if (!e.isTrusted) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    // B. Global Scroll Lockout: absolutely zero clicks accepted within 450ms of any window scroll
+    const timeSinceLastScroll = Date.now() - lastScrollTimestampRef.current;
+    if (timeSinceLastScroll < 450) {
+      e.preventDefault();
+      e.stopPropagation();
+      pointerStartRef.current = null;
+      return;
+    }
+
+    // C. Pointer cancellation guard (browser canceled touch due to scroll/gesture takeover)
+    if (wasPointerCanceledRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      wasPointerCanceledRef.current = false;
+      pointerStartRef.current = null;
+      return;
+    }
+
+    // D. Scroll during pointer hold guard
+    if (wasScrollDuringPointerRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      wasScrollDuringPointerRef.current = false;
+      pointerStartRef.current = null;
+      return;
+    }
+
+    // E. Drag displacement guard
     if (hasDraggedRef.current) {
       e.preventDefault();
       e.stopPropagation();
       hasDraggedRef.current = false;
+      pointerStartRef.current = null;
       return;
     }
 
-    // B. Guard against scroll gesture while touching
-    if (isScrollGestureRef.current) {
+    // F. Mandatory pointerdown verification: Click MUST originate from an active, verified pointerdown
+    if (!pointerStartRef.current) {
       e.preventDefault();
       e.stopPropagation();
-      isScrollGestureRef.current = false;
       return;
     }
 
-    // C. Guard against delta scroll or displacement
-    if (pointerStartRef.current && typeof window !== "undefined") {
-      const scrollDelta = Math.abs(window.scrollY - pointerStartRef.current.scrollY);
-      const moveDistance = Math.hypot(
-        e.clientX - pointerStartRef.current.clientX,
-        e.clientY - pointerStartRef.current.clientY
-      );
-      if (scrollDelta > 4 || moveDistance >= DRAG_THRESHOLD_PX) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
+    const { clientX, clientY, scrollY, time } = pointerStartRef.current;
+    pointerStartRef.current = null; // Consume immediately
+
+    // G. Delta scroll shift guard
+    const currentScrollY = typeof window !== "undefined" ? window.scrollY : 0;
+    if (Math.abs(currentScrollY - scrollY) > 2) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
     }
 
-    // D. Legitimate user tap/click confirmed -> Open assistant
+    // H. Distance moved guard
+    const moveDist = Math.hypot(e.clientX - clientX, e.clientY - clientY);
+    if (moveDist >= DRAG_THRESHOLD_PX) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    // I. Tap duration guard (legitimate intentional tap is between 30ms and 900ms)
+    const tapDuration = Date.now() - time;
+    if (tapDuration < 30 || tapDuration > 900) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    // J. Legitimate, deliberate user tap/click confirmed -> Open assistant
     handleOpen();
   };
 
