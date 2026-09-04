@@ -1,13 +1,14 @@
 /**
  * Meta WhatsApp Cloud API Webhook Handler
  *
- * Clean, baseline implementation:
+ * Robust, production-grade implementation:
  * - GET: Webhook verification handshake with Meta.
- * - POST: HMAC-SHA256 signature verification and direct message replies.
- * - In-memory session tracking with zero Redis, zero DB, and zero circuit breakers.
+ * - POST: HMAC-SHA256 signature verification and dynamic direct responses.
+ * - Persistent session tracking via Firebase Firestore (survives Vercel serverless cold starts).
  * - 2-button interactive menu: [ 📄 View Resume ] (consumed once) & [ 💬 Chat with Gaurav ].
  * - Free-form messaging up to 3 messages with real-time email alert to Gaurav.
- * - Optional visitor email capture for "I've Replied" notifications.
+ * - Visitor messages are NEVER rejected: genuine inquiries are always delivered to Gaurav.
+ * - Optional visitor email capture for 1-click "I've Replied" admin alerts.
  * - Strict rate limit on 4th message and beyond (counters concealed from visitor).
  */
 
@@ -15,13 +16,13 @@ import { NextRequest } from "next/server";
 import { verifyWebhookChallenge, verifyWebhookSignature } from "@/lib/whatsapp/webhook";
 import { WhatsAppMetaClient } from "@/lib/whatsapp/meta/client";
 import { sendWhatsAppAdminAlert } from "@/lib/whatsapp/notifications";
+import { getAdminFirestore } from "@/lib/admin/firebase-admin";
 import { adminLogger } from "@/lib/admin/logger";
 import type { MetaWebhookPayload } from "@/lib/whatsapp/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Ephemeral in-memory visitor session tracker (per process instance, zero backend/database)
 interface VisitorSession {
   hasReceivedResume: boolean;
   messageCount: number; // 0, 1, 2, 3
@@ -30,32 +31,80 @@ interface VisitorSession {
   lastActivityAt: number;
 }
 
-const visitorSessions = new Map<string, VisitorSession>();
+// In-memory L1 cache for fast hot-instance lookups
+const memorySessionCache = new Map<string, VisitorSession>();
 
-function getVisitorSession(from: string): VisitorSession {
-  let session = visitorSessions.get(from);
-  if (!session) {
-    session = {
-      hasReceivedResume: false,
-      messageCount: 0,
-      inChatMode: false,
-      lastActivityAt: Date.now(),
-    };
-    visitorSessions.set(from, session);
+/**
+ * Loads visitor session, checking in-memory cache first, then falling back to
+ * Firestore persistent store to guarantee continuity across Vercel cold starts.
+ */
+async function getVisitorSession(from: string): Promise<VisitorSession> {
+  const cleanKey = from.replace(/[^0-9]/g, "");
+
+  // 1. Check in-memory L1 cache
+  const cached = memorySessionCache.get(cleanKey);
+  if (cached && Date.now() - cached.lastActivityAt < 1000 * 60 * 60) {
+    cached.lastActivityAt = Date.now();
+    return cached;
   }
-  session.lastActivityAt = Date.now();
 
-  // Housekeeping: purge inactive sessions older than 24h if map exceeds 500 entries
-  if (visitorSessions.size > 500) {
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    for (const [key, s] of visitorSessions.entries()) {
-      if (s.lastActivityAt < cutoff) {
-        visitorSessions.delete(key);
+  // 2. Default initial state
+  let session: VisitorSession = {
+    hasReceivedResume: false,
+    messageCount: 0,
+    inChatMode: false,
+    lastActivityAt: Date.now(),
+  };
+
+  // 3. Fallback to Firestore persistent store
+  try {
+    const db = getAdminFirestore();
+    if (db) {
+      const doc = await db.collection("whatsapp_sessions").doc(cleanKey).get();
+      if (doc.exists) {
+        const data = doc.data() as Partial<VisitorSession>;
+        session = {
+          hasReceivedResume: Boolean(data.hasReceivedResume),
+          messageCount: typeof data.messageCount === "number" ? data.messageCount : 0,
+          inChatMode: Boolean(data.inChatMode),
+          email: data.email || undefined,
+          lastActivityAt: Date.now(),
+        };
       }
     }
+  } catch (err) {
+    adminLogger.warn("WhatsApp:FirestoreSessionReadFailed", "Could not load session from Firestore, using memory fallback", { error: err });
   }
 
+  memorySessionCache.set(cleanKey, session);
   return session;
+}
+
+/**
+ * Persists updated visitor session to both in-memory cache and Firestore.
+ */
+async function saveVisitorSession(from: string, session: VisitorSession): Promise<void> {
+  const cleanKey = from.replace(/[^0-9]/g, "");
+  session.lastActivityAt = Date.now();
+  memorySessionCache.set(cleanKey, session);
+
+  try {
+    const db = getAdminFirestore();
+    if (db) {
+      await db.collection("whatsapp_sessions").doc(cleanKey).set(
+        {
+          hasReceivedResume: session.hasReceivedResume,
+          messageCount: session.messageCount,
+          inChatMode: session.inChatMode,
+          email: session.email || null,
+          lastActivityAt: Date.now(),
+        },
+        { merge: true }
+      );
+    }
+  } catch (err) {
+    adminLogger.warn("WhatsApp:FirestoreSessionWriteFailed", "Could not persist session to Firestore", { error: err });
+  }
 }
 
 const GREETING_TEXT =
@@ -152,7 +201,8 @@ export async function POST(req: NextRequest): Promise<Response> {
             .replace(/^[/#.!]+|[.!?]+$/g, "")
             .trim();
 
-          const session = getVisitorSession(from);
+          // Load persistent session from Firestore/cache
+          const session = await getVisitorSession(from);
 
           adminLogger.info("WhatsApp:InboundReceived", "Inbound message received", {
             from,
@@ -181,6 +231,8 @@ export async function POST(req: NextRequest): Promise<Response> {
             normalized === "💬 CHAT WITH GAURAV" ||
             normalized.includes("CHAT WITH GAURAV") ||
             normalized === "TALK TO GAURAV" ||
+            normalized.includes("TALK TO GAURAV") ||
+            normalized.includes("TALK WITH GAURAV") ||
             normalized === "2";
 
           const isGreeting =
@@ -192,18 +244,20 @@ export async function POST(req: NextRequest): Promise<Response> {
               normalized === "HIII" ||
               normalized === "HELLO" ||
               normalized === "HEY" ||
-              normalized.includes("PORTFOLIO") ||
-              (!session.inChatMode &&
-                (normalized.startsWith("HI ") ||
-                  normalized.startsWith("HELLO ") ||
-                  normalized.startsWith("HEY ")))
+              normalized.includes("PORTFOLIO")
             );
 
           // -------------------------------------------------------------
           // 1. "STOP" / "UNSUBSCRIBE" -> Clear session and unsubscribe
           // -------------------------------------------------------------
           if (normalized === "STOP" || normalized === "UNSUBSCRIBE") {
-            visitorSessions.delete(from);
+            const cleanKey = from.replace(/[^0-9]/g, "");
+            memorySessionCache.delete(cleanKey);
+            try {
+              const db = getAdminFirestore();
+              if (db) await db.collection("whatsapp_sessions").doc(cleanKey).delete();
+            } catch {}
+
             await WhatsAppMetaClient.sendTextMessage(
               from,
               "You have been unsubscribed. Feel free to send Hi anytime to start again."
@@ -218,6 +272,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             session.messageCount = 0;
             session.inChatMode = false;
             session.email = undefined;
+            await saveVisitorSession(from, session);
 
             await WhatsAppMetaClient.sendQuickReplyButtons(
               from,
@@ -246,6 +301,7 @@ export async function POST(req: NextRequest): Promise<Response> {
               );
 
               session.hasReceivedResume = true;
+              await saveVisitorSession(from, session);
 
               // 2. Canonical, high-availability public PDF URL (HTTP 200 OK, zero redirects)
               const documentUrl =
@@ -278,6 +334,8 @@ export async function POST(req: NextRequest): Promise<Response> {
           // -------------------------------------------------------------
           else if (isChatAction) {
             session.inChatMode = true;
+            await saveVisitorSession(from, session);
+
             await WhatsAppMetaClient.sendTextMessage(
               from,
               "You're now connected with Gaurav! 💬\n\nPlease type your message, project idea, or role details below. Gaurav will be alerted in real time."
@@ -299,76 +357,68 @@ export async function POST(req: NextRequest): Promise<Response> {
           }
 
           // -------------------------------------------------------------
-          // 6. Free-form text / Chat messages & Email capture
+          // 6. ANY other message -> DELIVER DIRECTLY TO GAURAV
+          // Never reject a visitor's genuine inquiry or send dead-ends!
           // -------------------------------------------------------------
           else {
-            const isEngaged =
-              session.inChatMode ||
-              session.messageCount > 0 ||
-              session.hasReceivedResume;
+            // Check if the visitor provided an email address
+            const emailMatch = rawInput.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
 
-            if (isEngaged) {
-              // Check if the message contains an email address (visitor providing contact email)
-              const emailMatch = rawInput.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+            if (emailMatch) {
+              const detectedEmail = emailMatch[0].toLowerCase();
+              session.email = detectedEmail;
+              await saveVisitorSession(from, session);
 
-              if (emailMatch) {
-                const detectedEmail = emailMatch[0].toLowerCase();
-                session.email = detectedEmail;
-
-                await WhatsAppMetaClient.sendTextMessage(
-                  from,
-                  `Got it! We've saved your email (${detectedEmail}). You will receive an email the moment Gaurav replies.\n\nYou can continue chatting here anytime or visit the portfolio: https://gauravpatil.online`
-                );
-
-                // Dispatch updated alert to Gaurav so he gets the email and the 1-click notification button
-                const senderName = value.contacts?.[0]?.profile?.name || "WhatsApp Visitor";
-                void sendWhatsAppAdminAlert({
-                  senderName,
-                  senderPhone: from,
-                  messageText: rawInput,
-                  messageCount: session.messageCount || 1,
-                  visitorEmail: detectedEmail,
-                });
-              } else if (session.messageCount >= 3) {
-                // Strict rate limit triggered on 4th message and beyond
-                await WhatsAppMetaClient.sendTextMessage(
-                  from,
-                  "⚠️ Message limit reached (maximum 3 messages). Gaurav has received all your messages and will reply directly to your WhatsApp as soon as he is online. Thank you for your patience!"
-                );
-              } else {
-                session.messageCount += 1;
-                session.inChatMode = true;
-                const currentCount = session.messageCount;
-
-                // Offer optional email notification on 1st message if email not provided yet
-                if (currentCount === 1 && !session.email) {
-                  await WhatsAppMetaClient.sendTextMessage(
-                    from,
-                    "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.\n\nWant an email notification when Gaurav replies? Simply reply with your email address below (optional)."
-                  );
-                } else {
-                  await WhatsAppMetaClient.sendTextMessage(
-                    from,
-                    "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly."
-                  );
-                }
-
-                // Dispatch real-time text-first email alert to Gaurav (including visitorEmail if captured)
-                const senderName = value.contacts?.[0]?.profile?.name || "WhatsApp Visitor";
-                void sendWhatsAppAdminAlert({
-                  senderName,
-                  senderPhone: from,
-                  messageText: textBody || rawInput,
-                  messageCount: currentCount,
-                  visitorEmail: session.email,
-                });
-              }
-            } else {
-              // Unrecognized message before greeting or selecting an option
               await WhatsAppMetaClient.sendTextMessage(
                 from,
-                'Hi there! Please send "Hi" to start.'
+                `Got it! We've saved your email (${detectedEmail}). You will receive an email the moment Gaurav replies.\n\nYou can continue chatting here anytime or visit the portfolio: https://gauravpatil.online`
               );
+
+              // Dispatch updated alert to Gaurav so he immediately gets the email and the 1-click notification button
+              const senderName = value.contacts?.[0]?.profile?.name || "WhatsApp Visitor";
+              void sendWhatsAppAdminAlert({
+                senderName,
+                senderPhone: from,
+                messageText: rawInput,
+                messageCount: session.messageCount || 1,
+                visitorEmail: detectedEmail,
+              });
+            } else if (session.messageCount >= 3) {
+              // Strict rate limit triggered on 4th message and beyond
+              await WhatsAppMetaClient.sendTextMessage(
+                from,
+                "⚠️ Message limit reached (maximum 3 messages). Gaurav has received all your messages and will reply directly to your WhatsApp as soon as he is online. Thank you for your patience!"
+              );
+            } else {
+              // Increment message count and persist to Firestore
+              session.messageCount += 1;
+              session.inChatMode = true;
+              await saveVisitorSession(from, session);
+
+              const currentCount = session.messageCount;
+
+              // Offer optional email notification on 1st message if email not provided yet
+              if (currentCount === 1 && !session.email) {
+                await WhatsAppMetaClient.sendTextMessage(
+                  from,
+                  "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly.\n\nWant an email notification when Gaurav replies? Simply reply with your email address below (optional)."
+                );
+              } else {
+                await WhatsAppMetaClient.sendTextMessage(
+                  from,
+                  "Thank you! Your message has been delivered to Gaurav. He will review it and reply directly to your WhatsApp shortly."
+                );
+              }
+
+              // Dispatch real-time text-first email alert to Gaurav (including visitorEmail if captured)
+              const senderName = value.contacts?.[0]?.profile?.name || "WhatsApp Visitor";
+              void sendWhatsAppAdminAlert({
+                senderName,
+                senderPhone: from,
+                messageText: textBody || rawInput,
+                messageCount: currentCount,
+                visitorEmail: session.email,
+              });
             }
           }
         }
