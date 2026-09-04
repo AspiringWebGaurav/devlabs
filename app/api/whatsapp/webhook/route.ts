@@ -29,6 +29,7 @@ interface VisitorSession {
   hasReceivedResume: boolean;
   messageCount: number; // 0, 1, 2, 3
   inChatMode: boolean;
+  chatModeActivatedAt?: number;
   email?: string;
   lastActivityAt: number;
 }
@@ -44,46 +45,54 @@ async function getVisitorSession(from: string): Promise<VisitorSession> {
   const cleanKey = from.replace(/[^0-9]/g, "");
 
   // 1. Check in-memory L1 cache
-  const cached = memorySessionCache.get(cleanKey);
-  if (cached && Date.now() - cached.lastActivityAt < 1000 * 60 * 60) {
-    cached.lastActivityAt = Date.now();
-    return cached;
-  }
+  let session = memorySessionCache.get(cleanKey);
 
-  // 2. Default initial state
-  let session: VisitorSession = {
-    hasReceivedResume: false,
-    messageCount: 0,
-    inChatMode: false,
-    lastActivityAt: Date.now(),
-  };
-
-  // 3. Fallback to Firestore persistent store
-  try {
-    const db = getAdminFirestore();
-    if (db) {
-      const doc = await db.collection("whatsapp_sessions").doc(cleanKey).get();
-      if (doc.exists) {
-        const data = doc.data() as Partial<VisitorSession>;
-        session = {
-          hasReceivedResume: Boolean(data.hasReceivedResume),
-          messageCount: typeof data.messageCount === "number" ? data.messageCount : 0,
-          inChatMode: Boolean(data.inChatMode),
-          email: data.email || undefined,
-          lastActivityAt: Date.now(),
-        };
+  // 2. Fallback to Firestore persistent store if not in memory
+  if (!session) {
+    try {
+      const db = getAdminFirestore();
+      if (db) {
+        const doc = await db.collection("whatsapp_sessions").doc(cleanKey).get();
+        if (doc.exists) {
+          const data = doc.data() as Partial<VisitorSession>;
+          session = {
+            hasReceivedResume: Boolean(data.hasReceivedResume),
+            messageCount: typeof data.messageCount === "number" ? data.messageCount : 0,
+            inChatMode: Boolean(data.inChatMode),
+            chatModeActivatedAt: typeof data.chatModeActivatedAt === "number" ? data.chatModeActivatedAt : undefined,
+            email: data.email || undefined,
+            lastActivityAt: typeof data.lastActivityAt === "number" ? data.lastActivityAt : Date.now(),
+          };
+        }
       }
+    } catch (err) {
+      adminLogger.warn("WhatsApp:FirestoreSessionReadFailed", "Could not load session from Firestore, using memory fallback", { error: err });
     }
-  } catch (err) {
-    adminLogger.warn("WhatsApp:FirestoreSessionReadFailed", "Could not load session from Firestore, using memory fallback", { error: err });
   }
 
-  // 4. Check 24-hour inactivity window: auto-refresh counters if visitor was inactive > 24 hours
+  // 3. Default initial state if neither memory nor Firestore had it
+  if (!session) {
+    session = {
+      hasReceivedResume: false,
+      messageCount: 0,
+      inChatMode: false,
+      lastActivityAt: Date.now(),
+    };
+  }
+
+  // 4. Inactivity window: auto-refresh counters if visitor was inactive > 15 minutes (prevents stale sessions)
   const now = Date.now();
-  if (session.lastActivityAt > 0 && now - session.lastActivityAt > 24 * 60 * 60 * 1000) {
+  if (session.lastActivityAt > 0 && now - session.lastActivityAt > 15 * 60 * 1000) {
     session.messageCount = 0;
     session.inChatMode = false;
+    session.chatModeActivatedAt = undefined;
     session.hasReceivedResume = false;
+  }
+
+  // 5. Auto-expire chat connection prompt if older than 3 minutes without sending inquiry
+  if (session.inChatMode && session.chatModeActivatedAt && now - session.chatModeActivatedAt > 3 * 60 * 1000) {
+    session.inChatMode = false;
+    session.chatModeActivatedAt = undefined;
   }
 
   memorySessionCache.set(cleanKey, session);
@@ -106,6 +115,7 @@ async function saveVisitorSession(from: string, session: VisitorSession): Promis
           hasReceivedResume: session.hasReceivedResume,
           messageCount: session.messageCount,
           inChatMode: session.inChatMode,
+          chatModeActivatedAt: session.chatModeActivatedAt || null,
           email: session.email || null,
           lastActivityAt: Date.now(),
         },
@@ -354,9 +364,14 @@ export async function POST(req: NextRequest): Promise<Response> {
             normalized === "CONDITIONS" ||
             normalized.includes("TERMS");
 
+          const isFreshChatConnection = Boolean(
+            session.inChatMode &&
+            session.chatModeActivatedAt &&
+            Date.now() - session.chatModeActivatedAt < 3 * 60 * 1000
+          );
+
           const isGreeting =
-            !session.inChatMode &&
-            session.messageCount === 0 &&
+            !isFreshChatConnection &&
             !isResumeAction &&
             !isChatAction &&
             !isGuidelinesAction &&
@@ -368,6 +383,9 @@ export async function POST(req: NextRequest): Promise<Response> {
               normalized === "HIII" ||
               normalized === "HELLO" ||
               normalized === "HEY" ||
+              normalized === "HEYY" ||
+              normalized === "GREETINGS" ||
+              normalized === "MENU" ||
               normalized.includes("PORTFOLIO")
             );
 
@@ -406,6 +424,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             session.hasReceivedResume = false;
             session.messageCount = 0;
             session.inChatMode = false;
+            session.chatModeActivatedAt = undefined;
             session.email = undefined;
             await saveVisitorSession(from, session);
 
@@ -559,6 +578,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           // -------------------------------------------------------------
           else if (isChatAction) {
             session.inChatMode = true;
+            session.chatModeActivatedAt = Date.now();
             await saveVisitorSession(from, session);
 
             const chatMsg =
@@ -654,7 +674,8 @@ export async function POST(req: NextRequest): Promise<Response> {
                 // SCENARIO 3: User sent both their inquiry message AND their email together
                 if (session.messageCount < 3) {
                   session.messageCount += 1;
-                  session.inChatMode = true;
+                  session.inChatMode = false;
+                  session.chatModeActivatedAt = undefined;
                   await saveVisitorSession(from, session);
                 }
 
@@ -679,7 +700,8 @@ export async function POST(req: NextRequest): Promise<Response> {
             } else {
               // SCENARIO 1: Normal inquiry message (or user holding / replying without email)
               session.messageCount += 1;
-              session.inChatMode = true;
+              session.inChatMode = false;
+              session.chatModeActivatedAt = undefined;
               await saveVisitorSession(from, session);
 
               const currentCount = session.messageCount;

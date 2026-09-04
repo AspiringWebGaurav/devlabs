@@ -103,6 +103,50 @@ export class WhatsAppNotificationsRepository {
       return false;
     }
   }
+
+  /**
+   * Retrieves a single notification record by its unique dispatch ID.
+   */
+  public async getNotificationById(id: string): Promise<WhatsAppNotificationRecord | null> {
+    try {
+      return await firestoreDataSource.getDocument<WhatsAppNotificationRecord>(COLLECTION_NAME, id);
+    } catch (err) {
+      adminLogger.error("WhatsAppNotificationsRepository:getNotificationById", err, "Failed to load notification by id", { id });
+      return null;
+    }
+  }
+
+  /**
+   * Records a notification with an explicit, predetermined dispatch ID (for strict single-click idempotency).
+   */
+  public async recordNotificationWithId(
+    id: string,
+    record: Omit<WhatsAppNotificationRecord, "id" | "createdAt">
+  ): Promise<WhatsAppNotificationRecord> {
+    const createdAt = Date.now();
+    const cleanPhone = record.visitorPhone.replace(/[^0-9]/g, "");
+
+    const newRecord: WhatsAppNotificationRecord = {
+      ...record,
+      id,
+      visitorPhone: cleanPhone,
+      visitorEmail: record.visitorEmail.trim().toLowerCase(),
+      createdAt,
+    };
+
+    try {
+      await firestoreDataSource.setDocument(COLLECTION_NAME, id, newRecord);
+      adminLogger.info("WhatsAppNotificationsRepository:recordNotificationWithId", "Recorded notification event with custom ID", {
+        id,
+        phone: cleanPhone,
+        email: record.visitorEmail,
+      });
+      return newRecord;
+    } catch (err) {
+      adminLogger.error("WhatsAppNotificationsRepository:recordNotificationWithId", err, "Failed to record notification with ID", { id });
+      return newRecord;
+    }
+  }
 }
 
 export const whatsappNotificationsRepository = new WhatsAppNotificationsRepository();

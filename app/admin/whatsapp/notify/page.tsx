@@ -10,10 +10,12 @@
 import React from "react";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin/constants";
 import { verifyAdminSession } from "@/lib/admin/auth";
 import { AdminPageContainer } from "@/components/admin";
 import { verifyNotifyVisitorSignature } from "@/lib/whatsapp/notifications";
+import { createWhatsAppReplyToken } from "@/lib/whatsapp/tokens";
 import { sendTransactionalEmail, EMAIL_IDENTITIES, formatSubmissionTimestamp, escapeHtml } from "@/lib/email";
 import { whatsappNotificationsRepository } from "@/lib/dal/repositories/whatsapp-notifications.repository";
 import { adminLogger } from "@/lib/admin/logger";
@@ -71,6 +73,16 @@ export default async function WhatsAppNotifyPage({ searchParams }: PageProps) {
         </div>
       </div>
     );
+  }
+
+  // Seamlessly route to standalone, non-admin webpage with cryptic token
+  if (rawEmail && rawPhone) {
+    const token = createWhatsAppReplyToken({
+      phone: rawPhone,
+      email: rawEmail,
+      name: rawName,
+    });
+    redirect(`/wa/notify/${token}`);
   }
 
   const visitorEmail = rawEmail || "visitor@example.com";

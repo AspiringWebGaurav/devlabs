@@ -16,6 +16,7 @@ import crypto from "crypto";
 import { sendTransactionalEmail, EMAIL_IDENTITIES, formatSubmissionTimestamp, escapeHtml } from "@/lib/email";
 import { adminLogger } from "@/lib/admin/logger";
 import { getWhatsAppBaseUrl } from "./config/whatsapp.config";
+import { createWhatsAppReplyToken } from "./tokens";
 
 export interface WhatsAppInboundAlertParams {
   senderName: string;
@@ -66,18 +67,18 @@ export async function sendWhatsAppAdminAlert(params: WhatsAppInboundAlertParams)
 
     const baseUrl = getWhatsAppBaseUrl();
 
-    // Construct secure 1-click visitor email notification link IF visitor provided an email
+    // Construct secure, cryptic, standalone 1-click visitor email notification link IF visitor provided an email
     let notifyVisitorUrl = "";
     if (params.visitorEmail && params.visitorEmail.trim().length > 0) {
       const cleanVisitorEmail = params.visitorEmail.trim().toLowerCase();
-      const sig = createNotifyVisitorSignature(cleanVisitorEmail, cleanPhone);
-      const searchParams = new URLSearchParams({
-        email: cleanVisitorEmail,
+      const replyToken = createWhatsAppReplyToken({
         phone: cleanPhone,
+        email: cleanVisitorEmail,
         name: params.senderName || "Visitor",
-        sig,
+        messageCount: params.messageCount,
+        timestamp: Date.now(),
       });
-      notifyVisitorUrl = `${baseUrl}/admin/whatsapp/notify?${searchParams.toString()}`;
+      notifyVisitorUrl = `${baseUrl}/wa/notify/${replyToken}`;
     }
 
     // Plain text representation
