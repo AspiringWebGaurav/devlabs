@@ -46,6 +46,15 @@ export class WhatsAppMetaClient {
     buttons: QuickReplyButton[],
     footerText?: string
   ): Promise<SendMessageResult> {
+    // Meta Graph API hard ceiling: interactive body text must be <= 1024 characters
+    if (bodyText.length > 1024) {
+      const textResult = await this.sendTextMessage(toPhone, bodyText);
+      if (!textResult.success) {
+        return textResult;
+      }
+      bodyText = "Select an option below to proceed:";
+    }
+
     return this.postGraphMessage(toPhone, {
       type: "interactive",
       interactive: {

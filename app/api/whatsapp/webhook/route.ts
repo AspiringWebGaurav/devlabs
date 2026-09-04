@@ -282,15 +282,18 @@ export async function POST(req: NextRequest): Promise<Response> {
             sessionMessageCount: session.messageCount,
           });
 
-          // Action matchers
+          // Action matchers with smart typo-tolerance
           const isResumeAction =
             buttonId === "btn_resume" ||
             buttonTitle.toLowerCase().includes("resume") ||
             normalized === "RESUME" ||
+            normalized === "CV" ||
+            normalized === "BIO" ||
             normalized === "VIEW RESUME" ||
             normalized === "📄 VIEW RESUME" ||
             normalized.includes("VIEW RESUME") ||
             normalized === "GET RESUME" ||
+            normalized.includes("RESUME") ||
             normalized === "1";
 
           const isChatAction =
@@ -303,16 +306,27 @@ export async function POST(req: NextRequest): Promise<Response> {
             normalized === "TALK TO GAURAV" ||
             normalized.includes("TALK TO GAURAV") ||
             normalized.includes("TALK WITH GAURAV") ||
+            normalized === "CONNECT" ||
             normalized === "2";
 
           const isGuidelinesAction =
             normalized === "GUIDELINES" ||
             normalized === "GUIDELINE" ||
+            normalized === "GUIDLINES" ||
+            normalized === "GUIDLINE" ||
+            normalized === "GUIDELIN" ||
+            normalized === "GUIDELINS" ||
+            normalized.includes("GUIDELINE") ||
+            normalized.includes("GUIDLINE") ||
             normalized === "RULES" ||
             normalized === "RULE" ||
             normalized === "HELP" ||
             normalized === "INFO" ||
-            normalized === "GUIDE";
+            normalized === "FAQ" ||
+            normalized === "GUIDE" ||
+            normalized === "COMMANDS" ||
+            normalized === "COMMAND" ||
+            normalized === "INSTRUCTIONS";
 
           const isExportAction =
             normalized === "EXPORTMYDATA" ||
@@ -320,14 +334,20 @@ export async function POST(req: NextRequest): Promise<Response> {
             normalized === "MYDATA" ||
             normalized === "EXPORTDATA" ||
             normalized === "DOWNLOADMYDATA" ||
-            normalized === "DATAEXPORT";
+            normalized === "DATAEXPORT" ||
+            normalized === "GDPR" ||
+            normalized.includes("EXPORT") ||
+            normalized.includes("MYDATA");
 
           const isTermsAction =
             normalized === "TERMS" ||
+            normalized === "TERM" ||
             normalized === "TOC" ||
+            normalized === "TOS" ||
             normalized === "TERMSOFSERVICE" ||
             normalized === "CONDITION" ||
-            normalized === "CONDITIONS";
+            normalized === "CONDITIONS" ||
+            normalized.includes("TERMS");
 
           const isGreeting =
             !isResumeAction &&
@@ -439,11 +459,13 @@ export async function POST(req: NextRequest): Promise<Response> {
 
           // -------------------------------------------------------------
           // 5. Discord-Style "/guidelines" or "/rules" or "/help"
+          // Dispatches comprehensive guidelines text followed by quick-reply action buttons
           // -------------------------------------------------------------
           else if (isGuidelinesAction) {
+            await WhatsAppMetaClient.sendTextMessage(from, GUIDELINES_TEXT);
             await WhatsAppMetaClient.sendQuickReplyButtons(
               from,
-              GUIDELINES_TEXT,
+              "Select an option below to proceed:",
               [
                 { id: "btn_resume", title: "📄 View Resume" },
                 { id: "btn_chat", title: "💬 Chat with Gaurav" },
@@ -526,6 +548,35 @@ export async function POST(req: NextRequest): Promise<Response> {
               GREETING_FOOTER
             );
             void recordChatMessage(from, "assistant", GREETING_TEXT);
+          }
+
+          // -------------------------------------------------------------
+          // 9. Unrecognized Slash Command Protection (/anything_else)
+          // Prevents unrecognized commands like /menu, /helpme, /status from
+          // erroneously consuming one of the visitor's 3 direct message slots!
+          // -------------------------------------------------------------
+          else if (rawInput.trim().startsWith("/")) {
+            const unknownCommand = rawInput.trim().split(/\s+/)[0];
+            const helpMessage =
+              `❓ *Command not recognized:* \`${unknownCommand}\`\n\n` +
+              "Here are the available commands:\n" +
+              "• */guidelines* — Chat rules, options & rights\n" +
+              "• */terms* — WhatsApp Channel Terms of Service\n" +
+              "• */exportmydata* — Download full chat history (.zip)\n" +
+              "• *STOP* — Unsubscribe & permanently erase data\n" +
+              "• *START* — Reset session and display menu\n\n" +
+              "💡 *Tip:* Select an option below or simply type your message to connect directly with Gaurav!";
+
+            await WhatsAppMetaClient.sendQuickReplyButtons(
+              from,
+              helpMessage,
+              [
+                { id: "btn_resume", title: "📄 View Resume" },
+                { id: "btn_chat", title: "💬 Chat with Gaurav" },
+              ],
+              GREETING_FOOTER
+            );
+            void recordChatMessage(from, "assistant", helpMessage);
           }
 
           // -------------------------------------------------------------
