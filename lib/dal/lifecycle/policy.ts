@@ -231,17 +231,6 @@ export const LIFECYCLE_POLICY: Record<string, PolicyEntityDefinition> = {
     canSeed: true,
     isProtected: false,
   },
-  portfolio_legal_docs: {
-    name: "portfolio_legal_docs",
-    store: "firestore",
-    classification: "STATIC_CANONICAL",
-    description: "Authoritative public Terms of Service and Privacy Policy singletons and active drafts",
-    publicFeatureDependency: "app/terms/page.tsx, app/privacy/page.tsx",
-    isSingleton: false,
-    canDelete: true,
-    canSeed: true,
-    isProtected: false,
-  },
 
   // =========================================================================
   // 3. OPERATIONAL METADATA & SYSTEM SIGNALS (Never Deleted by Clean/Reset)
@@ -286,6 +275,17 @@ export const LIFECYCLE_POLICY: Record<string, PolicyEntityDefinition> = {
     canDelete: false,
     canSeed: false,
     isProtected: false,
+  },
+  portfolio_legal_docs: {
+    name: "portfolio_legal_docs",
+    store: "firestore",
+    classification: "OPERATIONAL_METADATA",
+    description: "Authoritative public Terms of Service and Privacy Policy singletons and active drafts (Preserved across purges)",
+    publicFeatureDependency: "app/terms/page.tsx, app/privacy/page.tsx",
+    isSingleton: false,
+    canDelete: false, // PRESERVED: Never deleted during Clean or Reset
+    canSeed: false,
+    isProtected: true,
   },
   portfolio_legal_history: {
     name: "portfolio_legal_history",
