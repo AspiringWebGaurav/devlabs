@@ -16,8 +16,35 @@ import {
   FaDownload,
 } from "react-icons/fa6";
 import { IoChatbubbleEllipses } from "react-icons/io5";
+import type { LegalDocument } from "@/types/legal";
+import { MarkdownLegalRenderer } from "./MarkdownLegalRenderer";
 
-function PrivacyContentInner() {
+export interface PrivacyPolicyContentProps {
+  initialData?: Omit<LegalDocument, "draft">;
+}
+
+function getPrivacySectionIcon(id: string) {
+  switch (id) {
+    case "anonymity":
+      return <FaUserSecret className="w-4 h-4 text-purple" />;
+    case "turnstile":
+      return <FaRobot className="w-4 h-4 text-purple" />;
+    case "brevo":
+      return <FaEnvelope className="w-4 h-4 text-purple" />;
+    case "data-rights":
+      return <FaLock className="w-4 h-4 text-purple" />;
+    case "assistant-privacy":
+      return <IoChatbubbleEllipses className="w-5 h-5 text-purple" />;
+    case "whatsapp-data-export":
+      return <FaWhatsapp className="w-5 h-5 text-[#25D366]" />;
+    case "admin-privacy":
+      return <FaShieldHalved className="w-4 h-4 text-purple" />;
+    default:
+      return <FaShieldHalved className="w-4 h-4 text-purple" />;
+  }
+}
+
+function PrivacyContentInner({ initialData }: PrivacyPolicyContentProps) {
   const searchParams = useSearchParams();
   const focusParam = searchParams.get("focus");
 
@@ -168,11 +195,13 @@ function PrivacyContentInner() {
             Privacy Policy
           </h1>
           <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400 font-mono">
-            <span>Original Effective: January 1, 2026</span>
+            <span>Version: {initialData?.publishedVersion || "0.0.1"}</span>
             <span>•</span>
-            <span className="text-purple font-semibold">Last Updated: August 29, 2026</span>
+            <span>Original Effective: {initialData?.effectiveDate || "January 1, 2026"}</span>
             <span>•</span>
-            <span className="text-emerald-400 font-semibold">Standard: Privacy-First</span>
+            <span className="text-purple font-semibold">Last Updated: {initialData?.lastUpdatedDate || "August 29, 2026"}</span>
+            <span>•</span>
+            <span className="text-emerald-400 font-semibold">Standard: {initialData?.jurisdiction || "Privacy-First"}</span>
           </div>
 
           {filterMode === "contact" && (
@@ -232,6 +261,61 @@ function PrivacyContentInner() {
 
         {/* Content Box */}
         <div className="w-full rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl p-6 sm:p-10 lg:p-12 space-y-8 text-neutral-300 leading-relaxed text-sm sm:text-base">
+          {initialData?.sections && initialData.sections.length > 0 ? (
+            initialData.sections.map((section) => {
+              const isVisible =
+                filterMode === "all" ||
+                (filterMode === "contact" && (section.filterMode === "contact" || section.id === "anonymity" || section.id === "turnstile" || section.id === "brevo")) ||
+                (filterMode === "assistant" && (section.filterMode === "assistant" || section.id === "assistant-privacy")) ||
+                (filterMode === "whatsapp" && (section.filterMode === "whatsapp" || section.id === "whatsapp-data-export"));
+
+              if (!isVisible) return null;
+
+              const isHighlighted =
+                highlightedSection === section.id ||
+                (filterMode === "contact" && (section.filterMode === "contact" || section.id === "anonymity")) ||
+                (filterMode === "assistant" && (section.filterMode === "assistant" || section.id === "assistant-privacy")) ||
+                (filterMode === "whatsapp" && (section.filterMode === "whatsapp" || section.id === "whatsapp-data-export"));
+
+              const isWhatsappTheme = section.filterMode === "whatsapp" || section.id === "whatsapp-data-export";
+
+              return (
+                <section
+                  key={section.id}
+                  id={section.id}
+                  className={`space-y-4 p-4 sm:p-6 rounded-xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
+                    isHighlighted
+                      ? isWhatsappTheme
+                        ? "bg-[#25D366]/10 border border-[#25D366]/50 shadow-[0_0_30px_rgba(37,211,102,0.15)] ring-1 ring-[#25D366]/50"
+                        : "bg-[#7C3AED]/10 border border-[#7C3AED]/50 shadow-[0_0_30px_rgba(124,58,237,0.15)] ring-1 ring-[#7C3AED]/50"
+                      : section.filterMode !== "all"
+                      ? "border border-white/[0.06] bg-white/[0.02]"
+                      : "border border-transparent"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+                    <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
+                      {getPrivacySectionIcon(section.id)}
+                      <span>{section.heading}</span>
+                    </h2>
+                    {isHighlighted && (
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                          isWhatsappTheme
+                            ? "bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/40"
+                            : "bg-[#7C3AED]/30 text-[#CBACF9] border border-[#7C3AED]/50"
+                        }`}
+                      >
+                        {isWhatsappTheme ? "WhatsApp Privacy" : section.filterMode === "contact" ? "Contact Term" : "Assistant Deep-Dive"}
+                      </span>
+                    )}
+                  </div>
+                  <MarkdownLegalRenderer content={section.contentMarkdown} />
+                </section>
+              );
+            })
+          ) : (
+            <>
           {/* Section 1: Overview */}
           {filterMode === "all" && (
             <section id="overview" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
@@ -471,9 +555,28 @@ function PrivacyContentInner() {
                     <code className="text-xs sm:text-sm text-purple font-mono font-bold">no-reply@gauravpatil.online</code>
                   </div>
                   <p className="text-xs text-neutral-400 pl-3.5">
-                    Non-interactive automated notifications, system passcodes, and security verifications only.
+                    Non-interactive automated notifications, system passcodes, and mandatory legal announcements only.
                   </p>
                 </div>
+              </div>
+
+              {/* Mandatory Legal & Policy Update Notices */}
+              <div className="mt-3 p-3.5 rounded-lg bg-white/[0.02] border border-white/[0.08] space-y-2 text-xs sm:text-sm">
+                <h4 className="font-semibold text-white text-xs sm:text-sm flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-purple" />
+                  Mandatory Legal Update Broadcasts &amp; Strict No-Unsubscribe Standard
+                </h4>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  Email addresses submitted through contact forms, assistant support inquiries, or verified via One-Time Passcodes (OTP) for Live Chat are securely stored in encrypted cloud databases. These addresses receive mandatory service announcements whenever the public Terms of Service or Privacy Policy are amended.
+                </p>
+                <ul className="list-disc list-inside space-y-1 pl-1 text-xs text-neutral-300">
+                  <li>
+                    <strong className="text-white">Strict Non-Marketing Standard:</strong> These dispatches are 100% transactional legal disclosures and never include commercial promotions, marketing campaigns, or sales sequences.
+                  </li>
+                  <li>
+                    <strong className="text-white">No-Unsubscribe Requirement:</strong> Because these announcements represent vital contractual and operational transparency notices, they do not offer an opt-out or unsubscribe mechanism. Even if automated email client features (such as Google/Gmail automatic 1-click unsubscribe headers) are invoked at the client level, you acknowledge and agree that you will continue to receive mandatory legal and policy updates as per this policy and your acceptance of use.
+                  </li>
+                </ul>
               </div>
             </div>
 
@@ -653,6 +756,8 @@ function PrivacyContentInner() {
               </a>
             </p>
           </section>
+            </>
+          )}
         </div>
 
         {/* Footer Note */}
@@ -664,10 +769,10 @@ function PrivacyContentInner() {
   );
 }
 
-export function PrivacyPolicyContent() {
+export function PrivacyPolicyContent({ initialData }: PrivacyPolicyContentProps) {
   return (
     <Suspense fallback={<div className="min-h-screen bg-black-100 text-white flex items-center justify-center">Loading Privacy Policy...</div>}>
-      <PrivacyContentInner />
+      <PrivacyContentInner initialData={initialData} />
     </Suspense>
   );
 }

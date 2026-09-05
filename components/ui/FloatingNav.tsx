@@ -140,12 +140,12 @@ export const FloatingNav = ({
     let ticking = false;
 
     const handleScroll = () => {
-      if (isNavigatingRef.current || ticking) return;
+      if (isNavigatingRef.current || ticking || isModalOpen) return;
       ticking = true;
 
       requestAnimationFrame(() => {
         ticking = false;
-        if (isNavigatingRef.current) return;
+        if (isNavigatingRef.current || isModalOpen) return;
 
         const scrollY = window.scrollY;
         const viewportHeight = window.innerHeight;
@@ -159,10 +159,10 @@ export const FloatingNav = ({
           return;
         }
 
-        // 2. Absolute bottom detection (Footer / Contact view)
+        // 2. Absolute bottom detection (Footer / Contact section view)
         if (viewportHeight + scrollY >= docHeight - 120) {
-          if (window.location.pathname !== "/contact") {
-            window.history.replaceState(null, "", "/contact");
+          if (window.location.hash !== "#contact" && window.location.pathname !== "/contact") {
+            window.history.replaceState(null, "", "/#contact");
           }
           return;
         }
@@ -187,13 +187,18 @@ export const FloatingNav = ({
         }
 
         if (dominantSection) {
-          // Map intermediate sections to primary navbar routes
-          let targetPath = `/${dominantSection}`;
-          if (dominantSection === "experience") targetPath = "/testimonials";
-          if (dominantSection === "approach") targetPath = "/contact";
+          if (dominantSection === "contact" || dominantSection === "approach") {
+            if (window.location.hash !== "#contact" && window.location.pathname !== "/contact") {
+              window.history.replaceState(null, "", "/#contact");
+            }
+          } else {
+            // Map intermediate sections to primary navbar routes
+            let targetPath = `/${dominantSection}`;
+            if (dominantSection === "experience") targetPath = "/testimonials";
 
-          if (window.location.pathname !== targetPath) {
-            window.history.replaceState(null, "", targetPath);
+            if (window.location.pathname !== targetPath) {
+              window.history.replaceState(null, "", targetPath);
+            }
           }
         }
       });
@@ -215,7 +220,7 @@ export const FloatingNav = ({
       window.removeEventListener("nav-scroll-start", onNavStartCustom);
       if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
     };
-  }, [pathname]);
+  }, [pathname, isModalOpen]);
 
   // =========================================================================
   // 3. Navbar Visibility & Directional Motion

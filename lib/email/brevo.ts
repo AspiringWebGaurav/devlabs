@@ -56,6 +56,7 @@ export function formatBrevoIdempotencyKey(key: string): string {
 export interface SendTransactionalEmailOptions {
   purpose?: EmailPurpose;
   identity?: EmailIdentity;
+  senderName?: string;
   to: EmailRecipient[];
   cc?: EmailRecipient[];
   bcc?: EmailRecipient[];
@@ -213,7 +214,7 @@ export async function sendTransactionalEmail(
 
   const payload: Record<string, unknown> = {
     sender: {
-      name: senderIdentity.name,
+      name: options.senderName?.trim() || senderIdentity.name,
       email: senderIdentity.email,
     },
     to: options.to.map((rec) => ({

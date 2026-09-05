@@ -51,6 +51,13 @@ export const BUTTON_HELP = {
   RESET_DATABASE: "Full environment reset: wipes all dynamic records and static portfolio content to zero while keeping admin authentication 100% intact.",
   RECONCILE_DATABASE: "Audits full-system drift across Firestore, RTDB, Redis, and signals; safely repairs missing or drifted static documents.",
   RESET_AND_RESEED: "Wipes dynamic data and repopulates the development database with realistic synthetic dummy inquiries, chats, and mail records.",
+
+  // Legal Center (/admin/legal)
+  LEGAL_PUBLISH: "Atomically publishes the new legal version to the live website, archives the previous version to immutable history, and initializes legal notification jobs if marked material.",
+  LEGAL_SAVE_DRAFT: "Saves your working changes privately to the database without modifying the live public website.",
+  LEGAL_DISCARD_DRAFT: "Discards private unpublished draft changes and restores the current published state.",
+  LEGAL_RESTORE_VERSION: "Loads this historical version into the draft editor so you can review and republish it.",
+  LEGAL_RETRY_JOB: "Re-queues failed recipient notifications for this legal update and re-triggers the background processor.",
 } as const;
 
 export type ButtonHelpKey = keyof typeof BUTTON_HELP;

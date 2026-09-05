@@ -156,7 +156,113 @@ class FirestoreDataSource {
         hasMore,
         totalFetched: items.length,
       };
-    } catch (err) {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const isMissingIndex =
+        errMsg.includes("requires an index") ||
+        errMsg.includes("FAILED_PRECONDITION") ||
+        (typeof err === "object" && err !== null && "code" in err && (err as { code: unknown }).code === 9);
+
+      if (isMissingIndex) {
+        const urlMatch = errMsg.match(/https:\/\/console\.firebase\.google\.com[^\s"']+/);
+        const indexUrl = urlMatch ? urlMatch[0] : null;
+
+        adminLogger.warn(
+          `Firestore:queryCollection:${collectionName}:resilientFallback`,
+          "Firestore compound index is pending or missing. Safely serving query via resilient in-memory index fallback.",
+          {
+            collectionName,
+            indexUrl,
+            orderByField: options.orderByField,
+            whereCount: options.whereConditions?.length || 0,
+          }
+        );
+
+        try {
+          // Fallback: Query with whereConditions only (bypassing missing composite index requirement)
+          let fallbackQ: Query<DocumentData> = db.collection(collectionName);
+          if (options.whereConditions && options.whereConditions.length > 0) {
+            for (const cond of options.whereConditions) {
+              fallbackQ = fallbackQ.where(cond.field, cond.operator, cond.value);
+            }
+          }
+
+          const limit = options.limit || 20;
+          // Fetch up to limit * 3 (or max 100) to allow accurate in-memory sort
+          fallbackQ = fallbackQ.limit(Math.min(limit * 3, 100));
+
+          let fallbackSnap;
+          try {
+            fallbackSnap = await fallbackQ.get();
+          } catch (whereErr) {
+            // If multi-where failed due to compound index requirement, query with first where condition
+            if (options.whereConditions && options.whereConditions.length > 1) {
+              const firstCond = options.whereConditions[0];
+              const singleQ = db.collection(collectionName).where(firstCond.field, firstCond.operator, firstCond.value).limit(Math.min(limit * 4, 150));
+              fallbackSnap = await singleQ.get();
+            } else {
+              throw whereErr;
+            }
+          }
+
+          let items: T[] = fallbackSnap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as T[];
+
+          // In-memory filter for remaining where conditions
+          if (options.whereConditions && options.whereConditions.length > 1) {
+            for (let i = 1; i < options.whereConditions.length; i++) {
+              const cond = options.whereConditions[i];
+              items = items.filter((doc: unknown) => {
+                const rec = doc as Record<string, unknown>;
+                const val = rec[cond.field];
+                switch (cond.operator) {
+                  case "==": return val === cond.value;
+                  case "!=": return val !== cond.value;
+                  case "<": return typeof val === "number" && typeof cond.value === "number" ? val < cond.value : String(val) < String(cond.value);
+                  case "<=": return typeof val === "number" && typeof cond.value === "number" ? val <= cond.value : String(val) <= String(cond.value);
+                  case ">": return typeof val === "number" && typeof cond.value === "number" ? val > cond.value : String(val) > String(cond.value);
+                  case ">=": return typeof val === "number" && typeof cond.value === "number" ? val >= cond.value : String(val) >= String(cond.value);
+                  case "in": return Array.isArray(cond.value) && cond.value.includes(val);
+                  default: return true;
+                }
+              });
+            }
+          }
+
+          // In-memory sort by orderByField
+          if (options.orderByField) {
+            const field = options.orderByField;
+            const dir = (options.orderDirection || "desc") === "asc" ? 1 : -1;
+            items.sort((a: unknown, b: unknown) => {
+              const recA = a as Record<string, unknown>;
+              const recB = b as Record<string, unknown>;
+              const va = recA[field];
+              const vb = recB[field];
+              if (va === vb) return 0;
+              if (va == null) return 1;
+              if (vb == null) return -1;
+              return va > vb ? dir : -dir;
+            });
+          }
+
+          const hasMore = items.length > limit;
+          const resultItems = items.slice(0, limit);
+          const lastDoc = fallbackSnap.docs.length > 0 ? fallbackSnap.docs[Math.min(resultItems.length - 1, fallbackSnap.docs.length - 1)] : null;
+
+          return {
+            docs: resultItems,
+            lastDoc,
+            hasMore,
+            totalFetched: resultItems.length,
+          };
+        } catch (fallbackErr) {
+          adminLogger.error(`Firestore:queryCollection:${collectionName}:fallbackFailed`, fallbackErr, "Fallback query also failed");
+          throw err;
+        }
+      }
+
       adminLogger.error(`Firestore:queryCollection:${collectionName}`, err, "Failed to query collection");
       throw err;
     }

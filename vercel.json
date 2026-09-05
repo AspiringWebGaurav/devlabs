@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/legal-job-recovery",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { FaLocationArrow } from "react-icons/fa6";
 import { FaGithub, FaTwitter, FaLinkedin } from "react-icons/fa";
 
@@ -23,6 +24,80 @@ export const FooterSection = ({
   socialLinks = SEED_SOCIAL_LINKS,
 }: FooterSectionProps) => {
   const [isContactOpen, setIsContactOpen] = useState(false);
+  const pathname = usePathname();
+  const isDirectInitRef = useRef(false);
+
+  // Helper to open the contact form and push /contact to browser address bar
+  const handleOpenContact = useCallback(() => {
+    setIsContactOpen(true);
+    if (typeof window !== "undefined" && window.location.pathname !== "/contact") {
+      window.history.pushState({ contactModal: true }, "", "/contact");
+    }
+  }, []);
+
+  // Helper to close the contact form and cleanly revert the address bar
+  const handleCloseContact = useCallback(() => {
+    setIsContactOpen(false);
+    if (typeof window !== "undefined" && window.location.pathname === "/contact") {
+      window.history.replaceState(null, "", "/");
+    }
+  }, []);
+
+  // Synchronize modal state on initial mount, browser back/forward (popstate), and custom events
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const checkShouldOpen = () => {
+      const currentPath = window.location.pathname;
+      const search = window.location.search;
+      const params = new URLSearchParams(search);
+
+      return (
+        currentPath === "/contact" ||
+        params.get("contact") === "true" ||
+        params.get("contact") === "open"
+      );
+    };
+
+    if (checkShouldOpen() && !isDirectInitRef.current) {
+      isDirectInitRef.current = true;
+      setIsContactOpen(true);
+
+      // Smoothly anchor background page layout to the contact section
+      requestAnimationFrame(() => {
+        const el = document.getElementById("contact");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    }
+
+    // Handle browser Back and Forward navigation smoothly
+    const handlePopState = () => {
+      const shouldOpen = checkShouldOpen();
+      setIsContactOpen(shouldOpen);
+    };
+
+    // Support external custom open trigger
+    const handleOpenCustom = () => {
+      handleOpenContact();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("open-contact-modal", handleOpenCustom);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("open-contact-modal", handleOpenCustom);
+    };
+  }, [handleOpenContact]);
+
+  // Synchronize when Next.js client-side route navigation targets /contact
+  useEffect(() => {
+    if (pathname === "/contact") {
+      setIsContactOpen(true);
+    }
+  }, [pathname]);
 
   const sortedSocial = [...socialLinks].sort((a, b) => (a.order || 0) - (b.order || 0));
 
@@ -72,7 +147,7 @@ export const FooterSection = ({
             title={cta.buttonText || "Let's get in touch"}
             icon={<FaLocationArrow />}
             position="right"
-            handleClick={() => setIsContactOpen(true)}
+            handleClick={handleOpenContact}
           />
         </div>
       )}
@@ -151,7 +226,7 @@ export const FooterSection = ({
       {/* Dynamic Interactive Contact Modal */}
       <ContactModal
         isOpen={isContactOpen}
-        onClose={() => setIsContactOpen(false)}
+        onClose={handleCloseContact}
       />
     </footer>
   );

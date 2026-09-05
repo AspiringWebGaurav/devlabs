@@ -16,8 +16,36 @@ import {
   FaWhatsapp,
 } from "react-icons/fa6";
 import { IoChatbubbleEllipses } from "react-icons/io5";
+import type { LegalDocument } from "@/types/legal";
+import { MarkdownLegalRenderer } from "./MarkdownLegalRenderer";
 
-function TermsContentInner() {
+export interface TermsOfServiceContentProps {
+  initialData?: Omit<LegalDocument, "draft">;
+}
+
+function getTermsSectionIcon(id: string) {
+  switch (id) {
+    case "anonymity":
+      return <FaUserSecret className="w-4 h-4 text-purple" />;
+    case "ip":
+      return <FaCode className="w-4 h-4 text-purple" />;
+    case "abuse-mitigation":
+      return <FaRobot className="w-4 h-4 text-purple" />;
+    case "email-standards":
+    case "legal-contact":
+      return <FaEnvelope className="w-4 h-4 text-purple" />;
+    case "assistant-terms":
+      return <IoChatbubbleEllipses className="w-5 h-5 text-purple" />;
+    case "whatsapp-terms":
+      return <FaWhatsapp className="w-5 h-5 text-[#25D366]" />;
+    case "admin-governance":
+      return <FaShieldHalved className="w-4 h-4 text-purple" />;
+    default:
+      return <FaScaleBalanced className="w-4 h-4 text-purple" />;
+  }
+}
+
+function TermsContentInner({ initialData }: TermsOfServiceContentProps) {
   const searchParams = useSearchParams();
   const focusParam = searchParams.get("focus");
 
@@ -168,11 +196,13 @@ function TermsContentInner() {
             Terms of Service
           </h1>
           <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400 font-mono">
-            <span>Original Effective: January 1, 2026</span>
+            <span>Version: {initialData?.publishedVersion || "0.0.1"}</span>
             <span>•</span>
-            <span className="text-purple font-semibold">Last Updated: August 29, 2026</span>
+            <span>Original Effective: {initialData?.effectiveDate || "January 1, 2026"}</span>
             <span>•</span>
-            <span className="text-emerald-400 font-semibold">Jurisdiction: Standard Global</span>
+            <span className="text-purple font-semibold">Last Updated: {initialData?.lastUpdatedDate || "August 29, 2026"}</span>
+            <span>•</span>
+            <span className="text-emerald-400 font-semibold">Jurisdiction: {initialData?.jurisdiction || "Standard Global"}</span>
           </div>
 
           {filterMode === "contact" && (
@@ -232,7 +262,62 @@ function TermsContentInner() {
 
         {/* Content Box */}
         <div className="w-full rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl p-6 sm:p-10 lg:p-12 space-y-8 text-neutral-300 leading-relaxed text-sm sm:text-base">
-          {/* Section 1: Acceptance */}
+          {initialData?.sections && initialData.sections.length > 0 ? (
+            initialData.sections.map((section) => {
+              const isVisible =
+                filterMode === "all" ||
+                (filterMode === "contact" && (section.filterMode === "contact" || section.id === "anonymity" || section.id === "abuse-mitigation" || section.id === "email-standards")) ||
+                (filterMode === "assistant" && (section.filterMode === "assistant" || section.id === "assistant-terms")) ||
+                (filterMode === "whatsapp" && (section.filterMode === "whatsapp" || section.id === "whatsapp-terms"));
+
+              if (!isVisible) return null;
+
+              const isHighlighted =
+                highlightedSection === section.id ||
+                (filterMode === "contact" && (section.filterMode === "contact" || section.id === "anonymity")) ||
+                (filterMode === "assistant" && (section.filterMode === "assistant" || section.id === "assistant-terms")) ||
+                (filterMode === "whatsapp" && (section.filterMode === "whatsapp" || section.id === "whatsapp-terms"));
+
+              const isWhatsappTheme = section.filterMode === "whatsapp" || section.id === "whatsapp-terms";
+
+              return (
+                <section
+                  key={section.id}
+                  id={section.id}
+                  className={`space-y-4 p-4 sm:p-6 rounded-xl transition-all duration-300 scroll-mt-24 sm:scroll-mt-32 ${
+                    isHighlighted
+                      ? isWhatsappTheme
+                        ? "bg-[#25D366]/10 border border-[#25D366]/50 shadow-[0_0_30px_rgba(37,211,102,0.15)] ring-1 ring-[#25D366]/50"
+                        : "bg-[#7C3AED]/10 border border-[#7C3AED]/50 shadow-[0_0_30px_rgba(124,58,237,0.15)] ring-1 ring-[#7C3AED]/50"
+                      : section.filterMode !== "all"
+                      ? "border border-white/[0.06] bg-white/[0.02]"
+                      : "border border-transparent"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+                    <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
+                      {getTermsSectionIcon(section.id)}
+                      <span>{section.heading}</span>
+                    </h2>
+                    {isHighlighted && (
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                          isWhatsappTheme
+                            ? "bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/40"
+                            : "bg-[#7C3AED]/30 text-[#CBACF9] border border-[#7C3AED]/50"
+                        }`}
+                      >
+                        {isWhatsappTheme ? "WhatsApp Term" : section.filterMode === "contact" ? "Contact Term" : "Assistant Deep-Dive"}
+                      </span>
+                    )}
+                  </div>
+                  <MarkdownLegalRenderer content={section.contentMarkdown} />
+                </section>
+              );
+            })
+          ) : (
+            <>
+              {/* Section 1: Acceptance */}
           {filterMode === "all" && (
             <section id="acceptance" className="space-y-3 scroll-mt-24 sm:scroll-mt-32">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
@@ -240,8 +325,8 @@ function TermsContentInner() {
                 <span>1. Acceptance of Terms &amp; Accessibility Commitment</span>
               </h2>
               <p>
-                By accessing and interacting with <span className="text-purple font-semibold">Gaurav Portfolio</span>,
-                you acknowledge and agree to be bound by these Terms of Service. This platform commits to a strict 
+                By accessing, browsing, submitting inquiries, using authenticated services, or otherwise interacting with <span className="text-purple font-semibold">Gaurav Portfolio</span>,
+                you acknowledge and agree to be bound by these Terms of Service and all applicable policies. This platform commits to a strict 
                 <strong className="text-white"> Mobile-First 10/10 Production Standard</strong>, ensuring zero horizontal overflow, 
                 fluid typography, touch-ergonomic 44px hit targets, accessible reduced-motion fallbacks, and single-view contact workflows 
                 across all modern smartphones, tablets, and desktop workstations. If you do not agree with any provision, you may discontinue viewing or utilizing this platform.
@@ -332,7 +417,7 @@ function TermsContentInner() {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2.5">
                 <FaEnvelope className="w-4 h-4 text-purple" />
-                <span>5. Transactional Communication Standards</span>
+                <span>5. Transactional Communication Standards &amp; Mandatory Legal Update Announcements</span>
               </h2>
               {filterMode === "contact" && (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/[0.08] text-neutral-300 border border-white/[0.15]">
@@ -341,8 +426,25 @@ function TermsContentInner() {
               )}
             </div>
             <p>
-              All transactional emails, contact receipts, and security alerts are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono">gauravservices.eu.cc</span> preserved) via Brevo API. Official sender identities include <code className="text-purple font-mono">hello@gauravpatil.online</code> (inquiries and auto-replies), <code className="text-purple font-mono">security@gauravpatil.online</code> (authentication alerts), and <code className="text-purple font-mono">no-reply@gauravpatil.online</code> (system OTPs). A strict zero-spam guarantee is maintained: submitted contact emails are never enrolled in marketing sequences.
+              All transactional emails, contact receipts, security alerts, and mandatory policy notices are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono">gauravservices.eu.cc</span> preserved) via Brevo API. Official sender identities include <code className="text-purple font-mono">hello@gauravpatil.online</code> (inquiries and auto-replies), <code className="text-purple font-mono">security@gauravpatil.online</code> (authentication alerts and audit logs), <code className="text-purple font-mono">help@gauravpatil.online</code> (support), and <code className="text-purple font-mono">no-reply@gauravpatil.online</code> (system OTPs and automated legal announcements). A strict zero-spam guarantee is maintained: submitted contact emails are never enrolled in promotional marketing sequences.
             </p>
+            <div className="mt-3 p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-2 text-xs sm:text-sm">
+              <h3 className="font-semibold text-white text-sm flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple" />
+                Mandatory Legal &amp; Policy Update Announcement Notice
+              </h3>
+              <ul className="list-disc list-inside space-y-1.5 pl-1 text-neutral-300">
+                <li>
+                  <strong className="text-white">Automatic Registration for Policy Updates:</strong> Submitting an email address through any service of this portfolio &mdash; including Contact Form inquiries, Live Chat email OTP authentication, support requests, or direct communications &mdash; registers that address to receive mandatory policy, legal, and security announcements in accordance with your acceptance of use.
+                </li>
+                <li>
+                  <strong className="text-white">Mandatory Non-Marketing Announcements:</strong> When material updates are made to the public Terms of Service, Privacy Policy, or critical security procedures, automated informational notices are broadcast directly from <code className="text-purple font-mono">no-reply@gauravpatil.online</code> or <code className="text-purple font-mono">security@gauravpatil.online</code>. These communications are strictly non-commercial, transactional legal disclosures and contain zero marketing or promotional sequences.
+                </li>
+                <li>
+                  <strong className="text-white">No Unsubscribe &amp; Immunity from Automated Client-Level Unsubscribe:</strong> Because legal update announcements are mandatory contractual disclosures required to maintain operational and legal transparency for all users who have interacted with Gaurav Portfolio or its authenticated services, <strong className="text-white">no unsubscribe or opt-out option is provided</strong>. Even if automated email client features (such as Google/Gmail&apos;s automatic &ldquo;Unsubscribe&rdquo; header or client-level spam filters) are invoked, you acknowledge and agree that you will continue to receive mandatory legal, policy, and security notices as per this policy and your acceptance of use.
+                </li>
+              </ul>
+            </div>
           </section>
 
           {/* Section: Personal Assistant Terms (Spotlighted for Assistant / Learn More) */}
@@ -575,6 +677,8 @@ function TermsContentInner() {
               </a>
             </p>
           </section>
+            </>
+          )}
         </div>
 
         {/* Footer Note */}
@@ -586,10 +690,10 @@ function TermsContentInner() {
   );
 }
 
-export function TermsOfServiceContent() {
+export function TermsOfServiceContent({ initialData }: TermsOfServiceContentProps = {}) {
   return (
     <Suspense fallback={<div className="min-h-screen bg-black-100 text-white flex items-center justify-center">Loading Terms of Service...</div>}>
-      <TermsContentInner />
+      <TermsContentInner initialData={initialData} />
     </Suspense>
   );
 }

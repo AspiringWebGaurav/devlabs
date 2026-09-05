@@ -25,6 +25,7 @@ import {
   FaRotate,
   FaRightFromBracket,
   FaWhatsapp,
+  FaScaleBalanced,
 } from "react-icons/fa6";
 
 import { useAdminSession } from "@/components/admin/context";
@@ -141,15 +142,16 @@ export const AdminSidebar: React.FC = () => {
     { id: "11", label: "Footer", href: "/admin/footer", icon: FaCopyright },
     { id: "12", label: "SEO & Metadata", href: "/admin/seo", icon: FaMagnifyingGlass },
     { id: "13", label: "Assistant", href: "/admin/assistant", icon: FaCommentDots },
+    { id: "14", label: "Legal Center", href: "/admin/legal", icon: FaScaleBalanced },
   ];
 
   const opsItems = [
-    { id: "14", label: "Media Assets", href: "/admin/media", icon: FaImages },
-    { id: "15", label: "Inquiries & Leads", href: "/admin/inquiries", icon: FaEnvelope },
-    { id: "16", label: "Mail Center", href: "/admin/mail", icon: FaPaperPlane },
-    { id: "17", label: "Cloudflare Security", href: "/admin/cloudflare", icon: FaShieldHalved },
-    { id: "18", label: "Database Reset", href: "/admin/purge", icon: FaRotate },
-    { id: "19", label: "WhatsApp Recruiter", href: "/admin/whatsapp", icon: FaWhatsapp },
+    { id: "15", label: "Media Assets", href: "/admin/media", icon: FaImages },
+    { id: "16", label: "Inquiries & Leads", href: "/admin/inquiries", icon: FaEnvelope },
+    { id: "17", label: "Mail Center", href: "/admin/mail", icon: FaPaperPlane },
+    { id: "18", label: "Cloudflare Security", href: "/admin/cloudflare", icon: FaShieldHalved },
+    { id: "19", label: "Database Reset", href: "/admin/purge", icon: FaRotate },
+    { id: "20", label: "WhatsApp Recruiter", href: "/admin/whatsapp", icon: FaWhatsapp },
   ];
 
   const isProfileActive = pathname === "/admin/profile";

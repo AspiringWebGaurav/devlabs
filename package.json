@@ -13,7 +13,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "push:notify": "node scripts/notify-push.mjs"
+    "push:notify": "node scripts/notify-push.mjs",
+    "firestore:indexes": "node scripts/deploy-firestore-indexes.mjs"
   },
   "dependencies": {
     "@js-sdsl/ordered-map": "^4.4.2",
