@@ -267,6 +267,156 @@ export class LegalDocumentsRepository extends BaseRepository {
     });
   }
 
+  private isValidEmail(email: string): boolean {
+    if (!email || typeof email !== "string") return false;
+    const clean = email.trim();
+    if (clean.length < 5 || clean.length > 254) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean);
+  }
+
+  /**
+   * Aggregates all unique, eligible broadcast recipients across the entire portfolio ecosystem:
+   * 1. Contact inquiries & live chat leads (`inquiries`)
+   * 2. Live Chat threads (`portfolio_live_chat_threads`)
+   * 3. Live Chat sessions (`live_chat_sessions`) - all statuses (ACTIVE, EXPIRED, REVOKED)
+   * 4. WhatsApp sessions (`whatsapp_sessions`)
+   * 5. Live Chat alert jobs (`live_chat_alert_jobs`)
+   * 6. Admin Mail Center history (`admin_mails`)
+   * 7. Mandatory Primary Admin (`PRIMARY_ADMIN_EMAIL` / `process.env.ADMIN_EMAIL`)
+   */
+  public async collectAllEligibleRecipients(): Promise<
+    Array<{ email: string; name?: string; type: "ADMIN" | "VISITOR" }>
+  > {
+    const db = firestoreDataSource["getDb"]?.() || null;
+    const recipientMap = new Map<string, { email: string; name?: string; type: "ADMIN" | "VISITOR" }>();
+
+    const registerEmail = (rawEmail: unknown, rawName?: unknown, isForcedAdmin = false) => {
+      if (typeof rawEmail !== "string") return;
+      const cleanEmail = rawEmail.trim().toLowerCase();
+      if (!this.isValidEmail(cleanEmail)) return;
+
+      const cleanName =
+        typeof rawName === "string" && rawName.trim().length > 0 ? rawName.trim() : undefined;
+
+      const isAdmin =
+        isForcedAdmin ||
+        cleanEmail === PRIMARY_ADMIN_EMAIL.toLowerCase() ||
+        (process.env.ADMIN_EMAIL && cleanEmail === process.env.ADMIN_EMAIL.trim().toLowerCase());
+
+      const existing = recipientMap.get(cleanEmail);
+      if (!existing) {
+        recipientMap.set(cleanEmail, {
+          email: cleanEmail,
+          name: cleanName,
+          type: isAdmin ? "ADMIN" : "VISITOR",
+        });
+      } else {
+        if (!existing.name && cleanName) {
+          existing.name = cleanName;
+        }
+        if (isAdmin) {
+          existing.type = "ADMIN";
+        }
+      }
+    };
+
+    // Mandatory Admin inclusion
+    registerEmail(PRIMARY_ADMIN_EMAIL, "Gaurav Patil", true);
+    if (process.env.ADMIN_EMAIL) {
+      registerEmail(process.env.ADMIN_EMAIL, "Gaurav Patil", true);
+    }
+
+    if (db) {
+      const scans = [
+        // 1. Inquiries (Contact forms and chat lead captures)
+        (async () => {
+          const snap = await db.collection("inquiries").get();
+          for (const doc of snap.docs) {
+            const data = doc.data();
+            registerEmail(data.email, data.name);
+          }
+        })(),
+
+        // 2. Portfolio Live Chat Threads
+        (async () => {
+          const snap = await db.collection("portfolio_live_chat_threads").get();
+          for (const doc of snap.docs) {
+            const data = doc.data();
+            registerEmail(data.visitorEmail, data.visitorName);
+          }
+        })(),
+
+        // 3. Live Chat Sessions (Include ALL sessions: ACTIVE, EXPIRED, REVOKED)
+        (async () => {
+          const snap = await db.collection("live_chat_sessions").get();
+          for (const doc of snap.docs) {
+            const data = doc.data();
+            registerEmail(data.email, data.name || data.visitorName);
+          }
+        })(),
+
+        // 4. WhatsApp Sessions (Recruiters & visitors who provided email)
+        (async () => {
+          const snap = await db.collection("whatsapp_sessions").get();
+          for (const doc of snap.docs) {
+            const data = doc.data();
+            registerEmail(data.email, data.name || data.visitorName);
+          }
+        })(),
+
+        // 5. Live Chat Alert Jobs (Offline visitor reply alerts)
+        (async () => {
+          const snap = await db.collection("live_chat_alert_jobs").get();
+          for (const doc of snap.docs) {
+            const data = doc.data();
+            registerEmail(data.visitorEmail, data.visitorName);
+          }
+        })(),
+
+        // 6. Admin Sent Mails (Mail Center interactions)
+        (async () => {
+          const snap = await db.collection("admin_mails").get();
+          for (const doc of snap.docs) {
+            const data = doc.data();
+            if (Array.isArray(data.to)) {
+              for (const item of data.to) {
+                registerEmail(item?.email, item?.name);
+              }
+            }
+            if (Array.isArray(data.cc)) {
+              for (const item of data.cc) {
+                registerEmail(item?.email, item?.name);
+              }
+            }
+            if (Array.isArray(data.bcc)) {
+              for (const item of data.bcc) {
+                registerEmail(item?.email, item?.name);
+              }
+            }
+          }
+        })(),
+      ];
+
+      const scanResults = await Promise.allSettled(scans);
+      scanResults.forEach((r, idx) => {
+        if (r.status === "rejected") {
+          adminLogger.warn(
+            "LegalDocumentsRepository:collectAllEligibleRecipients",
+            `Scan collection #${idx} note`,
+            { error: r.reason }
+          );
+        }
+      });
+    }
+
+    return Array.from(recipientMap.values()).sort((a, b) => {
+      // Admin first, then alphabetical by email
+      if (a.type === "ADMIN" && b.type !== "ADMIN") return -1;
+      if (b.type === "ADMIN" && a.type !== "ADMIN") return 1;
+      return a.email.localeCompare(b.email);
+    });
+  }
+
   /**
    * Resolves the eligible recipient set ONCE and freezes it into the recipients subcollection.
    */
@@ -286,42 +436,64 @@ export class LegalDocumentsRepository extends BaseRepository {
         return { totalRecipients: jobData.totalRecipients };
       }
 
-      const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-      // Query verified Live Chat sessions within application's 30-day window
-      const sessionsSnap = await db
-        .collection("live_chat_sessions")
-        .where("createdAt", ">=", thirtyDaysAgoIso)
-        .get();
-
-      const uniqueRecipients = new Map<string, { email: string; name?: string }>();
-
-      for (const doc of sessionsSnap.docs) {
-        const s = doc.data();
-        if (s.status === "REVOKED") continue;
-        if (!s.email || typeof s.email !== "string") continue;
-
-        const cleanEmail = s.email.trim().toLowerCase();
-        if (!uniqueRecipients.has(cleanEmail)) {
-          uniqueRecipients.set(cleanEmail, {
-            email: cleanEmail,
-            name: typeof s.visitorName === "string" ? s.visitorName : undefined,
-          });
-        }
-      }
+      // Collect all eligible recipients across portfolio ecosystem
+      const eligibleRecipients = await this.collectAllEligibleRecipients();
 
       // Prepare recipient records
       const recipientRecords: LegalNotificationRecipientRecord[] = [];
       const now = new Date().toISOString();
 
-      // 1. Add Visitor Recipients
-      for (const [cleanEmail, r] of uniqueRecipients.entries()) {
-        const recipId = `recip_${this.hashEmail(cleanEmail)}`;
-        recipientRecords.push({
-          id: recipId,
-          email: r.email,
-          name: r.name,
-          type: "VISITOR",
+      for (const r of eligibleRecipients) {
+        if (r.type === "ADMIN") {
+          const isAdminId =
+            r.email.trim().toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase()
+              ? "admin_audit"
+              : `admin_${this.hashEmail(r.email)}`;
+          recipientRecords.push({
+            id: isAdminId,
+            email: r.email,
+            name: r.name || "Gaurav Patil",
+            type: "ADMIN_AUDIT",
+            status: "PENDING",
+            attempts: 0,
+            maxAttempts: 3,
+            isPermanentFailure: false,
+            sentAt: null,
+            brevoMessageId: null,
+            idempotencyKey: formatBrevoIdempotencyKey(
+              `legal_audit:${jobData.docType}:${jobData.version}:${r.email.toLowerCase()}`
+            ),
+            updatedAt: now,
+          });
+        } else {
+          const recipId = `recip_${this.hashEmail(r.email)}`;
+          recipientRecords.push({
+            id: recipId,
+            email: r.email,
+            name: r.name,
+            type: "VISITOR",
+            status: "PENDING",
+            attempts: 0,
+            maxAttempts: 3,
+            isPermanentFailure: false,
+            sentAt: null,
+            brevoMessageId: null,
+            idempotencyKey: formatBrevoIdempotencyKey(
+              `legal_notif:${jobData.docType}:${jobData.version}:${r.email.toLowerCase()}`
+            ),
+            updatedAt: now,
+          });
+        }
+      }
+
+      // Safety check: ensure at least one primary admin audit copy exists
+      const hasAdminRecord = recipientRecords.some((rec) => rec.type === "ADMIN_AUDIT");
+      if (!hasAdminRecord) {
+        recipientRecords.unshift({
+          id: "admin_audit",
+          email: PRIMARY_ADMIN_EMAIL,
+          name: "Gaurav Patil",
+          type: "ADMIN_AUDIT",
           status: "PENDING",
           attempts: 0,
           maxAttempts: 3,
@@ -329,29 +501,11 @@ export class LegalDocumentsRepository extends BaseRepository {
           sentAt: null,
           brevoMessageId: null,
           idempotencyKey: formatBrevoIdempotencyKey(
-            `legal_notif:${jobData.docType}:${jobData.version}:${cleanEmail}`
+            `legal_audit:${jobData.docType}:${jobData.version}:${PRIMARY_ADMIN_EMAIL.toLowerCase()}`
           ),
           updatedAt: now,
         });
       }
-
-      // 2. Add Dedicated Admin Audit Copy
-      recipientRecords.push({
-        id: "admin_audit",
-        email: PRIMARY_ADMIN_EMAIL,
-        name: "Gaurav Patil",
-        type: "ADMIN_AUDIT",
-        status: "PENDING",
-        attempts: 0,
-        maxAttempts: 3,
-        isPermanentFailure: false,
-        sentAt: null,
-        brevoMessageId: null,
-        idempotencyKey: formatBrevoIdempotencyKey(
-          `legal_audit:${jobData.docType}:${jobData.version}:${PRIMARY_ADMIN_EMAIL.toLowerCase()}`
-        ),
-        updatedAt: now,
-      });
 
       // Batch write recipients into subcollection
       const batchSize = 400;
@@ -389,46 +543,7 @@ export class LegalDocumentsRepository extends BaseRepository {
     RepositoryResult<{ email: string; name?: string; type: string }[]>
   > {
     return this.executeQuery("getEligibleRecipientsPreview", async () => {
-      const db = firestoreDataSource["getDb"]?.() || null;
-      const list: { email: string; name?: string; type: string }[] = [];
-      const seen = new Set<string>();
-
-      if (db) {
-        try {
-          const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-          const sessionsSnap = await db
-            .collection("live_chat_sessions")
-            .where("createdAt", ">=", thirtyDaysAgoIso)
-            .get();
-
-          for (const doc of sessionsSnap.docs) {
-            const s = doc.data();
-            if (s.status === "REVOKED") continue;
-            if (!s.email || typeof s.email !== "string") continue;
-            const clean = s.email.trim().toLowerCase();
-            if (!seen.has(clean)) {
-              seen.add(clean);
-              list.push({
-                email: clean,
-                name: typeof s.visitorName === "string" ? s.visitorName : undefined,
-                type: "VISITOR",
-              });
-            }
-          }
-        } catch (err) {
-          adminLogger.warn("LegalDocumentsRepository:getEligibleRecipientsPreview", "Live chat scan note", { error: err });
-        }
-      }
-
-      if (!seen.has(PRIMARY_ADMIN_EMAIL.toLowerCase())) {
-        list.push({
-          email: PRIMARY_ADMIN_EMAIL,
-          name: "Gaurav Patil",
-          type: "ADMIN",
-        });
-      }
-
-      return list;
+      return await this.collectAllEligibleRecipients();
     });
   }
 

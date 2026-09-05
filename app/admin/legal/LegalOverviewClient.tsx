@@ -648,7 +648,7 @@ export const LegalOverviewClient: React.FC<LegalOverviewClientProps> = ({
                   <span>Next Broadcast Audience Preview</span>
                 </h3>
                 <p className="text-[11px] text-[#64748B] font-admin-mono mt-0.5">
-                  Eligible recipients from active visitor sessions (30d) + Admin
+                  All registered portfolio contacts (Live Chat, Inquiries & WhatsApp) + Admin
                 </p>
               </div>
               <button
@@ -664,7 +664,7 @@ export const LegalOverviewClient: React.FC<LegalOverviewClientProps> = ({
               {isLoadingAudience ? (
                 <div className="p-8 text-center text-xs font-admin-mono text-[#64748B] flex items-center justify-center gap-2">
                   <FaRotate className="w-3.5 h-3.5 animate-spin text-[#7C3AED]" />
-                  <span>Scanning active sessions...</span>
+                  <span>Scanning portfolio contacts...</span>
                 </div>
               ) : !audienceList || audienceList.length === 0 ? (
                 <div className="p-8 text-center text-xs font-admin-mono text-[#94A3B8]">
