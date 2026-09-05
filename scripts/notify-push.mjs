@@ -6,6 +6,13 @@
  * Dispatches a single-view, zero-scroll audit email to Admin Gmail
  * whenever changes are pushed to GitHub.
  *
+ * Layout Standard:
+ * - 100% Mobile & Desktop responsive (Zero flexbox, robust HTML tables)
+ * - Clean left alignment on desktop (No awkward centered box in a grey void)
+ * - Seamless white canvas (#ffffff) blending natively with email clients
+ * - Clear, color-coded file status badges (MOD, ADD, DEL) with diff stats
+ * - Strictly bounded height (~320-350px) for one-view zero-scroll guarantee
+ *
  * Run with: node scripts/notify-push.mjs
  */
 
@@ -48,7 +55,7 @@ if (!BREVO_API_KEY) {
   process.exit(1);
 }
 
-// 2. Extract git commit metadata
+// 2. Extract git commit metadata with file statuses & diff stats
 function getGitMetadata() {
   try {
     const commitHash = execSync("git log -1 --format=%H", { encoding: "utf-8" }).trim();
@@ -57,8 +64,35 @@ function getGitMetadata() {
     const authorEmail = execSync("git log -1 --format=%ae", { encoding: "utf-8" }).trim();
     const timestampRaw = execSync("git log -1 --format=%cI", { encoding: "utf-8" }).trim();
     const branch = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf-8" }).trim();
-    const filesOutput = execSync("git diff-tree --no-commit-id --name-only -r HEAD", { encoding: "utf-8" }).trim();
-    const filesChanged = filesOutput ? filesOutput.split("\n").map((f) => f.trim()).filter(Boolean) : [];
+
+    // Parse status and path for each changed file
+    const filesOutput = execSync("git diff-tree --no-commit-id --name-status -r HEAD", { encoding: "utf-8" }).trim();
+    const filesChanged = filesOutput
+      ? filesOutput
+          .split("\n")
+          .map((line) => {
+            const parts = line.trim().split(/\t+/);
+            const rawStatus = parts[0] ? parts[0].charAt(0).toUpperCase() : "M";
+            const filePath = parts.slice(1).join("\t") || parts[0] || "";
+            let status = "MOD";
+            if (rawStatus === "A") status = "ADD";
+            else if (rawStatus === "D") status = "DEL";
+            else if (rawStatus === "R") status = "REN";
+            return { status, path: filePath };
+          })
+          .filter((f) => Boolean(f.path))
+      : [];
+
+    // Parse insertions and deletions from git show
+    let insertions = "";
+    let deletions = "";
+    try {
+      const statOutput = execSync("git show --shortstat --format= HEAD", { encoding: "utf-8" }).trim();
+      const insMatch = statOutput.match(/(\d+)\s+insertion/);
+      const delMatch = statOutput.match(/(\d+)\s+deletion/);
+      if (insMatch) insertions = `+${Number(insMatch[1]).toLocaleString()}`;
+      if (delMatch) deletions = `-${Number(delMatch[1]).toLocaleString()}`;
+    } catch {}
 
     return {
       commitHash,
@@ -68,6 +102,8 @@ function getGitMetadata() {
       timestampRaw,
       branch,
       filesChanged,
+      insertions,
+      deletions,
     };
   } catch (err) {
     console.warn("⚠️ Warning: Failed to query git metadata, using fallback:", err.message);
@@ -79,6 +115,8 @@ function getGitMetadata() {
       timestampRaw: new Date().toISOString(),
       branch: "main",
       filesChanged: [],
+      insertions: "",
+      deletions: "",
     };
   }
 }
@@ -114,15 +152,47 @@ function escapeHtml(text) {
 const formattedTime = formatTimestamp(gitData.timestampRaw);
 const repoName = "AspiringWebGaurav/devlabs";
 const commitUrl = `https://github.com/${repoName}/commit/${gitData.commitHash}`;
+const totalFilesCount = gitData.filesChanged.length;
 
-let filesSummary = "0 files";
-if (gitData.filesChanged.length > 0) {
-  const count = gitData.filesChanged.length;
-  const names = gitData.filesChanged.slice(0, 4).map((f) => f.split("/").pop() || f).join(", ");
-  filesSummary = count > 4 ? `${count} files (${names}, +${count - 4} more)` : `${count} files (${names})`;
-}
+// Display top 5 key files with status badges, followed by overflow count
+const displayLimit = 5;
+const displayedFiles = gitData.filesChanged.slice(0, displayLimit);
+const remainingFilesCount = totalFilesCount - displayedFiles.length;
 
-// 3. Ultra-compact single-view no-scroll HTML template with dynamic vertical message expansion
+const fileRowsHtml = displayedFiles.map((file) => {
+  let badgeBg = "#eff6ff";
+  let badgeColor = "#2563eb";
+  let badgeBorder = "#bfdbfe";
+  let label = "MOD";
+
+  if (file.status === "ADD") {
+    badgeBg = "#ecfdf5";
+    badgeColor = "#059669";
+    badgeBorder = "#a7f3d0";
+    label = "ADD";
+  } else if (file.status === "DEL") {
+    badgeBg = "#fef2f2";
+    badgeColor = "#dc2626";
+    badgeBorder = "#fecaca";
+    label = "DEL";
+  } else if (file.status === "REN") {
+    badgeBg = "#fdf4ff";
+    badgeColor = "#9333ea";
+    badgeBorder = "#f0abfc";
+    label = "REN";
+  }
+
+  return `<tr>
+    <td style="padding:2px 0; width:44px; vertical-align:middle;">
+      <span style="display:inline-block; font-family:'SFMono-Regular',Consolas,monospace; font-size:9px; font-weight:700; color:${badgeColor}; background:${badgeBg}; border:1px solid ${badgeBorder}; padding:1px 4px; border-radius:3px; letter-spacing:0.03em;">${label}</span>
+    </td>
+    <td style="padding:2px 0; font-family:'SFMono-Regular',Consolas,Menlo,monospace; font-size:11px; color:#1e293b; vertical-align:middle; word-break:break-all;">
+      ${escapeHtml(file.path)}
+    </td>
+  </tr>`;
+}).join("");
+
+// 3. Ultra-responsive single-view zero-scroll HTML template
 const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -130,54 +200,106 @@ const htmlContent = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Push Audit #${shortHash}</title>
 </head>
-<body style="margin:0;padding:12px;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="max-width:480px;margin:0 auto;">
+<body style="margin:0; padding:16px 12px; background-color:#ffffff; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; color:#0f172a;">
+  <!-- Main Container: Left-Aligned on Desktop, Fluid 100% on Mobile, No Centered Void -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="left" style="max-width:580px; margin:0; border-collapse:collapse;">
     <tr>
-      <td>
-        <div style="background:#ffffff;border:1px solid #e4e4e7;border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-          <!-- Header -->
-          <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f4f4f5;padding-bottom:8px;margin-bottom:10px;">
-            <div style="font-size:13px;font-weight:700;color:#18181b;letter-spacing:-0.01em;">
-              ⚡ Git Push Audit Log
-            </div>
-            <div style="background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:9999px;font-family:monospace;letter-spacing:0.02em;">
-              VERIFIED ✓
-            </div>
-          </div>
+      <td style="padding:0;">
+        <!-- Executive Security Card with Sleek Purple Accent -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid #7c3aed; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.04); border-collapse:collapse;">
+          <tr>
+            <td style="padding:14px 16px;">
+              
+              <!-- 1. Header: Status & Category (Bulletproof HTML Table Alignment) -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <tr>
+                  <td align="left" style="font-size:12px; font-weight:700; color:#0f172a; letter-spacing:-0.01em;">
+                    ⚡ Git Push Audit Log
+                  </td>
+                  <td align="right">
+                    <span style="display:inline-block; font-family:'SFMono-Regular',Consolas,monospace; font-size:10px; font-weight:700; color:#059669; background:#ecfdf5; border:1px solid #a7f3d0; padding:2px 8px; border-radius:9999px; letter-spacing:0.02em;">
+                      VERIFIED ✓
+                    </span>
+                  </td>
+                </tr>
+              </table>
 
-          <!-- Key-Value Metadata Grid (Single-View, Dynamic Vertical Message Expand) -->
-          <table style="width:100%;border-collapse:collapse;font-size:12px;line-height:1.45;">
-            <tr>
-              <td style="padding:3px 0;color:#71717a;width:75px;font-weight:500;vertical-align:top;">Commit</td>
-              <td style="padding:3px 0;font-family:'SFMono-Regular',Consolas,Menlo,monospace;font-size:11px;font-weight:600;vertical-align:top;">
-                <a href="${commitUrl}" style="color:#7c3aed;text-decoration:none;">#${shortHash}</a>
-                <span style="color:#a1a1aa;font-weight:400;margin-left:6px;">(${escapeHtml(gitData.branch)})</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:3px 0;color:#71717a;font-weight:500;vertical-align:top;width:75px;">Message</td>
-              <td style="padding:3px 0;font-weight:600;color:#18181b;word-break:break-word;white-space:pre-wrap;line-height:1.4;vertical-align:top;">${escapeHtml(gitData.commitMessage)}</td>
-            </tr>
-            <tr>
-              <td style="padding:3px 0;color:#71717a;font-weight:500;vertical-align:top;">Timestamp</td>
-              <td style="padding:3px 0;color:#27272a;vertical-align:top;">${escapeHtml(formattedTime)}</td>
-            </tr>
-            <tr>
-              <td style="padding:3px 0;color:#71717a;font-weight:500;vertical-align:top;">Actor</td>
-              <td style="padding:3px 0;color:#27272a;vertical-align:top;">${escapeHtml(gitData.authorName)} &lt;${escapeHtml(gitData.authorEmail)}&gt;</td>
-            </tr>
-            <tr>
-              <td style="padding:3px 0;color:#71717a;font-weight:500;vertical-align:top;">Changes</td>
-              <td style="padding:3px 0;font-family:'SFMono-Regular',Consolas,Menlo,monospace;font-size:11px;color:#52525b;vertical-align:top;">${escapeHtml(filesSummary)}</td>
-            </tr>
-          </table>
+              <!-- 2. Commit Message Box: Front & Center, Dynamic Vertical Expansion -->
+              <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:9px 12px; margin-top:8px; margin-bottom:10px;">
+                <div style="font-size:13px; font-weight:600; color:#0f172a; line-height:1.45; word-break:break-word;">
+                  ${escapeHtml(gitData.commitMessage)}
+                </div>
+              </div>
 
-          <!-- Footer -->
-          <div style="border-top:1px solid #f4f4f5;margin-top:10px;padding-top:8px;font-size:10px;color:#a1a1aa;display:flex;justify-content:space-between;line-height:1.3;">
-            <span>Gaurav Portfolio Security Audit</span>
-            <span style="font-family:monospace;color:#059669;font-weight:600;">Delivered ✓</span>
-          </div>
-        </div>
+              <!-- 3. Key Metadata Details: Compact, Zero Column Collisions -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:11px; color:#64748b; border-collapse:collapse; margin-bottom:10px;">
+                <tr>
+                  <td align="left" style="padding:2px 0; color:#475569;">
+                    <span style="font-weight:600; color:#0f172a;">Commit:</span>
+                    <a href="${commitUrl}" style="color:#7c3aed; font-family:'SFMono-Regular',Consolas,monospace; font-weight:600; text-decoration:none;">#${shortHash}</a>
+                    <span style="color:#cbd5e1; margin:0 4px;">&bull;</span>
+                    <span style="font-weight:600; color:#0f172a;">Branch:</span>
+                    <span style="font-family:'SFMono-Regular',Consolas,monospace; color:#334155; font-weight:500;">${escapeHtml(gitData.branch)}</span>
+                  </td>
+                  <td align="right" style="padding:2px 0; color:#64748b; font-size:11px; white-space:nowrap;">
+                    ${escapeHtml(formattedTime)}
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="padding:2px 0; color:#475569;">
+                    <span style="font-weight:600; color:#0f172a;">Actor:</span>
+                    <span style="color:#334155;">${escapeHtml(gitData.authorName)} &lt;${escapeHtml(gitData.authorEmail)}&gt;</span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- 4. Highlighted Updated Files Section -->
+              <div style="border-top:1px solid #f1f5f9; padding-top:8px; margin-top:8px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-bottom:4px;">
+                  <tr>
+                    <td align="left" style="font-size:10px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.04em;">
+                      Changed Files (${totalFilesCount})
+                    </td>
+                    <td align="right">
+                      ${gitData.insertions ? `<span style="display:inline-block; font-family:'SFMono-Regular',Consolas,monospace; font-size:10px; font-weight:600; color:#059669; background:#ecfdf5; border:1px solid #a7f3d0; padding:1px 5px; border-radius:3px; margin-right:3px;">${escapeHtml(gitData.insertions)}</span>` : ""}
+                      ${gitData.deletions ? `<span style="display:inline-block; font-family:'SFMono-Regular',Consolas,monospace; font-size:10px; font-weight:600; color:#dc2626; background:#fef2f2; border:1px solid #fecaca; padding:1px 5px; border-radius:3px;">${escapeHtml(gitData.deletions)}</span>` : ""}
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Highlighted File Rows with Monospace Paths & Status Badges -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-top:2px;">
+                  ${fileRowsHtml}
+                </table>
+
+                <!-- Overflow Indicator & Quick Diff Link -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-top:4px;">
+                  <tr>
+                    <td align="left" style="font-size:10px; color:#64748b;">
+                      ${remainingFilesCount > 0 ? `+ ${remainingFilesCount} other files in commit` : ""}
+                    </td>
+                    <td align="right" style="font-size:10px;">
+                      <a href="${commitUrl}" style="color:#7c3aed; text-decoration:none; font-weight:600;">View diff on GitHub &rarr;</a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- 5. Footer: Clean 2-Cell Status (Bulletproof Table Alignment) -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #f1f5f9; margin-top:10px; padding-top:8px; border-collapse:collapse;">
+                <tr>
+                  <td align="left" style="font-size:10px; color:#94a3b8;">
+                    Gaurav Portfolio Security Audit
+                  </td>
+                  <td align="right" style="font-family:'SFMono-Regular',Consolas,monospace; font-size:10px; color:#059669; font-weight:600;">
+                    Delivered ✓
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
   </table>
@@ -191,7 +313,9 @@ Commit: #${shortHash} (${gitData.commitHash})
 Message: ${gitData.commitMessage}
 Timestamp: ${formattedTime}
 Pushed By: ${gitData.authorName} <${gitData.authorEmail}>
-Files Changed: ${gitData.filesChanged.join(", ") || "None"}
+Changes: ${totalFilesCount} files (${gitData.insertions} ${gitData.deletions})
+${gitData.filesChanged.slice(0, 10).map((f) => `- [${f.status}] ${f.path}`).join("\n")}
+${remainingFilesCount > 0 ? `...and ${remainingFilesCount} more files` : ""}
 
 Commit Link: ${commitUrl}`;
 
