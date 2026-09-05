@@ -40,7 +40,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AuthResen
       );
     }
 
-    const challenge = await otpService.getChallenge(challengeId);
+    const challenge = result.challenge;
     const now = Date.now();
 
     return NextResponse.json<AuthResendApiResponse>({

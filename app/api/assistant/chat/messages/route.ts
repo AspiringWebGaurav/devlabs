@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import {
   getAuthenticatedVisitor,
   extractClientIp,
@@ -7,7 +7,7 @@ import {
 import { checkLiveChatRateLimit, recordLiveChatAction } from "@/lib/assistant/services/live-chat-rate-limiter";
 import {
   createLiveChatAlertJob,
-  triggerAlertJobProcessing,
+  processAlertJob,
 } from "@/lib/assistant/services/live-chat-alert-jobs.service";
 import { inquiriesRepository } from "@/lib/admin/repositories";
 import { liveChatRepository } from "@/lib/dal/repositories/live-chat.repository";
@@ -45,12 +45,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const messagesRes = await liveChatRepository.getMessagesForThread(thread.id);
+    const messages =
+      Array.isArray(thread.messages) && thread.messages.length > 0
+        ? thread.messages
+        : (await liveChatRepository.getMessagesForThread(thread.id)).data || [];
 
     return NextResponse.json({
       ok: true,
       thread,
-      messages: messagesRes.data || [],
+      messages,
       isVisitorLocked: thread.isVisitorLocked === true,
     });
   } catch (err: unknown) {
@@ -208,9 +211,16 @@ export async function POST(req: NextRequest) {
       return null;
     });
 
-    // 9. Trigger background worker processing asynchronously
+    // 9. Trigger background worker processing asynchronously via Next.js after() to guarantee serverless execution
     if (alertJob) {
-      triggerAlertJobProcessing(alertJob.id);
+      after(async () => {
+        try {
+          const workerId = `worker_${process.pid || 1}_${Date.now()}`;
+          await processAlertJob(alertJob.id, workerId);
+        } catch (jobErr) {
+          console.warn("LiveChatAlertJob after execution exception:", jobErr);
+        }
+      });
     }
 
     return NextResponse.json(

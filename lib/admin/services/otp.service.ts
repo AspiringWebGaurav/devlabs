@@ -274,7 +274,13 @@ export class OtpService {
     clientIp: string | null,
     userAgent?: string,
     requestHeaders?: Headers | null
-  ): Promise<{ success: boolean; error?: string; message?: string; cooldownSeconds?: number }> {
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    message?: string;
+    cooldownSeconds?: number;
+    challenge?: AdminOtpChallengeRecord;
+  }> {
     if (!challengeId || typeof challengeId !== "string") {
       return { success: false, error: "Invalid challenge identifier." };
     }
@@ -331,6 +337,16 @@ export class OtpService {
       const currentResendCount = challenge.resendCount || 0;
       const previousResentAt = challenge.lastResentAt;
 
+      const updatedChallenge: AdminOtpChallengeRecord = {
+        ...challenge,
+        otpHash: newOtpHmac,
+        otpSalt: newSalt,
+        resendCount: currentResendCount + 1,
+        lastResentAt: now,
+        clientIp: clientIp || challenge.clientIp,
+        userAgent: userAgent || challenge.userAgent,
+      };
+
       // Update challenge record with new HMAC (strictly keeping existing attemptsCount)
       transaction.update(challengeRef, {
         otpHash: newOtpHmac,
@@ -343,6 +359,7 @@ export class OtpService {
 
       return {
         success: true,
+        challenge: updatedChallenge,
         email: challenge.email,
         name: challenge.name,
         clientIp: clientIp || challenge.clientIp,
@@ -394,6 +411,7 @@ export class OtpService {
     return {
       success: true,
       message: "A new 6-digit verification code has been dispatched to your email.",
+      challenge: txResult.challenge,
     };
   }
 

@@ -8,11 +8,129 @@ interface MarkdownLegalRendererProps {
   className?: string;
 }
 
+type ParsedBlock =
+  | { type: "h1"; content: string }
+  | { type: "h2"; content: string }
+  | { type: "h3"; content: string }
+  | { type: "paragraph"; content: string }
+  | { type: "ul"; items: string[] }
+  | { type: "ol"; items: string[] };
+
+/**
+ * Deterministic line-by-line Markdown block parser.
+ * Accurately segments headings, contiguous lists, and paragraphs regardless
+ * of single vs. double newline formatting, preventing CSS flex container blowouts.
+ */
+function parseMarkdownBlocks(rawMarkdown: string): ParsedBlock[] {
+  const blocks: ParsedBlock[] = [];
+  const lines = rawMarkdown.replace(/\r\n/g, "\n").split("\n");
+
+  let currentList: { type: "ul" | "ol"; items: string[] } | null = null;
+  let currentParagraphLines: string[] = [];
+
+  const flushParagraph = () => {
+    if (currentParagraphLines.length > 0) {
+      blocks.push({
+        type: "paragraph",
+        content: currentParagraphLines.join(" ").trim(),
+      });
+      currentParagraphLines = [];
+    }
+  };
+
+  const flushList = () => {
+    if (currentList) {
+      blocks.push(currentList);
+      currentList = null;
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const trimmed = rawLine.trim();
+
+    // 1. Blank line -> flush active paragraph or list
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    // 2. Heading 3 (### )
+    if (trimmed.startsWith("### ")) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "h3", content: trimmed.slice(4).trim() });
+      continue;
+    }
+
+    // 3. Heading 2 (## )
+    if (trimmed.startsWith("## ")) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "h2", content: trimmed.slice(3).trim() });
+      continue;
+    }
+
+    // 4. Heading 1 (# )
+    if (trimmed.startsWith("# ")) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "h1", content: trimmed.slice(2).trim() });
+      continue;
+    }
+
+    // 5. Unordered list item (- or *)
+    const ulMatch = trimmed.match(/^[-*]\s+(.*)$/);
+    if (ulMatch) {
+      flushParagraph();
+      if (!currentList || currentList.type !== "ul") {
+        flushList();
+        currentList = { type: "ul", items: [] };
+      }
+      currentList.items.push(ulMatch[1].trim());
+      continue;
+    }
+
+    // 6. Ordered list item (1. )
+    const olMatch = trimmed.match(/^\d+\.\s+(.*)$/);
+    if (olMatch) {
+      flushParagraph();
+      if (!currentList || currentList.type !== "ol") {
+        flushList();
+        currentList = { type: "ol", items: [] };
+      }
+      currentList.items.push(olMatch[1].trim());
+      continue;
+    }
+
+    // 7. Indented list item continuation
+    if (currentList && (rawLine.startsWith("  ") || rawLine.startsWith("\t"))) {
+      if (currentList.items.length > 0) {
+        currentList.items[currentList.items.length - 1] += " " + trimmed;
+      } else {
+        currentList.items.push(trimmed);
+      }
+      continue;
+    }
+
+    // 8. If inside a list but encountered non-indented normal text, terminate list
+    if (currentList) {
+      flushList();
+    }
+
+    // 9. Standard paragraph line
+    currentParagraphLines.push(trimmed);
+  }
+
+  flushParagraph();
+  flushList();
+
+  return blocks;
+}
+
 export function MarkdownLegalRenderer({ content, className = "" }: MarkdownLegalRendererProps) {
   if (!content) return null;
-
-  // Split into paragraphs / blocks
-  const blocks = content.split(/\n\n+/);
 
   const formatInline = (text: string): React.ReactNode => {
     // Matches **bold**, `code`, [label](url), and raw email
@@ -77,52 +195,54 @@ export function MarkdownLegalRenderer({ content, className = "" }: MarkdownLegal
     return parts;
   };
 
+  const blocks = parseMarkdownBlocks(content);
+
   return (
     <div className={`space-y-3.5 text-neutral-300 leading-relaxed text-sm sm:text-base ${className}`}>
       {blocks.map((block, idx) => {
-        const trimmed = block.trim();
-
-        // Level 3 Heading (### )
-        if (trimmed.startsWith("### ")) {
+        if (block.type === "h3") {
           return (
-            <h3 key={idx} className="text-base sm:text-lg font-semibold text-white pt-2 flex items-center gap-2">
+            <h3 key={idx} className="text-base sm:text-lg font-semibold text-white pt-2.5 pb-0.5 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-purple shrink-0" />
-              {formatInline(trimmed.slice(4))}
+              <span className="flex-1 min-w-0">{formatInline(block.content)}</span>
             </h3>
           );
         }
 
-        // Level 2 Heading (## )
-        if (trimmed.startsWith("## ")) {
+        if (block.type === "h2") {
           return (
-            <h2 key={idx} className="text-lg sm:text-xl font-bold text-white pt-3 border-t border-white/[0.06]">
-              {formatInline(trimmed.slice(3))}
+            <h2 key={idx} className="text-lg sm:text-xl font-bold text-white pt-4 pb-0.5 border-t border-white/[0.06]">
+              <span>{formatInline(block.content)}</span>
             </h2>
           );
         }
 
-        // Bulleted List (- item or * item)
-        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-          const items = trimmed.split(/\n[-*]\s+/).map((item) => item.replace(/^[-*]\s+/, ""));
+        if (block.type === "h1") {
           return (
-            <ul key={idx} className="list-disc list-inside space-y-2 pl-2 text-sm sm:text-base">
-              {items.map((item, itemIdx) => (
-                <li key={itemIdx} className="text-neutral-300">
-                  {formatInline(item)}
+            <h1 key={idx} className="text-xl sm:text-2xl font-bold text-white pt-4 pb-1">
+              <span>{formatInline(block.content)}</span>
+            </h1>
+          );
+        }
+
+        if (block.type === "ul") {
+          return (
+            <ul key={idx} className="list-disc list-inside space-y-2 pl-2 text-sm sm:text-base text-neutral-300">
+              {block.items.map((item, itemIdx) => (
+                <li key={itemIdx} className="leading-relaxed">
+                  <span>{formatInline(item)}</span>
                 </li>
               ))}
             </ul>
           );
         }
 
-        // Numbered List (1. item)
-        if (/^\d+\.\s+/.test(trimmed)) {
-          const items = trimmed.split(/\n\d+\.\s+/).map((item) => item.replace(/^\d+\.\s+/, ""));
+        if (block.type === "ol") {
           return (
-            <ol key={idx} className="list-decimal list-inside space-y-2 pl-2 text-sm sm:text-base">
-              {items.map((item, itemIdx) => (
-                <li key={itemIdx} className="text-neutral-300">
-                  {formatInline(item)}
+            <ol key={idx} className="list-decimal list-inside space-y-2 pl-2 text-sm sm:text-base text-neutral-300">
+              {block.items.map((item, itemIdx) => (
+                <li key={itemIdx} className="leading-relaxed">
+                  <span>{formatInline(item)}</span>
                 </li>
               ))}
             </ol>
@@ -131,8 +251,8 @@ export function MarkdownLegalRenderer({ content, className = "" }: MarkdownLegal
 
         // Standard Paragraph
         return (
-          <p key={idx} className="text-neutral-300">
-            {formatInline(trimmed)}
+          <p key={idx} className="text-neutral-300 leading-relaxed text-sm sm:text-base">
+            {formatInline(block.content)}
           </p>
         );
       })}

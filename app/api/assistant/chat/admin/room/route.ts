@@ -32,13 +32,16 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const messagesRes = await liveChatRepository.getMessagesForThread(thread.id);
+    const messages =
+      Array.isArray(thread.messages) && thread.messages.length > 0
+        ? thread.messages
+        : (await liveChatRepository.getMessagesForThread(thread.id)).data || [];
 
     return NextResponse.json(
       {
         ok: true,
         thread,
-        messages: messagesRes.data || [],
+        messages,
       },
       { status: 200, headers: { "x-request-id": requestId } }
     );

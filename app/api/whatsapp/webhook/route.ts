@@ -12,7 +12,7 @@
  * - Strict rate limit on 4th message and beyond (counters concealed from visitor).
  */
 
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { verifyWebhookChallenge, verifyWebhookSignature } from "@/lib/whatsapp/webhook";
 import { WhatsAppMetaClient } from "@/lib/whatsapp/meta/client";
 import { sendWhatsAppAdminAlert } from "@/lib/whatsapp/notifications";
@@ -196,6 +196,7 @@ async function saveVisitorSession(from: string, session: VisitorSession): Promis
 
 /**
  * Appends a message to the visitor's Firestore message log for GDPR export capability.
+ * Guaranteed to persist across serverless execution via Next.js after().
  */
 async function recordChatMessage(
   from: string,
@@ -205,29 +206,31 @@ async function recordChatMessage(
   const cleanPhone = from.replace(/[^0-9]/g, "");
   if (!cleanPhone || !text) return;
 
-  try {
-    const db = getAdminFirestore();
-    if (db) {
-      const now = Date.now();
-      const timestampIST = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
-      const msgId = `msg_${now}_${Math.random().toString(36).slice(2, 7)}`;
+  after(async () => {
+    try {
+      const db = getAdminFirestore();
+      if (db) {
+        const now = Date.now();
+        const timestampIST = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+        const msgId = `msg_${now}_${Math.random().toString(36).slice(2, 7)}`;
 
-      await db
-        .collection("whatsapp_sessions")
-        .doc(cleanPhone)
-        .collection("messages")
-        .doc(msgId)
-        .set({
-          id: msgId,
-          sender,
-          text,
-          timestamp: timestampIST,
-          createdAt: now,
-        });
+        await db
+          .collection("whatsapp_sessions")
+          .doc(cleanPhone)
+          .collection("messages")
+          .doc(msgId)
+          .set({
+            id: msgId,
+            sender,
+            text,
+            timestamp: timestampIST,
+            createdAt: now,
+          });
+      }
+    } catch (err) {
+      adminLogger.warn("WhatsApp:RecordMessageFailed", "Could not persist chat message log", { error: err });
     }
-  } catch (err) {
-    adminLogger.warn("WhatsApp:RecordMessageFailed", "Could not persist chat message log", { error: err });
-  }
+  });
 }
 
 const GREETING_TEXT =

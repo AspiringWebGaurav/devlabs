@@ -7,6 +7,29 @@ import { ApiError, createApiErrorResponse } from "@/lib/api/error";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+interface CachedCloudflareSettings {
+  isSimulatedDowntime: boolean;
+  expiresAt: number;
+}
+
+let cachedCfSettings: CachedCloudflareSettings | null = null;
+const CF_SETTINGS_CACHE_TTL_MS = 60_000; // 60 seconds
+
+async function getCachedSimulatedDowntime(): Promise<boolean> {
+  const now = Date.now();
+  if (cachedCfSettings && now < cachedCfSettings.expiresAt) {
+    return cachedCfSettings.isSimulatedDowntime;
+  }
+
+  const cfRes = await cloudflareRepository.getCloudflareSettings();
+  const isSimulatedDowntime = Boolean(cfRes.data?.isSimulatedDowntime);
+  cachedCfSettings = {
+    isSimulatedDowntime,
+    expiresAt: now + CF_SETTINGS_CACHE_TTL_MS,
+  };
+  return isSimulatedDowntime;
+}
+
 export async function POST(req: NextRequest) {
   const { requestId, clientIp } = getRequestContext(req);
 
@@ -18,9 +41,9 @@ export async function POST(req: NextRequest) {
       throw new ApiError("VALIDATION_FAILED", "Missing security verification token.");
     }
 
-    // Check if Admin enabled simulated downtime
-    const cfRes = await cloudflareRepository.getCloudflareSettings();
-    if (cfRes.data?.isSimulatedDowntime) {
+    // Check if Admin enabled simulated downtime (cached 60s to avoid redundant database reads)
+    const isSimulatedDowntime = await getCachedSimulatedDowntime();
+    if (isSimulatedDowntime) {
       throw new ApiError(
         "BOT_CHALLENGE_FAILED",
         "Simulated Cloudflare downtime / network connection conflict."

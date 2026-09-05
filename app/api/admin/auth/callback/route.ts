@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminEmail } from "@/lib/admin/auth";
 import { fetchWithTimeout } from "@/lib/api/fetcher";
+import { extractClientIp } from "@/lib/admin/services/ip-security.service";
+import { otpService } from "@/lib/admin/services/otp.service";
+import { ADMIN_COOKIE_NAME, ADMIN_OTP_COOKIE_NAME, OTP_TTL_SECONDS } from "@/lib/admin/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -63,19 +66,43 @@ export async function GET(request: NextRequest) {
       throw new Error(tokenData.error_description || "Failed to exchange OAuth token with Google.");
     }
 
-    // Fetch verified Google User Profile (3.0s timeout)
-    const userinfoResponse = await fetchWithTimeout(
-      "https://www.googleapis.com/oauth2/v3/userinfo",
-      {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` },
-      },
-      3000
-    );
+    let email: string | undefined = undefined;
+    let avatar: string | undefined = undefined;
+    let name: string | undefined = undefined;
 
-    const profile = await userinfoResponse.json();
-    const email = profile?.email;
-    const avatar = profile?.picture;
-    const name = profile?.name;
+    // Fast-path: Extract verified identity directly from Google's signed ID token JWT payload (< 0.1ms)
+    if (tokenData.id_token && typeof tokenData.id_token === "string") {
+      try {
+        const parts = tokenData.id_token.split(".");
+        if (parts.length >= 2) {
+          const payloadJson = Buffer.from(parts[1], "base64url").toString("utf8");
+          const payload = JSON.parse(payloadJson);
+          if (payload?.email && typeof payload.email === "string") {
+            email = payload.email;
+            avatar = typeof payload.picture === "string" ? payload.picture : undefined;
+            name = typeof payload.name === "string" ? payload.name : undefined;
+          }
+        }
+      } catch {
+        // Fallback to userinfo endpoint below
+      }
+    }
+
+    // Fallback: Query Google userinfo endpoint if id_token was absent or could not be parsed
+    if (!email) {
+      const userinfoResponse = await fetchWithTimeout(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        },
+        3000
+      );
+
+      const profile = await userinfoResponse.json();
+      email = profile?.email;
+      avatar = profile?.picture;
+      name = profile?.name;
+    }
 
     if (!email) {
       throw new Error("No verified email received from Google profile.");
@@ -90,10 +117,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Authorized Identity: Extract deployment-authoritative client IP
-    const { extractClientIp } = await import("@/lib/admin/services/ip-security.service");
-    const { otpService } = await import("@/lib/admin/services/otp.service");
-    const { ADMIN_COOKIE_NAME, ADMIN_OTP_COOKIE_NAME, OTP_TTL_SECONDS } = await import("@/lib/admin/constants");
-
     const clientIp = extractClientIp(request.headers);
     const userAgent = request.headers.get("user-agent") || undefined;
 

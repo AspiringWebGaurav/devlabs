@@ -11,7 +11,10 @@ import {
   verifyVisitorSession,
   VisitorSession,
 } from "./auth";
-import { liveChatSessionsRepository } from "@/lib/dal/repositories/live-chat-sessions.repository";
+import {
+  liveChatSessionsRepository,
+  type LiveChatSessionDocument,
+} from "@/lib/dal/repositories/live-chat-sessions.repository";
 import crypto from "crypto";
 
 export interface AuthenticatedVisitorContext {
@@ -21,8 +24,24 @@ export interface AuthenticatedVisitorContext {
   name: string;
 }
 
+interface CachedVisitorSession {
+  dbSession: LiveChatSessionDocument;
+  cachedUntil: number;
+}
+
+const visitorSessionCache = new Map<string, CachedVisitorSession>();
+const VISITOR_SESSION_CACHE_TTL_MS = 30_000; // 30 seconds
+
+/**
+ * Invalidates a visitor session from the local L1 memory cache upon signout or revocation.
+ */
+export function invalidateVisitorSessionCache(sessionId: string): void {
+  visitorSessionCache.delete(sessionId);
+}
+
 /**
  * Extracts and authoritatively verifies the visitor session from the request cookie and Firestore registry.
+ * Utilizes a high-performance 30-second in-memory L1 cache to avoid redundant database reads during active chat polling.
  */
 export async function getAuthenticatedVisitor(
   req: NextRequest
@@ -34,12 +53,30 @@ export async function getAuthenticatedVisitor(
   const session = verifyVisitorSession(cookie.value);
   if (!session) return null;
 
-  // 2. Server-Authoritative Session Registry Check in Firestore
-  const dbSession = await liveChatSessionsRepository.getSession(session.sessionId);
+  // 2. Server-Authoritative Session Registry Check (In-Memory L1 Cache + Firestore)
+  const now = Date.now();
+  let dbSession: LiveChatSessionDocument | null = null;
+  const cached = visitorSessionCache.get(session.sessionId);
+
+  if (cached && now < cached.cachedUntil) {
+    dbSession = cached.dbSession;
+  } else {
+    dbSession = await liveChatSessionsRepository.getSession(session.sessionId);
+    if (dbSession) {
+      if (visitorSessionCache.size > 500) {
+        visitorSessionCache.clear();
+      }
+      visitorSessionCache.set(session.sessionId, {
+        dbSession,
+        cachedUntil: Math.min(now + VISITOR_SESSION_CACHE_TTL_MS, dbSession.expiresAt),
+      });
+    }
+  }
+
   if (!dbSession) return null;
 
-  const now = Date.now();
   if (dbSession.status !== "ACTIVE" || now >= dbSession.expiresAt) {
+    visitorSessionCache.delete(session.sessionId);
     return null;
   }
 

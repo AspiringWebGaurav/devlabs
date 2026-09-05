@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import crypto from "crypto";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
@@ -37,22 +37,6 @@ const ContactSchema = z.object({
 export async function POST(request: NextRequest) {
   const { requestId, clientIp } = getRequestContext(request);
 
-  // 0. Maintenance Lock Guard during Database Lifecycle Reset
-  if (await isLifecycleLockActive()) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "SERVICE_UNAVAILABLE",
-          message: "Database maintenance in progress. Please retry in a few moments.",
-          retryable: true,
-          requestId,
-        },
-      },
-      { status: 503, headers: { "Retry-After": "5", "x-request-id": requestId } }
-    );
-  }
-
   try {
     // 1. Content-Length Protection (Max 1MB)
     const contentLength = request.headers.get("content-length");
@@ -90,8 +74,27 @@ export async function POST(request: NextRequest) {
       throw new ApiError("VALIDATION_FAILED", messageValidation.error);
     }
 
-    // 3. Multi-Tier Anti-Abuse Rate Limiting
-    const rateLimitCheck = await checkContactRateLimit(clientIp, email);
+    // 3. Concurrent Pre-Flight Security Gate: Maintenance Lock & Multi-Tier Rate Limiting
+    const [lifecycleLocked, rateLimitCheck] = await Promise.all([
+      isLifecycleLockActive(),
+      checkContactRateLimit(clientIp, email),
+    ]);
+
+    if (lifecycleLocked) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "SERVICE_UNAVAILABLE",
+            message: "Database maintenance in progress. Please retry in a few moments.",
+            retryable: true,
+            requestId,
+          },
+        },
+        { status: 503, headers: { "Retry-After": "5", "x-request-id": requestId } }
+      );
+    }
+
     if (!rateLimitCheck.allowed) {
       throw new ApiError(
         "RATE_LIMITED_HOURLY",
@@ -254,29 +257,36 @@ export async function POST(request: NextRequest) {
       ? ("DELIVERY_UNCERTAIN" as const)
       : ("FAILED" as const);
 
-    // Update Firestore record with terminal delivery outcomes
-    await inquiriesRepository.updateInquiryDeliveries(operationId, {
-      durableStatus: aggregateStatus,
-      deliveries: {
-        ownerNotification: {
-          state: ownerState,
-          brevoMessageId: ownerResult.status === "fulfilled" ? ownerResult.value.messageId : undefined,
-          dispatchedAt: new Date().toISOString(),
-          error: ownerResult.status === "fulfilled" ? ownerResult.value.error : String(ownerResult.reason),
-        },
-        visitorAutoReply: {
-          state: visitorState,
-          brevoMessageId: visitorResult.status === "fulfilled" ? visitorResult.value.messageId : undefined,
-          dispatchedAt: new Date().toISOString(),
-          error: visitorResult.status === "fulfilled" ? visitorResult.value.error : String(visitorResult.reason),
-        },
-      },
-    }).catch((err: unknown) => {
-      console.warn("Failed to update inquiry delivery status:", err);
-    });
+    // 8. Reconcile Deliveries & Record Durable State via Next.js after() to prevent blocking client response
+    after(async () => {
+      try {
+        await inquiriesRepository.updateInquiryDeliveries(operationId, {
+          durableStatus: aggregateStatus,
+          deliveries: {
+            ownerNotification: {
+              state: ownerState,
+              brevoMessageId: ownerResult.status === "fulfilled" ? ownerResult.value.messageId : undefined,
+              dispatchedAt: new Date().toISOString(),
+              error: ownerResult.status === "fulfilled" ? ownerResult.value.error : String(ownerResult.reason),
+            },
+            visitorAutoReply: {
+              state: visitorState,
+              brevoMessageId: visitorResult.status === "fulfilled" ? visitorResult.value.messageId : undefined,
+              dispatchedAt: new Date().toISOString(),
+              error: visitorResult.status === "fulfilled" ? visitorResult.value.error : String(visitorResult.reason),
+            },
+          },
+        });
+      } catch (err: unknown) {
+        console.warn("Failed to update inquiry delivery status:", err);
+      }
 
-    // Record submission for rate limiting
-    recordContactSubmission(clientIp, email);
+      try {
+        recordContactSubmission(clientIp, email);
+      } catch (err: unknown) {
+        console.warn("Failed to record contact submission:", err);
+      }
+    });
 
     // 9. Return Standardized Response Contract
     if (isFullyConfirmed) {

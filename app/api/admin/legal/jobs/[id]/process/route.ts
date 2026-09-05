@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin/constants";
@@ -150,14 +150,18 @@ export async function POST(
   // 7. Self-Chaining Asynchronous Dispatch if Remaining Recipients Exist
   if (remaining > 0) {
     const appBaseUrl = resolveAppUrl(req.headers);
-    fetch(`${appBaseUrl}/api/admin/legal/jobs/${jobId}/process`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${workerSecret}`,
-        "Content-Type": "application/json",
-      },
-    }).catch((chainErr) => {
-      console.error("[LegalJobRunner:SelfChainError]", chainErr);
+    after(async () => {
+      try {
+        await fetch(`${appBaseUrl}/api/admin/legal/jobs/${jobId}/process`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${workerSecret}`,
+            "Content-Type": "application/json",
+          },
+        });
+      } catch (chainErr) {
+        console.error("[LegalJobRunner:SelfChainError]", chainErr);
+      }
     });
 
     return Response.json(

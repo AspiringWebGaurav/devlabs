@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin/constants";
 import { verifyAdminSession } from "@/lib/admin/auth";
@@ -55,17 +55,23 @@ export async function GET(req: NextRequest): Promise<Response> {
     process.env.JWT_SECRET ||
     "internal_legal_worker_secret";
 
-  for (const job of recoverableJobs) {
-    fetch(`${appBaseUrl}/api/admin/legal/jobs/${job.id}/process`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${workerSecret}`,
-        "Content-Type": "application/json",
-      },
-    }).catch((err) => {
-      console.error(`[LegalCronRecovery] Failed to trigger job ${job.id}:`, err);
-    });
-  }
+  after(async () => {
+    await Promise.allSettled(
+      recoverableJobs.map(async (job) => {
+        try {
+          await fetch(`${appBaseUrl}/api/admin/legal/jobs/${job.id}/process`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${workerSecret}`,
+              "Content-Type": "application/json",
+            },
+          });
+        } catch (err) {
+          console.error(`[LegalCronRecovery] Failed to trigger job ${job.id}:`, err);
+        }
+      })
+    );
+  });
 
   return Response.json({
     recoveredJobsCount: recoverableJobs.length,

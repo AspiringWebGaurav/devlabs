@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getAuthenticatedVisitor,
   validateCsrfOrigin,
+  invalidateVisitorSessionCache,
 } from "@/lib/assistant/session";
 import { LIVE_CHAT_COOKIE_NAME, verifyVisitorSession } from "@/lib/assistant/auth";
 import { liveChatSessionsRepository } from "@/lib/dal/repositories/live-chat-sessions.repository";
@@ -68,6 +69,7 @@ export async function DELETE(req: NextRequest) {
     if (cookie?.value) {
       const session = verifyVisitorSession(cookie.value);
       if (session?.sessionId) {
+        invalidateVisitorSessionCache(session.sessionId);
         await liveChatSessionsRepository.revokeSession(session.sessionId);
       }
     }
