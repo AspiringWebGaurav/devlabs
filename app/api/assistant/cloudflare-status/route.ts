@@ -15,7 +15,7 @@ export async function GET() {
       siteKey: settings?.siteKey || "0x4AAAAAAEilFWDvwBZ3NPSK",
       maxRetryAttempts: settings?.maxRetryAttempts || 2,
       circuitBreakerEnabled: settings?.circuitBreakerEnabled !== false,
-      fallbackEmailGateway: settings?.fallbackEmailGateway || "no-reply@gauravpatil.online",
+      fallbackEmailGateway: settings?.fallbackEmailGateway || "no-reply@gauravpatil.site",
     });
   } catch {
     return NextResponse.json({
@@ -24,7 +24,7 @@ export async function GET() {
       siteKey: "0x4AAAAAAEilFWDvwBZ3NPSK",
       maxRetryAttempts: 2,
       circuitBreakerEnabled: true,
-      fallbackEmailGateway: "no-reply@gauravpatil.online",
+      fallbackEmailGateway: "no-reply@gauravpatil.site",
     });
   }
 }

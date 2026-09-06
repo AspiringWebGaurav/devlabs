@@ -122,7 +122,7 @@ export const LiveChatAuthForm: React.FC<LiveChatAuthFormProps> = ({
         {/* 2. Description Box */}
         <p className="text-[11px] sm:text-[12px] leading-relaxed text-neutral-600 bg-neutral-50/70 border border-neutral-200/60 rounded-xl p-2.5 sm:p-3">
           To prevent spam and verify your identity, a single-use 6-digit code will be sent to your email from{" "}
-          <span className="font-mono font-semibold text-[#7C3AED]">no-reply@gauravpatil.online</span>.
+          <span className="font-mono font-semibold text-[#7C3AED]">no-reply@gauravpatil.site</span>.
         </p>
 
         {/* 3. Error Alert Region */}

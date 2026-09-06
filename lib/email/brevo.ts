@@ -166,7 +166,7 @@ export function resolveAppUrl(requestHeaders?: Headers | null): string {
   }
 
   // 5. Canonical production domain fallback
-  return "https://gauravpatil.online";
+  return "https://gauravpatil.site";
 }
 
 /**
@@ -386,7 +386,7 @@ export function generateVisitorAutoReplyHtml(
 /**
  * Contact Form Workflow Dispatcher:
  * 1. Dispatches Internal Notification Email (Lead alert to owner with Reply-To set to visitor).
- * 2. Dispatches Visitor Auto-Reply Email (Local code-generated layout with Reply-To: hello@gauravpatil.online).
+ * 2. Dispatches Visitor Auto-Reply Email (Local code-generated layout with Reply-To: hello@gauravpatil.site).
  */
 export async function dispatchContactFormWorkflow(
   params: ContactFormWorkflowParams
@@ -455,7 +455,7 @@ If your inquiry is urgent, you can reply directly to this email.
 
 Gaurav Patil
 Developer & Backend Services
-https://gauravpatil.online`;
+https://gauravpatil.site`;
 
   // =========================================================================
   // Parallel Dual Dispatch (Lead Alert + Auto-Reply concurrently)
@@ -513,7 +513,7 @@ export interface OtpEmailParams {
 }
 
 /**
- * Dispatches a 6-digit OTP code to the Superadmin inbox via no-reply@gauravpatil.online
+ * Dispatches a 6-digit OTP code to the Superadmin inbox via no-reply@gauravpatil.site
  * Styled in minimal, spam-free Wasmer Pro aesthetic with dynamic admin panel URLs.
  */
 export async function dispatchOtpEmail(
@@ -627,7 +627,7 @@ export interface NewIpAlertParams {
 }
 
 /**
- * Dispatches an untrusted IP authorization alert with 1-click approval link via security@gauravpatil.online
+ * Dispatches an untrusted IP authorization alert with 1-click approval link via security@gauravpatil.site
  * Styled in minimal, spam-free Wasmer Pro aesthetic with dynamic admin panel URLs.
  */
 export async function dispatchNewIpSecurityAlert(
@@ -686,7 +686,7 @@ export interface ReplyInquiryEmailParams {
 }
 
 /**
- * Dispatches a direct reply to an inbound inquiry or outreach contact via security@gauravpatil.online.
+ * Dispatches a direct reply to an inbound inquiry or outreach contact via security@gauravpatil.site.
  * Uses Brevo REST API v3 with clean HTML and plain text formatting.
  */
 export async function dispatchInquiryReplyEmail(
@@ -737,7 +737,7 @@ export interface LiveChatOtpEmailParams {
 
 /**
  * Dispatches a single-use 6-digit OTP verification code to a visitor attempting to use Live Chat.
- * Strictly uses no-reply@gauravpatil.online (EMAIL_IDENTITIES.NO_REPLY).
+ * Strictly uses no-reply@gauravpatil.site (EMAIL_IDENTITIES.NO_REPLY).
  * Enforces single-view, no-scroll layout with selectable text OTP and security notice.
  */
 export async function dispatchLiveChatOtpEmail(
@@ -806,7 +806,7 @@ export interface TurnstileFallbackOtpEmailParams {
 
 /**
  * Dispatches a single-use 6-digit OTP security code when Cloudflare Turnstile encounters a network or downtime conflict.
- * Strictly uses no-reply@gauravpatil.online (EMAIL_IDENTITIES.NO_REPLY).
+ * Strictly uses no-reply@gauravpatil.site (EMAIL_IDENTITIES.NO_REPLY).
  * Enforces single-view, no-scroll layout with selectable text OTP and clear downtime notification.
  */
 export async function dispatchTurnstileFallbackOtpEmail(

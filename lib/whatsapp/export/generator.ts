@@ -141,8 +141,8 @@ export function generateReadmeCertificate(
     `-----------------------------------------------------------------------\n` +
     `Data Controller:    Gaurav Patil (Full-Stack Engineer & System Architect)\n` +
     `Official Website:   ${baseUrl}\n` +
-    `Security Contact:   security@gauravpatil.online\n` +
-    `Legal Channel:      hello@gauravpatil.online\n` +
+    `Security Contact:   security@gauravpatil.site\n` +
+    `Legal Channel:      hello@gauravpatil.site\n` +
     `Jurisdiction:       European Union (GDPR), California (CCPA/CPRA), India (DPDPA)\n\n` +
     `DATA SUBJECT DETAILS:\n` +
     `-----------------------------------------------------------------------\n` +
@@ -170,7 +170,7 @@ export function generateReadmeCertificate(
     `  at any time by replying "STOP" directly in your WhatsApp conversation.\n` +
     `• Right to Rectification (GDPR Art. 16):\n` +
     `  You can update your registered email anytime in WhatsApp or by contacting\n` +
-    `  security@gauravpatil.online.\n` +
+    `  security@gauravpatil.site.\n` +
     `• Right to Data Portability (GDPR Art. 20):\n` +
     `  You may re-download your updated archive at any time by sending /exportmydata.\n\n` +
     `ARCHIVE MANIFEST (FILES IN THIS DIRECTORY):\n` +
@@ -502,7 +502,7 @@ function generateStructuredJsonHistory(
   const totalChars = messages.reduce((sum, m) => sum + m.text.length, 0);
 
   const payload = {
-    $schema: "https://devlabs.eu.cc/schemas/whatsapp-data-export-v2.json",
+    $schema: `${baseUrl}/schemas/whatsapp-data-export-v2.json`,
     exportId,
     exportType: "GAURAV_PATIL_PORTFOLIO_WHATSAPP_DATA_EXPORT",
     version: "2.0.0",
@@ -513,8 +513,8 @@ function generateStructuredJsonHistory(
       name: "Gaurav Patil",
       title: "Full-Stack Engineer & System Architect",
       website: baseUrl,
-      securityEmail: "security@gauravpatil.online",
-      legalEmail: "hello@gauravpatil.online",
+      securityEmail: "security@gauravpatil.site",
+      legalEmail: "hello@gauravpatil.site",
       privacyPolicyUrl: `${baseUrl}/privacy?focus=whatsapp#whatsapp-data-export`,
       termsUrl: `${baseUrl}/terms?focus=whatsapp#whatsapp-terms`,
     },

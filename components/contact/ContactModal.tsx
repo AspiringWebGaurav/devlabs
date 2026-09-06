@@ -815,7 +815,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               <div aria-live="polite" aria-atomic="true" className="sr-only">
                 {submittedData.variant === "PARTIAL_AUTOREPLY_FAILED"
                   ? `Thanks for reaching out, ${firstName}! Your message was received, and Gaurav will reply soon.`
-                  : `Thanks for reaching out, ${firstName}! Your message is in Gaurav's inbox, and a confirmation copy was sent to your email from hello@gauravpatil.online.`}
+                  : `Thanks for reaching out, ${firstName}! Your message is in Gaurav's inbox, and a confirmation copy was sent to your email from hello@gauravpatil.site.`}
               </div>
 
               {/* Top Status Row with Badge & Close Button */}
@@ -912,7 +912,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         </span>{" "}
                         from{" "}
                         <span className="font-mono text-[#CBACF9] font-medium whitespace-nowrap">
-                          hello@gauravpatil.online
+                          hello@gauravpatil.site
                         </span>
                         .
                       </p>
@@ -926,7 +926,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     <p className="text-amber-200/90 font-medium">
                       Your message reached me safely! The automated confirmation from{" "}
                       <span className="font-mono text-[#CBACF9] font-semibold whitespace-nowrap">
-                        hello@gauravpatil.online
+                        hello@gauravpatil.site
                       </span>{" "}
                       had a slight hiccup, but no worries &mdash; no need to resubmit.
                     </p>
@@ -941,7 +941,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                         </span>{" "}
                         from{" "}
                         <span className="font-mono text-[#CBACF9] font-medium whitespace-nowrap">
-                          hello@gauravpatil.online
+                          hello@gauravpatil.site
                         </span>
                         .
                       </p>

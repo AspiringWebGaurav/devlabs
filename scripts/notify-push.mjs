@@ -47,7 +47,7 @@ loadEnv();
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.BREVO_NOTIFICATION_RECIPIENT || "gauravpatil5737@gmail.com";
-const SENDER_EMAIL = "security@gauravpatil.online";
+const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || "security@gauravpatil.site";
 const SENDER_NAME = "Gaurav Security Services";
 
 if (!BREVO_API_KEY) {

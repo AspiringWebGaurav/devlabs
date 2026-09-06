@@ -222,7 +222,7 @@ export const CloudflareUpdateSchema = z.object({
   siteKey: z.string().min(1).default("0x4AAAAAAEilFWDvwBZ3NPSK"),
   maxRetryAttempts: z.number().int().min(1).max(5).default(2),
   circuitBreakerEnabled: z.boolean().default(true),
-  fallbackEmailGateway: z.string().email().default("no-reply@gauravpatil.online"),
+  fallbackEmailGateway: z.string().email().default("no-reply@gauravpatil.site"),
   expectedVersion: z.number().int().optional(),
 });
 

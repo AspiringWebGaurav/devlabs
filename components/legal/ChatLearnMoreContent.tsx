@@ -186,7 +186,7 @@ export const ChatLearnMoreContent: React.FC = () => {
                   What is &ldquo;Live Chat with Gaurav&rdquo;?
                 </h2>
                 <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-                  <strong>Direct Personal Connection:</strong> Live Chat establishes a real-time messaging channel with Gaurav Patil. To safeguard against spam and protect communication integrity, visitors authenticate with a single-use 6-digit verification code sent to their email via <span className="font-mono text-purple">no-reply@gauravpatil.online</span>.
+                  <strong>Direct Personal Connection:</strong> Live Chat establishes a real-time messaging channel with Gaurav Patil. To safeguard against spam and protect communication integrity, visitors authenticate with a single-use 6-digit verification code sent to their email via <span className="font-mono text-purple">no-reply@gauravpatil.site</span>.
                 </p>
                 <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-2">
                   <h3 className="text-xs font-mono uppercase tracking-wider font-semibold text-purple">
@@ -401,11 +401,11 @@ export const ChatLearnMoreContent: React.FC = () => {
                 </p>
                 <div className="flex flex-wrap items-center gap-3 pt-2">
                   <a
-                    href="mailto:hello@gauravpatil.online"
+                    href="mailto:hello@gauravpatil.site"
                     className="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-black bg-purple hover:bg-[#b895f5] rounded-xl transition-all shadow-md active:scale-95"
                   >
                     <FaEnvelope className="w-3.5 h-3.5" />
-                    <span>Email hello@gauravpatil.online</span>
+                    <span>Email hello@gauravpatil.site</span>
                   </a>
                   <Link
                     href="/#contact"

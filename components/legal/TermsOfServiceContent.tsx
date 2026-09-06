@@ -426,7 +426,7 @@ function TermsContentInner({ initialData }: TermsOfServiceContentProps) {
               )}
             </div>
             <p>
-              All transactional emails, contact receipts, security alerts, and mandatory policy notices are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono">gauravservices.eu.cc</span> preserved) via Brevo API. Official sender identities include <code className="text-purple font-mono">hello@gauravpatil.online</code> (inquiries and auto-replies), <code className="text-purple font-mono">security@gauravpatil.online</code> (authentication alerts and audit logs), <code className="text-purple font-mono">help@gauravpatil.online</code> (support), and <code className="text-purple font-mono">no-reply@gauravpatil.online</code> (system OTPs and automated legal announcements). A strict zero-spam guarantee is maintained: submitted contact emails are never enrolled in promotional marketing sequences.
+              All transactional emails, contact receipts, security alerts, and mandatory policy notices are dispatched from the authenticated server domain <span className="text-purple font-mono">gauravpatil.site</span> via Brevo API. Official sender identities include <code className="text-purple font-mono">hello@gauravpatil.site</code> (inquiries and auto-replies), <code className="text-purple font-mono">security@gauravpatil.site</code> (authentication alerts and audit logs), <code className="text-purple font-mono">help@gauravpatil.site</code> (support), and <code className="text-purple font-mono">no-reply@gauravpatil.site</code> (system OTPs and automated legal announcements). A strict zero-spam guarantee is maintained: submitted contact emails are never enrolled in promotional marketing sequences.
             </p>
             <div className="mt-3 p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-2 text-xs sm:text-sm">
               <h3 className="font-semibold text-white text-sm flex items-center gap-2">
@@ -438,7 +438,7 @@ function TermsContentInner({ initialData }: TermsOfServiceContentProps) {
                   <strong className="text-white">Automatic Registration for Policy Updates:</strong> Submitting an email address through any service of this portfolio &mdash; including Contact Form inquiries, Live Chat email OTP authentication, support requests, or direct communications &mdash; registers that address to receive mandatory policy, legal, and security announcements in accordance with your acceptance of use.
                 </li>
                 <li>
-                  <strong className="text-white">Mandatory Non-Marketing Announcements:</strong> When material updates are made to the public Terms of Service, Privacy Policy, or critical security procedures, automated informational notices are broadcast directly from <code className="text-purple font-mono">no-reply@gauravpatil.online</code> or <code className="text-purple font-mono">security@gauravpatil.online</code>. These communications are strictly non-commercial, transactional legal disclosures and contain zero marketing or promotional sequences.
+                  <strong className="text-white">Mandatory Non-Marketing Announcements:</strong> When material updates are made to the public Terms of Service, Privacy Policy, or critical security procedures, automated informational notices are broadcast directly from <code className="text-purple font-mono">no-reply@gauravpatil.site</code> or <code className="text-purple font-mono">security@gauravpatil.site</code>. These communications are strictly non-commercial, transactional legal disclosures and contain zero marketing or promotional sequences.
                 </li>
                 <li>
                   <strong className="text-white">No Unsubscribe &amp; Immunity from Automated Client-Level Unsubscribe:</strong> Because legal update announcements are mandatory contractual disclosures required to maintain operational and legal transparency for all users who have interacted with Gaurav Portfolio or its authenticated services, <strong className="text-white">no unsubscribe or opt-out option is provided</strong>. Even if automated email client features (such as Google/Gmail&apos;s automatic &ldquo;Unsubscribe&rdquo; header or client-level spam filters) are invoked, you acknowledge and agree that you will continue to receive mandatory legal, policy, and security notices as per this policy and your acceptance of use.
@@ -496,7 +496,7 @@ function TermsContentInner({ initialData }: TermsOfServiceContentProps) {
                   <strong className="text-white">Automated Inbox Dispatch:</strong> If Gaurav is away or offline, the server instantaneously generates and dispatches an automated lead notification directly to Gaurav&apos;s private inbox containing your verified sender details and full message transcript with 1-click direct response routing.
                 </li>
                 <li>
-                  <strong className="text-white">Single-Use 6-Digit Email Verification:</strong> To eliminate spam and protect system resources, access to Live Chat requires a single-use 6-digit OTP code dispatched exclusively from <code className="text-purple font-mono">no-reply@gauravpatil.online</code>. Verification codes expire in 5 minutes.
+                  <strong className="text-white">Single-Use 6-Digit Email Verification:</strong> To eliminate spam and protect system resources, access to Live Chat requires a single-use 6-digit OTP code dispatched exclusively from <code className="text-purple font-mono">no-reply@gauravpatil.site</code>. Verification codes expire in 5 minutes.
                 </li>
                 <li>
                   <strong className="text-white">4-Hour Active Session Token:</strong> Once verified, an encrypted session remains active for 4 hours. You may close and reopen the chat window anytime within this window without re-authenticating. Visitors may explicitly terminate their session at any time using the <strong className="text-white">Sign out</strong> button in the top-right header.
@@ -511,23 +511,23 @@ function TermsContentInner({ initialData }: TermsOfServiceContentProps) {
                 Official Verified Senders &amp; Support Pipeline
               </h3>
               <p className="text-sm text-neutral-300 leading-relaxed">
-                All communications, support tickets, and contact verification flows originate exclusively from the authenticated domain <span className="text-purple font-mono font-semibold">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono font-semibold">gauravservices.eu.cc</span> supported for backward compatibility):
+                All communications, support tickets, and contact verification flows originate exclusively from the authenticated domain <span className="text-purple font-mono font-semibold">gauravpatil.site</span>:
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
-                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">hello@gauravpatil.online</span>
+                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">hello@gauravpatil.site</span>
                   <p className="text-xs text-neutral-400">General portfolio inquiries, recruiter outreach, and direct developer contact.</p>
                 </div>
                 <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
-                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">help@gauravpatil.online</span>
+                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">help@gauravpatil.site</span>
                   <p className="text-xs text-neutral-400">Assistant technical support, bug reports, and portfolio navigation guidance.</p>
                 </div>
                 <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
-                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">security@gauravpatil.online</span>
+                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">security@gauravpatil.site</span>
                   <p className="text-xs text-neutral-400">Security notifications, 2FA OTP codes, and vulnerability disclosure reports.</p>
                 </div>
                 <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
-                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">no-reply@gauravpatil.online</span>
+                  <span className="text-xs sm:text-sm text-purple font-mono font-bold">no-reply@gauravpatil.site</span>
                   <p className="text-xs text-neutral-400">Automated Live Chat OTP passcodes, system receipts, and non-interactive alerts.</p>
                 </div>
               </div>
@@ -670,10 +670,10 @@ function TermsContentInner({ initialData }: TermsOfServiceContentProps) {
             <p className="text-purple font-medium">
               Email:{" "}
               <a
-                href="mailto:hello@gauravpatil.online"
+                href="mailto:hello@gauravpatil.site"
                 className="hover:underline"
               >
-                hello@gauravpatil.online
+                hello@gauravpatil.site
               </a>
             </p>
           </section>

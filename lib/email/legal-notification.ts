@@ -9,7 +9,7 @@
  * - "Sincerely, Gaurav Patil" sign-off
  * - Google-style Help Center and Contact Us footer links
  * - Zero internal logs, zero version numbers (e.g. 0.0.2)
- * - Sourced strictly from no-reply@gauravpatil.online with no-reply routing
+ * - Sourced strictly from no-reply@gauravpatil.site with no-reply routing
  */
 
 import { EMAIL_IDENTITIES } from "./identities";

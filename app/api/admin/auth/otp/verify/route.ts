@@ -110,7 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AuthVerif
         request.headers
       );
 
-      // Dispatch security authorization alert strictly via security@gauravpatil.online
+      // Dispatch security authorization alert strictly via security@gauravpatil.site
       await dispatchNewIpSecurityAlert({
         email,
         name: challenge.name,

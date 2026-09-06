@@ -214,7 +214,7 @@ export const SecurityPolicyContent: React.FC = () => {
                   Transactional Email Gateway Standards
                 </h2>
                 <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-                  All transactional correspondence dispatched from the platform originates from authenticated domains (<code className="text-xs text-purple font-mono">gauravpatil.online</code>) via encrypted Brevo REST APIs.
+                  All transactional correspondence dispatched from the platform originates from authenticated domains (<code className="text-xs text-purple font-mono">gauravpatil.site</code>) via encrypted Brevo REST APIs.
                 </p>
                 <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
                   Domain records enforce strict <strong>SPF</strong> (Sender Policy Framework), <strong>DKIM</strong> (DomainKeys Identified Mail), and <strong>DMARC</strong> alignment to prevent email spoofing, phishing, and impersonation attacks.
@@ -247,11 +247,11 @@ export const SecurityPolicyContent: React.FC = () => {
                   </p>
                   <div className="pt-2">
                     <a
-                      href="mailto:security@gauravpatil.online"
+                      href="mailto:security@gauravpatil.site"
                       className="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-black bg-purple hover:bg-[#b895f5] rounded-xl transition-all shadow-md active:scale-95"
                     >
                       <FaEnvelope className="w-3.5 h-3.5" />
-                      <span>Report to security@gauravpatil.online</span>
+                      <span>Report to security@gauravpatil.site</span>
                     </a>
                   </div>
                 </div>

@@ -1,20 +1,29 @@
 /**
  * Central Email Identity & Sender Configuration
- * Primary Domain: gauravpatil.online
- * Legacy Domain: gauravservices.eu.cc
+ * Primary Domain: gauravpatil.site (Verified Brevo Gateway)
+ * Pre-Production Link: devlabs.eu.cc
+ * Production Link: gauravpatil.site
  *
  * Single Source of Truth for all portfolio email senders, purposes, and reply-to routing.
  */
 
-export const PRIMARY_EMAIL_DOMAIN = "gauravpatil.online";
-export const LEGACY_EMAIL_DOMAIN = "gauravservices.eu.cc";
+export const PRIMARY_EMAIL_DOMAIN = "gauravpatil.site";
+export const LEGACY_EMAIL_DOMAIN = "gauravpatil.site";
+export const PRE_PRODUCTION_DOMAIN = "devlabs.eu.cc";
+export const PRODUCTION_DOMAIN = "gauravpatil.site";
 
 /**
  * Backwards compatibility alias for the active authenticated email domain.
  */
 export const AUTHENTICATED_EMAIL_DOMAIN = PRIMARY_EMAIL_DOMAIN;
 
-export type EmailIdentityType = "HELLO" | "SECURITY" | "HELP" | "NO_REPLY";
+export type EmailIdentityType =
+  | "HELLO"
+  | "SECURITY"
+  | "HELP"
+  | "NO_REPLY"
+  | "ME"
+  | "WORK";
 
 export interface EmailSenderVariant {
   email: string;
@@ -43,108 +52,162 @@ export const EMAIL_IDENTITIES: Record<EmailIdentityType, EmailIdentity> = {
   HELLO: {
     type: "HELLO",
     key: "HELLO",
-    email: "hello@gauravpatil.online",
-    primaryEmail: "hello@gauravpatil.online",
-    legacyEmail: "hello@gauravservices.eu.cc",
+    email: "hello@gauravpatil.site",
+    primaryEmail: "hello@gauravpatil.site",
+    legacyEmail: "hello@gauravpatil.site",
     name: "Gaurav Patil",
     displayName: "Gaurav Patil",
-    defaultReplyTo: "hello@gauravpatil.online",
+    defaultReplyTo: "hello@gauravpatil.site",
     purpose:
       "Public-facing communication, contact form inquiries, auto replies, and general visitor correspondence.",
     isNoReply: false,
     primary: {
-      email: "hello@gauravpatil.online",
+      email: "hello@gauravpatil.site",
       name: "Gaurav Patil",
-      defaultReplyTo: "hello@gauravpatil.online",
+      defaultReplyTo: "hello@gauravpatil.site",
       purpose: "Direct contact and automated receipts.",
       isNoReply: false,
     },
     legacy: {
-      email: "hello@gauravservices.eu.cc",
-      name: "Gaurav Services",
-      defaultReplyTo: "hello@gauravservices.eu.cc",
-      purpose: "Legacy direct contact and automated receipts.",
+      email: "hello@gauravpatil.site",
+      name: "Gaurav Patil",
+      defaultReplyTo: "hello@gauravpatil.site",
+      purpose: "Direct contact and automated receipts.",
+      isNoReply: false,
+    },
+  },
+  ME: {
+    type: "ME",
+    key: "ME",
+    email: "me@gauravpatil.site",
+    primaryEmail: "me@gauravpatil.site",
+    legacyEmail: "me@gauravpatil.site",
+    name: "Gaurav Patil",
+    displayName: "Gaurav Patil",
+    defaultReplyTo: "me@gauravpatil.site",
+    purpose:
+      "Direct executive correspondence, personal developer outreach, and VIP contacts.",
+    isNoReply: false,
+    primary: {
+      email: "me@gauravpatil.site",
+      name: "Gaurav Patil",
+      defaultReplyTo: "me@gauravpatil.site",
+      purpose: "Executive direct line.",
+      isNoReply: false,
+    },
+    legacy: {
+      email: "me@gauravpatil.site",
+      name: "Gaurav Patil",
+      defaultReplyTo: "me@gauravpatil.site",
+      purpose: "Executive direct line.",
+      isNoReply: false,
+    },
+  },
+  WORK: {
+    type: "WORK",
+    key: "WORK",
+    email: "work@gauravpatil.site",
+    primaryEmail: "work@gauravpatil.site",
+    legacyEmail: "work@gauravpatil.site",
+    name: "Gaurav Patil",
+    displayName: "Gaurav Patil",
+    defaultReplyTo: "work@gauravpatil.site",
+    purpose:
+      "Client proposals, consulting engagements, freelance contracts, and business inquiries.",
+    isNoReply: false,
+    primary: {
+      email: "work@gauravpatil.site",
+      name: "Gaurav Patil",
+      defaultReplyTo: "work@gauravpatil.site",
+      purpose: "Professional and consulting engagements.",
+      isNoReply: false,
+    },
+    legacy: {
+      email: "work@gauravpatil.site",
+      name: "Gaurav Patil",
+      defaultReplyTo: "work@gauravpatil.site",
+      purpose: "Professional and consulting engagements.",
       isNoReply: false,
     },
   },
   SECURITY: {
     type: "SECURITY",
     key: "SECURITY",
-    email: "security@gauravpatil.online",
-    primaryEmail: "security@gauravpatil.online",
-    legacyEmail: "security@gauravservices.eu.cc",
+    email: "security@gauravpatil.site",
+    primaryEmail: "security@gauravpatil.site",
+    legacyEmail: "security@gauravpatil.site",
     name: "Gaurav Security Services",
     displayName: "Gaurav Security Services",
-    defaultReplyTo: "security@gauravpatil.online",
+    defaultReplyTo: "security@gauravpatil.site",
     purpose:
       "OTP emails, email verification, 2FA, login/security verification, password reset, security recovery & alerts.",
     isNoReply: false,
     primary: {
-      email: "security@gauravpatil.online",
+      email: "security@gauravpatil.site",
       name: "Gaurav Security Services",
-      defaultReplyTo: "security@gauravpatil.online",
+      defaultReplyTo: "security@gauravpatil.site",
       purpose: "Security alerts and inquiry replies.",
       isNoReply: false,
     },
     legacy: {
-      email: "security@gauravservices.eu.cc",
+      email: "security@gauravpatil.site",
       name: "Gaurav Security Services",
-      defaultReplyTo: "security@gauravservices.eu.cc",
-      purpose: "Legacy security alerts and inquiry replies.",
+      defaultReplyTo: "security@gauravpatil.site",
+      purpose: "Security alerts and inquiry replies.",
       isNoReply: false,
     },
   },
   HELP: {
     type: "HELP",
     key: "HELP",
-    email: "help@gauravpatil.online",
-    primaryEmail: "help@gauravpatil.online",
-    legacyEmail: "help@gauravservices.eu.cc",
+    email: "help@gauravpatil.site",
+    primaryEmail: "help@gauravpatil.site",
+    legacyEmail: "help@gauravpatil.site",
     name: "Gaurav Support",
     displayName: "Gaurav Support",
-    defaultReplyTo: "help@gauravpatil.online",
+    defaultReplyTo: "help@gauravpatil.site",
     purpose:
       "Support requests, assistance, ticket notifications, and user help workflows.",
     isNoReply: false,
     primary: {
-      email: "help@gauravpatil.online",
+      email: "help@gauravpatil.site",
       name: "Gaurav Support",
-      defaultReplyTo: "help@gauravpatil.online",
+      defaultReplyTo: "help@gauravpatil.site",
       purpose: "Support and assistance.",
       isNoReply: false,
     },
     legacy: {
-      email: "help@gauravservices.eu.cc",
+      email: "help@gauravpatil.site",
       name: "Gaurav Support",
-      defaultReplyTo: "help@gauravservices.eu.cc",
-      purpose: "Legacy support and assistance.",
+      defaultReplyTo: "help@gauravpatil.site",
+      purpose: "Support and assistance.",
       isNoReply: false,
     },
   },
   NO_REPLY: {
     type: "NO_REPLY",
     key: "NO_REPLY",
-    email: "no-reply@gauravpatil.online",
-    primaryEmail: "no-reply@gauravpatil.online",
-    legacyEmail: "no-reply@gauravservices.eu.cc",
-    name: "Gaurav Services",
-    displayName: "Gaurav Services",
-    defaultReplyTo: "no-reply@gauravpatil.online",
+    email: "no-reply@gauravpatil.site",
+    primaryEmail: "no-reply@gauravpatil.site",
+    legacyEmail: "no-reply@gauravpatil.site",
+    name: "Gaurav Portfolio No-Reply",
+    displayName: "Gaurav Portfolio No-Reply",
+    defaultReplyTo: "no-reply@gauravpatil.site",
     purpose:
       "Strictly non-reply automated system notifications and ephemeral passcodes where replying is not applicable.",
     isNoReply: true,
     primary: {
-      email: "no-reply@gauravpatil.online",
-      name: "Gaurav Services",
-      defaultReplyTo: "no-reply@gauravpatil.online",
+      email: "no-reply@gauravpatil.site",
+      name: "Gaurav Portfolio No-Reply",
+      defaultReplyTo: "no-reply@gauravpatil.site",
       purpose: "OTP and system notifications.",
       isNoReply: true,
     },
     legacy: {
-      email: "no-reply@gauravservices.eu.cc",
-      name: "Gaurav Services",
-      defaultReplyTo: "no-reply@gauravservices.eu.cc",
-      purpose: "Legacy OTP and system notifications.",
+      email: "no-reply@gauravpatil.site",
+      name: "Gaurav Portfolio No-Reply",
+      defaultReplyTo: "no-reply@gauravpatil.site",
+      purpose: "OTP and system notifications.",
       isNoReply: true,
     },
   },

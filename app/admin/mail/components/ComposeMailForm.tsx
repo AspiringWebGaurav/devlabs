@@ -907,18 +907,9 @@ export const ComposeMailForm: React.FC<ComposeMailFormProps> = ({
             disabled={isPending || isSavingDraft || isDiscarding}
             className="w-full px-3 py-1.5 text-xs font-admin-sans font-semibold bg-[#FAFAFA] border border-[#E2E8F0] rounded-sm focus:outline-hidden focus:border-[#7C3AED] focus:bg-[#FFFFFF] transition-colors cursor-pointer disabled:opacity-60"
           >
-            <optgroup label="PRIMARY — gauravpatil.online">
+            <optgroup label="OFFICIAL SENDERS — gauravpatil.site">
               {Object.values(ADMIN_MAIL_SENDERS)
                 .filter((s) => !s.isLegacy)
-                .map((identity) => (
-                  <option key={identity.key} value={identity.key}>
-                    {identity.displayName} &lt;{identity.email}&gt;
-                  </option>
-                ))}
-            </optgroup>
-            <optgroup label="LEGACY — gauravservices.eu.cc">
-              {Object.values(ADMIN_MAIL_SENDERS)
-                .filter((s) => s.isLegacy)
                 .map((identity) => (
                   <option key={identity.key} value={identity.key}>
                     {identity.displayName} &lt;{identity.email}&gt;

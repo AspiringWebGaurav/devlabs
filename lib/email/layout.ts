@@ -132,7 +132,7 @@ export function renderEmailFooter(
     ${divider}
     <p style="${EMAIL_SPACING.footerMargin}font-size:${EMAIL_TYPOGRAPHY.sizeFooter};color:${EMAIL_TYPOGRAPHY.colorFooter};line-height:${EMAIL_TYPOGRAPHY.lineHeightFooter};">
       <span>Sent via Gaurav Services</span> &nbsp;&bull;&nbsp;
-      <a href="https://gauravpatil.online" style="color:${EMAIL_TYPOGRAPHY.colorLink};text-decoration:underline;">gauravpatil.online</a>
+      <a href="https://gauravpatil.site" style="color:${EMAIL_TYPOGRAPHY.colorLink};text-decoration:underline;">gauravpatil.site</a>
     </p>
   `;
 }

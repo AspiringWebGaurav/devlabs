@@ -35,7 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const seoResult = await seoRepository.getSeo();
     const seo = seoResult.data || SEED_SEO;
 
-    const canonicalUrl = seo.canonicalUrl || "https://gauravpatil.online";
+    const canonicalUrl = seo.canonicalUrl || "https://gauravpatil.site";
     const title = seo.title || "Gaurav's Portfolio";
     const description = seo.description || "Modern, Slick and Minimalist Developer Portfolio";
 
@@ -63,7 +63,7 @@ export async function generateMetadata(): Promise<Metadata> {
     };
   } catch {
     return {
-      metadataBase: new URL("https://gauravpatil.online"),
+      metadataBase: new URL("https://gauravpatil.site"),
       title: "Gaurav's Portfolio",
       description: "Modern, Slick and Minimalist Developer Portfolio",
     };

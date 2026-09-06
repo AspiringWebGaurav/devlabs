@@ -134,7 +134,7 @@ export const ReplyInquiryModal: React.FC<ReplyInquiryModalProps> = ({
               <h3 className="font-bold text-sm text-black">Dispatch Email Reply</h3>
               <p className="font-admin-mono text-[11px] text-[#64748B] flex items-center gap-1.5 mt-0.5">
                 <FaLock className="w-2.5 h-2.5 text-[#10B981]" />
-                <span>From: security@gauravpatil.online (Brevo Gateway)</span>
+                <span>From: security@gauravpatil.site (Brevo Gateway)</span>
               </p>
             </div>
           </div>

@@ -6,7 +6,7 @@
  * - Plaintext OTP is NEVER stored, logged, or serialized.
  * - OTP salt is a 128-bit random hex value stored as non-secret metadata with the challenge.
  * - Comparison is executed using constant-time crypto.timingSafeEqual.
- * - Emails dispatched via no-reply@gauravpatil.online.
+ * - Emails dispatched via no-reply@gauravpatil.site.
  */
 
 import crypto from "crypto";
@@ -118,7 +118,7 @@ export async function generateAndDispatchOtp(params: {
     type: "OTP_SEND",
   });
 
-  // 4. Dispatch Email via Brevo REST API (strictly no-reply@gauravpatil.online)
+  // 4. Dispatch Email via Brevo REST API (strictly no-reply@gauravpatil.site)
   const emailRes = await dispatchLiveChatOtpEmail({
     email: cleanEmail,
     name: cleanName,

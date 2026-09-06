@@ -64,13 +64,13 @@ export function validateWhatsAppConfig(): { valid: boolean; missingKeys: string[
  * Resolves the public application base URL for all WhatsApp links,
  * 1-click notification links in admin emails, guidelines links, and GDPR data export archives.
  *
- * Defaults strictly to the active testing domain: https://devlabs.eu.cc
+ * Defaults to: https://gauravpatil.site
  */
 export function getWhatsAppBaseUrl(): string {
   const customUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
-  if (customUrl && !customUrl.includes("gauravpatil.online") && !customUrl.includes("vercel.app")) {
+  if (customUrl) {
     return customUrl.replace(/\/+$/, "");
   }
 
-  return "https://devlabs.eu.cc";
+  return "https://gauravpatil.site";
 }

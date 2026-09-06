@@ -16,7 +16,7 @@ export const SeoEditor: React.FC<{ initialData: SeoDocument | null }> = ({ initi
   const [formData, setFormData] = useState({
     title: initialData?.title || "Gaurav's Portfolio",
     description: initialData?.description || "Modern, Slick and Minimalist Developer Portfolio",
-    canonicalUrl: initialData?.canonicalUrl || "https://gauravpatil.online",
+    canonicalUrl: initialData?.canonicalUrl || "https://gauravpatil.site",
     ogImageUrl: initialData?.ogImageUrl || "",
     keywords: (initialData?.keywords || ["Developer", "Portfolio", "Frontend", "Next.js"]).join(", "),
     author: initialData?.author || "Gaurav Patil",
@@ -32,7 +32,7 @@ export const SeoEditor: React.FC<{ initialData: SeoDocument | null }> = ({ initi
       setFormData({
         title: initialData.title || "Gaurav's Portfolio",
         description: initialData.description || "Modern, Slick and Minimalist Developer Portfolio",
-        canonicalUrl: initialData.canonicalUrl || "https://gauravpatil.online",
+        canonicalUrl: initialData.canonicalUrl || "https://gauravpatil.site",
         ogImageUrl: initialData.ogImageUrl || "",
         keywords: (initialData.keywords || ["Developer", "Portfolio", "Frontend", "Next.js"]).join(", "),
         author: initialData.author || "Gaurav Patil",
@@ -144,7 +144,7 @@ export const SeoEditor: React.FC<{ initialData: SeoDocument | null }> = ({ initi
               value={formData.canonicalUrl}
               onChange={(e) => setFormData({ ...formData, canonicalUrl: e.target.value })}
               className="w-full px-3.5 py-2.5 text-sm border border-[#E2E8F0] rounded-sm bg-[#FAFAFA] focus:bg-[#FFFFFF] focus:ring-1 focus:ring-[#7C3AED] focus:border-[#7C3AED] transition-all"
-              placeholder="https://gauravpatil.online"
+              placeholder="https://gauravpatil.site"
               required
             />
           </div>

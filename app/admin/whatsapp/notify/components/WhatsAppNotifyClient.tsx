@@ -130,7 +130,7 @@ export const WhatsAppNotifyClient: React.FC<WhatsAppNotifyClientProps> = ({
               <FaEnvelope className="w-3 h-3 text-[#7C3AED]" />
               <span>Sender Identity</span>
             </div>
-            <div className="text-sm font-bold text-[#7C3AED] truncate">hello@gauravpatil.online</div>
+            <div className="text-sm font-bold text-[#7C3AED] truncate">hello@gauravpatil.site</div>
           </div>
         </div>
 

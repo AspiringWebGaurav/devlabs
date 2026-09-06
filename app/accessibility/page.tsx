@@ -6,13 +6,13 @@ export const metadata: Metadata = {
   description:
     "Accessibility practices adhering to modern design targets, reduced motion, fluid scaling, and keyboard navigation.",
   alternates: {
-    canonical: "https://gauravpatil.online/accessibility",
+    canonical: "https://gauravpatil.site/accessibility",
   },
   openGraph: {
     title: "Accessibility Standards & Targets | Gaurav Portfolio",
     description:
       "Accessibility practices adhering to modern design targets, reduced motion, fluid scaling, and keyboard navigation.",
-    url: "https://gauravpatil.online/accessibility",
+    url: "https://gauravpatil.site/accessibility",
     siteName: "Gaurav Portfolio",
     type: "website",
   },

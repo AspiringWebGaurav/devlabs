@@ -235,15 +235,15 @@ export const AccessibilityContent: React.FC = () => {
                   </h2>
                 </div>
                 <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-                  If you encounter an accessibility barrier, experience difficulty accessing any content, or require information in an alternate format, please let us know:
+                  If you encounter an accessibility barrier, experience difficulty accessing any content, or require information in an alternate format, please reach out directly:
                 </p>
                 <div className="flex flex-wrap items-center gap-3 pt-2">
                   <a
-                    href="mailto:help@gauravpatil.online"
+                    href="mailto:help@gauravpatil.site"
                     className="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-black bg-purple hover:bg-[#b895f5] rounded-xl transition-all shadow-md active:scale-95"
                   >
                     <FaEnvelope className="w-3.5 h-3.5" />
-                    <span>Email help@gauravpatil.online</span>
+                    <span>Email help@gauravpatil.site</span>
                   </a>
                   <Link
                     href="/"

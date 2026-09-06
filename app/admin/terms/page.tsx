@@ -246,7 +246,7 @@ export default function AdminTermsPage() {
                 </div>
               </div>
               <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
-                Superadmin authentication enforces mandatory secondary verification. One-Time Passcodes (OTP) are cryptographically hashed using HMAC-SHA256 with unique salts and constrained by a strict global 3-attempt budget. Sign-in attempts from unrecognized IP locations generate an automated security authorization link dispatched via <code>security@gauravpatil.online</code> with a 15-minute expiration window. An on-screen passcode fallback pathway ensures guaranteed access even if email verification links are inaccessible, maintaining complete security without risk of lockout.
+                Superadmin authentication enforces mandatory secondary verification. One-Time Passcodes (OTP) are cryptographically hashed using HMAC-SHA256 with unique salts and constrained by a strict global 3-attempt budget. Sign-in attempts from unrecognized IP locations generate an automated security authorization link dispatched via <code>security@gauravpatil.site</code> with a 15-minute expiration window. An on-screen passcode fallback pathway ensures guaranteed access even if email verification links are inaccessible, maintaining complete security without risk of lockout.
               </p>
             </div>
 

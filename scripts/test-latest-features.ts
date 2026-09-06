@@ -2,7 +2,7 @@
  * Comprehensive Test Suite for Latest Features:
  * 1. Learn More Modal & Educational Workflow
  * 2. Vibrant Gaurav Reply Celebratory Badge Lifecycle
- * 3. Visitor Reply Email Routing via no-reply@gauravpatil.online
+ * 3. Visitor Reply Email Routing via no-reply@gauravpatil.site
  * 4. Facebook-Style History Chunking (PAGE_SIZE = 15) & Remaining Count Logic
  * 5. Scroll-Offset Preservation Delta Math
  * 6. LiveChatRepository & Multi-Room Concurrency Integration
@@ -65,8 +65,12 @@ async function runTests() {
   // -------------------------------------------------------------
   console.log("\n--- Test 2: Visitor Reply Email Sender & Content Policy ---");
   assert(
-    EMAIL_IDENTITIES.NO_REPLY.primary.email === "no-reply@gauravpatil.online",
-    "NO_REPLY primary email is strictly no-reply@gauravpatil.online"
+    EMAIL_IDENTITIES.NO_REPLY.primary.email === "no-reply@gauravpatil.site",
+    "NO_REPLY primary email is strictly no-reply@gauravpatil.site"
+  );
+  assert(
+    EMAIL_IDENTITIES.NO_REPLY.primary.name === "Gaurav Portfolio No-Reply",
+    "NO_REPLY sender display name is strictly Gaurav Portfolio No-Reply"
   );
   assert(EMAIL_IDENTITIES.NO_REPLY.isNoReply === true, "NO_REPLY identity is flagged as isNoReply: true");
 
@@ -78,7 +82,7 @@ async function runTests() {
     replySnippet: "Hey, thanks for reaching out! Let's discuss your project.",
     capabilityToken: "",
     threadId: "thread_test_123",
-    baseUrl: "https://gauravpatil.online",
+    baseUrl: "https://gauravpatil.site",
   });
 
   // Since we are testing offline/local with mock/real key, verify function execution

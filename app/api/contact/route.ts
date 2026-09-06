@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
     const autoReplyHtml = generateVisitorAutoReplyHtml({
       name: nameSanitization.sanitizedText,
     });
-    const autoReplyPlainText = `Hi ${nameSanitization.sanitizedText.split(" ")[0]},\n\nThanks for reaching out through my portfolio. I've received your message and will get back to you as soon as possible.\n\nGaurav Patil\nhttps://gauravpatil.online`;
+    const autoReplyPlainText = `Hi ${nameSanitization.sanitizedText.split(" ")[0]},\n\nThanks for reaching out through my portfolio. I've received your message and will get back to you as soon as possible.\n\nGaurav Patil\nhttps://gauravpatil.site`;
 
     const [ownerResult, visitorResult] = await Promise.allSettled([
       sendTransactionalEmail({

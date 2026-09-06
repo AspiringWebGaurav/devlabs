@@ -505,7 +505,7 @@ async function main() {
 
   // 11. OUTBOUND_RECONCILING with verified actor
   await runTest("Reconciler lease claim atomically writes OUTBOUND_RECONCILING with verified actor", async () => {
-    const adminActor = { type: "ADMIN", id: "security@gauravpatil.online" };
+    const adminActor = { type: "ADMIN", id: "security@gauravpatil.site" };
     const claim = await outboxRepo.claimForReconciliation(opAmbiguous, adminActor);
     assert.strictEqual(claim.success, true);
 
@@ -513,12 +513,12 @@ async function main() {
     assert(auditDoc, "OUTBOUND_RECONCILING audit record must exist");
     assert.strictEqual(auditDoc.eventType, "OUTBOUND_RECONCILING");
     assert.strictEqual(auditDoc.actor, "ADMIN");
-    assert.strictEqual(auditDoc.actorId, "security@gauravpatil.online");
+    assert.strictEqual(auditDoc.actorId, "security@gauravpatil.site");
   });
 
   // 12. OUTBOUND_RECONCILED (CONFIRMED_ACCEPTED)
   await runTest("Reconciled with verified wamid atomically writes OUTBOUND_RECONCILED (CONFIRMED_ACCEPTED)", async () => {
-    const adminActor = { type: "ADMIN", id: "security@gauravpatil.online" };
+    const adminActor = { type: "ADMIN", id: "security@gauravpatil.site" };
     const res = await outboxRepo.finalizeReconciliation(opAmbiguous, adminActor, {
       proofType: "META_WAMID_VERIFIED",
       metaMessageId: "wamid.HBgLMjE2OTg5NDM1MjIVAgASGBgyM0I=",
@@ -531,7 +531,7 @@ async function main() {
     assert(auditDoc, "OUTBOUND_RECONCILED audit record must exist");
     assert.strictEqual(auditDoc.newState, "CONFIRMED_ACCEPTED");
     assert.strictEqual(auditDoc.actor, "ADMIN");
-    assert.strictEqual(auditDoc.actorId, "security@gauravpatil.online");
+    assert.strictEqual(auditDoc.actorId, "security@gauravpatil.site");
     assert.strictEqual(auditDoc.metadata.proofType, "META_WAMID_VERIFIED");
   });
 
@@ -589,7 +589,7 @@ async function main() {
 
   // 15. OUTBOUND_RETRY_AUTHORIZED with deterministic attempt ID
   await runTest("Safe retry dispatch creates OUTBOUND_RETRY_AUTHORIZED with deterministic attempt ID", async () => {
-    const adminActor = { type: "ADMIN", id: "security@gauravpatil.online" };
+    const adminActor = { type: "ADMIN", id: "security@gauravpatil.site" };
     const res = await outboxRepo.recordRetryAuthorized(opReconRetry, adminActor);
     assert.strictEqual(res.success, true);
 
@@ -599,7 +599,7 @@ async function main() {
     assert(auditDoc, "OUTBOUND_RETRY_AUTHORIZED audit record must exist");
     assert.strictEqual(auditDoc.eventType, "OUTBOUND_RETRY_AUTHORIZED");
     assert.strictEqual(auditDoc.actor, "ADMIN");
-    assert.strictEqual(auditDoc.actorId, "security@gauravpatil.online");
+    assert.strictEqual(auditDoc.actorId, "security@gauravpatil.site");
     assert.strictEqual(auditDoc.metadata.authorizedAttempt, 2);
   });
 

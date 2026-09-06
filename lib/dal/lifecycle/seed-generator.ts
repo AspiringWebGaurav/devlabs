@@ -280,9 +280,9 @@ export async function generateSyntheticDevelopmentData(options: SeedOptions): Pr
     mailDocs.push({
       id: mailId,
       senderKey: "HELLO",
-      senderEmail: "hello@gauravpatil.online",
+      senderEmail: "hello@gauravpatil.site",
       senderName: "Gaurav Patil",
-      replyTo: "hello@gauravpatil.online",
+      replyTo: "hello@gauravpatil.site",
       to: [{ email: recipientEmail, name: recipientName }],
       subject: `Project Inquiry Response: ${getRandomItem(SYNTHETIC_SUBJECTS)}`,
       htmlBody: `<p>Hi ${recipientName.split(" ")[0]},</p><p>Thank you for reaching out regarding your project.</p>`,

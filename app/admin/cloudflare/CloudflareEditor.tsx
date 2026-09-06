@@ -29,7 +29,7 @@ export const CloudflareEditor: React.FC<{ initialData: CloudflareSettingsDocumen
     siteKey: initialData?.siteKey || "0x4AAAAAAEilFWDvwBZ3NPSK",
     maxRetryAttempts: initialData?.maxRetryAttempts || 2,
     circuitBreakerEnabled: initialData?.circuitBreakerEnabled !== false,
-    fallbackEmailGateway: initialData?.fallbackEmailGateway || "no-reply@gauravpatil.online",
+    fallbackEmailGateway: initialData?.fallbackEmailGateway || "no-reply@gauravpatil.site",
   });
 
   const [isPending, setIsPending] = useState(false);
@@ -43,7 +43,7 @@ export const CloudflareEditor: React.FC<{ initialData: CloudflareSettingsDocumen
         siteKey: initialData.siteKey || "0x4AAAAAAEilFWDvwBZ3NPSK",
         maxRetryAttempts: initialData.maxRetryAttempts || 2,
         circuitBreakerEnabled: initialData.circuitBreakerEnabled !== false,
-        fallbackEmailGateway: initialData.fallbackEmailGateway || "no-reply@gauravpatil.online",
+        fallbackEmailGateway: initialData.fallbackEmailGateway || "no-reply@gauravpatil.site",
       });
     }
   }, [initialData]);
@@ -74,7 +74,7 @@ export const CloudflareEditor: React.FC<{ initialData: CloudflareSettingsDocumen
       siteKey: formData.siteKey.trim() || "0x4AAAAAAEilFWDvwBZ3NPSK",
       maxRetryAttempts: Number(formData.maxRetryAttempts) || 2,
       circuitBreakerEnabled: formData.circuitBreakerEnabled,
-      fallbackEmailGateway: formData.fallbackEmailGateway.trim() || "no-reply@gauravpatil.online",
+      fallbackEmailGateway: formData.fallbackEmailGateway.trim() || "no-reply@gauravpatil.site",
       expectedVersion: initialData?.version,
     };
 
@@ -102,7 +102,7 @@ export const CloudflareEditor: React.FC<{ initialData: CloudflareSettingsDocumen
         siteKey: initialData.siteKey || "0x4AAAAAAEilFWDvwBZ3NPSK",
         maxRetryAttempts: initialData.maxRetryAttempts || 2,
         circuitBreakerEnabled: initialData.circuitBreakerEnabled !== false,
-        fallbackEmailGateway: initialData.fallbackEmailGateway || "no-reply@gauravpatil.online",
+        fallbackEmailGateway: initialData.fallbackEmailGateway || "no-reply@gauravpatil.site",
       });
     }
     setStatusMessage(null);
@@ -344,7 +344,7 @@ export const CloudflareEditor: React.FC<{ initialData: CloudflareSettingsDocumen
                 <FaEnvelope className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-1/2 -translate-y-1/2" />
               </div>
               <span className="text-[11px] text-[#64748B] mt-1 block">
-                Strictly adheres to Master Rule 2.7 (Verified domain: gauravpatil.online).
+                Strictly adheres to Master Rule 2.7 (Verified domain: gauravpatil.site).
               </span>
             </div>
           </div>

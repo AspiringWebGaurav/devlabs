@@ -1,6 +1,7 @@
 # Gaurav Portfolio &mdash; Modern Web Engineering Platform
 
-[![Production](https://img.shields.io/badge/Production-gauravpatil.online-6366f1?style=flat-square&logo=vercel)](https://gauravpatil.online)
+[![Production](https://img.shields.io/badge/Production-gauravpatil.site-6366f1?style=flat-square&logo=vercel)](https://gauravpatil.site)
+[![Staging](https://img.shields.io/badge/Staging-devlabs.eu.cc-7c3aed?style=flat-square)](https://devlabs.eu.cc)
 [![Next.js](https://img.shields.io/badge/Next.js-15.5-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
@@ -11,7 +12,11 @@
 
 An enterprise-grade, high-performance web engineering portfolio designed and built by **Gaurav Patil**. Engineered with **Next.js 15 (App Router)**, **React 19**, **Three.js WebGL**, and modern cloud infrastructure. Architected with isolated presentation layers, touch ergonomics, privacy-first communication channels, and zero cumulative layout shift (`CLS = 0`).
 
-> 📬 **Direct Inquiries & Collaboration**: To discuss project proposals, consulting engagements, or engineering opportunities, reach out directly via [`hello@gauravpatil.online`](mailto:hello@gauravpatil.online) or launch the interactive contact form at [gauravpatil.online/contact](https://gauravpatil.online/contact).
+* **Production URL**: [`https://gauravpatil.site`](https://gauravpatil.site)
+* **Pre-Production Staging Preview**: [`https://devlabs.eu.cc`](https://devlabs.eu.cc)
+* **Verified Email Gateway**: `gauravpatil.site`
+
+> 📬 **Direct Inquiries & Collaboration**: To discuss project proposals, consulting engagements, or engineering opportunities, reach out directly via [`hello@gauravpatil.site`](mailto:hello@gauravpatil.site) or launch the interactive contact form at [gauravpatil.site/contact](https://gauravpatil.site/contact).
 
 ---
 
@@ -87,7 +92,7 @@ The platform follows clean separation of concerns, ensuring high maintainability
 
 ### 3.2 Personal Assistant & Live Chat Ecosystem
 * **Navigation Companion**: Floating interactive assistant providing instant guidance across project architectures, tech stacks, and case studies.
-* **Verified Live Communication**: Access to live chat sessions requires a single-use 6-digit email passcode (OTP) dispatched exclusively from `no-reply@gauravpatil.online`.
+* **Verified Live Communication**: Access to live chat sessions requires a single-use 6-digit email passcode (OTP) dispatched exclusively from `no-reply@gauravpatil.site`.
 * **Session Security**: Verified sessions utilize encrypted 4-hour `httpOnly` session tokens with 1-click sign-out and detachment.
 * **Hybrid Routing Pipeline**: Messages stream in real-time when Gaurav is online, or trigger automated lead alerts directly to private inbox with 1-click reply routing.
 
@@ -127,11 +132,11 @@ The platform includes comprehensive transparency documentation accessible direct
 
 | Route | Document Title | Active Version | Scope & Responsibility |
 | :--- | :--- | :--- | :--- |
-| [`/terms`](https://gauravpatil.online/terms) | **Terms of Service** | `v0.0.1` | Operating terms, intellectual property, acceptable use, and communication standards. |
-| [`/privacy`](https://gauravpatil.online/privacy) | **Privacy Policy** | `v0.0.1` | Data minimization principles, anonymity rights, encryption standards, and GDPR compliance. |
-| [`/security`](https://gauravpatil.online/security) | **Security Policy** | `v0.0.1` | Infrastructure defenses, authentication standards, and vulnerability disclosure policies. |
-| [`/accessibility`](https://gauravpatil.online/accessibility) | **Accessibility Statement** | `v0.0.1` | Mobile-first 10/10 standards, touch ergonomics, and WCAG 2.1 AA conformance details. |
-| [`/chat`](https://gauravpatil.online/chat) | **Assistant & Chat Guide** | `v0.0.1` | Complete technical breakdown of the personal assistant and live chat architecture. |
+| [`/terms`](https://gauravpatil.site/terms) | **Terms of Service** | `v0.0.1` | Operating terms, intellectual property, acceptable use, and communication standards. |
+| [`/privacy`](https://gauravpatil.site/privacy) | **Privacy Policy** | `v0.0.1` | Data minimization principles, anonymity rights, encryption standards, and GDPR compliance. |
+| [`/security`](https://gauravpatil.site/security) | **Security Policy** | `v0.0.1` | Infrastructure defenses, authentication standards, and vulnerability disclosure policies. |
+| [`/accessibility`](https://gauravpatil.site/accessibility) | **Accessibility Statement** | `v0.0.1` | Mobile-first 10/10 standards, touch ergonomics, and WCAG 2.1 AA conformance details. |
+| [`/chat`](https://gauravpatil.site/chat) | **Assistant & Chat Guide** | `v0.0.1` | Complete technical breakdown of the personal assistant and live chat architecture. |
 
 ### Mandatory Legal Update Dispatches (Strict Non-Marketing Standard)
 Submitting an email address through any feature of this portfolio &mdash; including Contact Form submissions, Assistant/Live Chat OTP authentication, support requests, or direct messaging &mdash; registers that address to receive mandatory policy, legal, and security announcements in accordance with the user's acceptance of use.
@@ -143,14 +148,16 @@ Submitting an email address through any feature of this portfolio &mdash; includ
 
 ## 7. Official Communication Directory
 
-Official electronic communications, receipts, security notices, and legal updates originate strictly from verified email addresses under the authenticated primary domain `gauravpatil.online`:
+Official electronic communications, receipts, security notices, and legal updates originate strictly from verified email addresses under the authenticated primary domain `gauravpatil.site`:
 
 | Mailbox / Sender | Display Identity | Purpose & Scope | Expected Response |
 | :--- | :--- | :--- | :--- |
-| [`hello@gauravpatil.online`](mailto:hello@gauravpatil.online) | **Gaurav Patil** | **Client & Inquiries**: Project proposals, collaboration inquiries, consulting requests, and public contact routing. | Auto-acknowledgement; personal response typically within 24 hours. |
-| [`security@gauravpatil.online`](mailto:security@gauravpatil.online) | **Security & Auth** | **Security Operations**: Multi-factor authentication notices, login alerts, git push audit logs, and vulnerability reports. | Urgent security disclosures triaged immediately. |
-| [`help@gauravpatil.online`](mailto:help@gauravpatil.online) | **Gaurav Support** | **Technical Support**: Assistant inquiries, bug reports, user feedback, and portfolio navigation guidance. | Initial response within 12–24 business hours. |
-| [`no-reply@gauravpatil.online`](mailto:no-reply@gauravpatil.online) | **System Notifications** | **Automated Alerts (Do Not Reply)**: One-Time Passcodes (OTP), Live Chat verification, and mandatory legal announcements. | Automated dispatch; inbound replies are unmonitored. |
+| [`hello@gauravpatil.site`](mailto:hello@gauravpatil.site) | **Gaurav Patil** | **Client & Inquiries**: Project proposals, collaboration inquiries, consulting requests, and public contact routing. | Auto-acknowledgement; personal response typically within 24 hours. |
+| [`me@gauravpatil.site`](mailto:me@gauravpatil.site) | **Gaurav Patil** | **Direct & Founder**: Direct communication, founder correspondence, and personal engineering discussions. | Personal response within 24 hours. |
+| [`work@gauravpatil.site`](mailto:work@gauravpatil.site) | **Gaurav Patil** | **Professional & Contracting**: Contract engagements, technical advisory, consulting, and recruitment dialogues. | Priority review within 12–24 hours. |
+| [`security@gauravpatil.site`](mailto:security@gauravpatil.site) | **Gaurav Security Services** | **Security Operations**: Multi-factor authentication notices, login alerts, git push audit logs, and vulnerability reports. | Urgent security disclosures triaged immediately. |
+| [`help@gauravpatil.site`](mailto:help@gauravpatil.site) | **Gaurav Support** | **Technical Support**: Assistant inquiries, bug reports, user feedback, and portfolio navigation guidance. | Initial response within 12–24 business hours. |
+| [`no-reply@gauravpatil.site`](mailto:no-reply@gauravpatil.site) | **Gaurav Portfolio No-Reply** | **Automated Alerts (Do Not Reply)**: One-Time Passcodes (OTP), Live Chat verification, and mandatory legal announcements. | Automated dispatch; inbound replies are unmonitored. |
 
 > 🛡️ **Email Security & Authenticity**: Outgoing emails are authenticated with SPF, DKIM, and DMARC cryptographic signatures. Inbound email addresses are never enrolled in marketing lists or commercial campaigns.
 
@@ -216,7 +223,7 @@ npm run lint
 
 * **Zero Hardcoded Secrets**: Credentials, service accounts, and API tokens are managed via encrypted environment configurations and are never committed to version control.
 * **Edge Rate Limiting**: Public endpoints are protected by bot challenges, request throttling, and payload sanitization.
-* **Responsible Vulnerability Disclosure**: If you discover a potential security issue, please send a confidential report with reproduction steps to [`security@gauravpatil.online`](mailto:security@gauravpatil.online).
+* **Responsible Vulnerability Disclosure**: If you discover a potential security issue, please send a confidential report with reproduction steps to [`security@gauravpatil.site`](mailto:security@gauravpatil.site).
 
 ---
 

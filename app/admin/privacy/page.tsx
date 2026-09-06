@@ -242,7 +242,7 @@ export default function AdminPrivacyPage() {
                 </div>
               </div>
               <p className="text-xs sm:text-sm text-[#334155] font-admin-sans leading-relaxed">
-                One-Time Passcodes (OTP) generated during 2FA are stored exclusively in salted HMAC-SHA256 hashed representations; plaintext codes are never written to database logs. Device IP addresses and client user-agents collected during authentication are utilized strictly for real-time risk evaluation and security link generation via <code>security@gauravpatil.online</code>. Unverified IP challenge documents are governed by an immutable 15-minute TTL and automatically purged upon consumption or expiration.
+                One-Time Passcodes (OTP) generated during 2FA are stored exclusively in salted HMAC-SHA256 hashed representations; plaintext codes are never written to database logs. Device IP addresses and client user-agents collected during authentication are utilized strictly for real-time risk evaluation and security link generation via <code>security@gauravpatil.site</code>. Unverified IP challenge documents are governed by an immutable 15-minute TTL and automatically purged upon consumption or expiration.
               </p>
             </div>
 

@@ -223,12 +223,12 @@ assertTest("SESSION-04", "SESSION", "API_SEC", "Rejects malformed token strings"
 // Category 3: Email Identity & Brevo Policy Compliance
 // =========================================================================
 
-assertTest("EMAIL-01", "EMAIL", "UNIT", "Security sender identity is security@gauravpatil.online", () => {
-  return EMAIL_IDENTITIES.SECURITY.primaryEmail === "security@gauravpatil.online";
+assertTest("EMAIL-01", "EMAIL", "UNIT", "Security sender identity is security@gauravpatil.site", () => {
+  return EMAIL_IDENTITIES.SECURITY.primaryEmail === "security@gauravpatil.site";
 });
 
-assertTest("EMAIL-02", "EMAIL", "UNIT", "Contact / Inquiry sender identity is hello@gauravpatil.online", () => {
-  return EMAIL_IDENTITIES.HELLO.primaryEmail === "hello@gauravpatil.online";
+assertTest("EMAIL-02", "EMAIL", "UNIT", "Contact / Inquiry sender identity is hello@gauravpatil.site", () => {
+  return EMAIL_IDENTITIES.HELLO.primaryEmail === "hello@gauravpatil.site";
 });
 
 assertTest("EMAIL-03", "EMAIL", "UNIT", "Brevo idempotency key conforms to alphanumeric sanitized pattern", () => {

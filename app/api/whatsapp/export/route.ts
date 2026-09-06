@@ -340,7 +340,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   } catch (err) {
     adminLogger.error("WhatsApp:ExportFailed", err, "Failed to compile export archive");
     return new Response(
-      `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center;background:#000319;color:#F8FAFC;"><h2>Compilation Error</h2><p style="color:#94A3B8;">Could not package data export at this time. Please try again or contact security@gauravpatil.online.</p></body></html>`,
+      `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center;background:#000319;color:#F8FAFC;"><h2>Compilation Error</h2><p style="color:#94A3B8;">Could not package data export at this time. Please try again or contact security@gauravpatil.site.</p></body></html>`,
       {
         status: 500,
         headers: { "Content-Type": "text/html; charset=utf-8" },

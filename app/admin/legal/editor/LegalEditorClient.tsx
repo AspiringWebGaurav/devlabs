@@ -525,7 +525,7 @@ export const LegalEditorClient: React.FC<LegalEditorClientProps> = ({
                 <div className="pt-2 border-t border-[#DDD6FE]">
                   <div className="text-[10px] uppercase font-bold text-[#6D28D9] font-admin-mono mb-2 flex items-center justify-between">
                     <span>Live Email Preview (Clean Notice &mdash; Zero Logs / No Version Numbers)</span>
-                    <span className="text-[#64748B] lowercase font-normal">from: Gaurav Portfolio &lt;no-reply@gauravpatil.online&gt;</span>
+                    <span className="text-[#64748B] lowercase font-normal">from: Gaurav Portfolio No-Reply &lt;no-reply@gauravpatil.site&gt;</span>
                   </div>
 
                   <div className="bg-[#FFFFFF] border border-[#CBD5E1] rounded-sm p-5 text-left shadow-xs space-y-3 font-sans max-w-xl mx-auto">
@@ -589,7 +589,7 @@ export const LegalEditorClient: React.FC<LegalEditorClientProps> = ({
                     </div>
 
                     <div className="text-center text-[11px] text-[#70757A]">
-                      Gaurav Portfolio &bull; Full-Stack Engineer &bull; gauravpatil.online
+                      Gaurav Portfolio &bull; Full-Stack Engineer &bull; gauravpatil.site
                     </div>
 
                     <div className="text-center text-[10px] text-[#70757A] space-y-1">

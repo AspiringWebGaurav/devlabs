@@ -5,7 +5,7 @@
  * whenever changes are pushed to GitHub.
  *
  * Routing Invariant:
- * - Sender: Gaurav Security Services <security@gauravpatil.online>
+ * - Sender: Gaurav Security Services <security@gauravpatil.site>
  * - To: Admin Gmail (ADMIN_EMAIL / gauravpatil5737@gmail.com)
  * - CC: None
  *

@@ -40,7 +40,7 @@ export async function updateInquiryStatusAction(formData: { id: string; status: 
 }
 
 /**
- * Server Action to reply to an inquiry via security@gauravpatil.online using Brevo REST API v3.
+ * Server Action to reply to an inquiry via security@gauravpatil.site using Brevo REST API v3.
  * Protected by strict superadmin session assertion, Zod validation, and atomic transaction locks.
  */
 export async function replyToInquiryAction(formData: {

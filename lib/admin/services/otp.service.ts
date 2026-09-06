@@ -418,7 +418,7 @@ export class OtpService {
   /**
    * Requests a Fallback Passcode for IP Authorization (In-Place Mutation).
    * Rate limited: 60s cooldown, max 3 fallback resends.
-   * Dispatched strictly via no-reply@gauravpatil.online.
+   * Dispatched strictly via no-reply@gauravpatil.site.
    */
   public async requestFallbackPasscode(
     challengeId: string,

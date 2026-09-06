@@ -78,6 +78,8 @@ export type MailSenderKey =
   | "HELP"
   | "HELLO"
   | "NO_REPLY"
+  | "ME"
+  | "WORK"
   | "LEGACY_SECURITY"
   | "LEGACY_HELP"
   | "LEGACY_HELLO"

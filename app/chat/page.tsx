@@ -6,13 +6,13 @@ export const metadata: Metadata = {
   description:
     "Explore the architectural purpose, preview mechanics, and privacy standards for the Gaurav Portfolio Personal Assistant.",
   alternates: {
-    canonical: "https://gauravpatil.online/chat",
+    canonical: "https://gauravpatil.site/chat",
   },
   openGraph: {
     title: "Personal Assistant & Chat Guide | Gaurav Portfolio",
     description:
       "Architectural purpose, option mechanics, and privacy standards for the portfolio assistant.",
-    url: "https://gauravpatil.online/chat",
+    url: "https://gauravpatil.site/chat",
     siteName: "Gaurav Portfolio",
     type: "website",
   },

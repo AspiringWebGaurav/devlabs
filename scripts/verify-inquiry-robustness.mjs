@@ -14,9 +14,9 @@
  * 10. Identical-content NEW reply (distinct operation keys)
  * 11. Different-content NEW reply (distinct operation keys)
  * 12. Permanent provider failure
- * 13. Historical .eu.cc sender preservation
+ * 13. Historical legacy sender preservation
  * 14. Historical missing senderIdentity displays "Legacy / Unrecorded Sender"
- * 15. New reply attribution (security@gauravpatil.online)
+ * 15. New reply attribution (security@gauravpatil.site)
  */
 
 import assert from "node:assert";
@@ -54,7 +54,7 @@ async function runSuite() {
       status: "read",
       replyMessage: "Hello Alice",
       replyMessageId: brevoMock.messageId,
-      senderIdentity: "security@gauravpatil.online",
+      senderIdentity: "security@gauravpatil.site",
       activeReplyKey: opKey,
       replyLockUntil: null,
     });
@@ -134,7 +134,7 @@ async function runSuite() {
       status: "read",
       replyMessageId: confirmedMessageId,
       activeReplyKey: opKey,
-      senderIdentity: "security@gauravpatil.online",
+      senderIdentity: "security@gauravpatil.site",
     });
 
     const doc = firestoreDb.get("inq_004");
@@ -323,16 +323,16 @@ async function runSuite() {
   });
 
   // ---------------------------------------------------------------------------
-  // Test 13: Historical .eu.cc sender preservation
+  // Test 13: Historical legacy sender preservation
   // ---------------------------------------------------------------------------
-  await runTest("Test 13 — Historical record with .eu.cc sender preserves exact string", async () => {
+  await runTest("Test 13 — Historical record with legacy sender preserves exact string", async () => {
     const historicalItem = {
       id: "inq_hist_01",
-      senderIdentity: "security@gauravservices.eu.cc",
+      senderIdentity: "legacy-admin@example.com",
     };
 
     const renderedText = `Sent Reply via ${historicalItem.senderIdentity ? historicalItem.senderIdentity : "Legacy / Unrecorded Sender"}`;
-    assert.strictEqual(renderedText, "Sent Reply via security@gauravservices.eu.cc");
+    assert.strictEqual(renderedText, "Sent Reply via legacy-admin@example.com");
   });
 
   // ---------------------------------------------------------------------------
@@ -346,21 +346,21 @@ async function runSuite() {
 
     const renderedText = `Sent Reply via ${historicalItemNoSender.senderIdentity ? historicalItemNoSender.senderIdentity : "Legacy / Unrecorded Sender"}`;
     assert.strictEqual(renderedText, "Sent Reply via Legacy / Unrecorded Sender");
-    assert.doesNotMatch(renderedText, /gauravpatil\.online/);
+    assert.doesNotMatch(renderedText, /devlabs\.eu\.cc/);
   });
 
   // ---------------------------------------------------------------------------
   // Test 15: New reply attribution
   // ---------------------------------------------------------------------------
-  await runTest("Test 15 — New reply attribution records and displays security@gauravpatil.online", async () => {
-    const primarySecurityEmail = "security@gauravpatil.online";
+  await runTest("Test 15 — New reply attribution records and displays security@gauravpatil.site", async () => {
+    const primarySecurityEmail = "security@gauravpatil.site";
     const newItem = {
       id: "inq_new_01",
       senderIdentity: primarySecurityEmail,
     };
 
     const renderedText = `Sent Reply via ${newItem.senderIdentity ? newItem.senderIdentity : "Legacy / Unrecorded Sender"}`;
-    assert.strictEqual(renderedText, "Sent Reply via security@gauravpatil.online");
+    assert.strictEqual(renderedText, "Sent Reply via security@gauravpatil.site");
   });
 
   console.log(`\n===============================================================`);

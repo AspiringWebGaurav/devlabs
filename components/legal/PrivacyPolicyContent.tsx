@@ -430,15 +430,15 @@ function PrivacyContentInner({ initialData }: PrivacyPolicyContentProps) {
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
               <li>
-                <strong className="text-white">Authenticated Domain:</strong> Official communications originate strictly from the verified primary identity <span className="text-purple font-mono">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono">gauravservices.eu.cc</span> supported).
+                <strong className="text-white">Authenticated Domain:</strong> Official communications originate strictly from the verified primary identity <span className="text-purple font-mono">gauravpatil.site</span>.
               </li>
               <li>
                 <strong className="text-white">Official Senders:</strong>
                 <ul className="list-disc list-inside pl-5 mt-1 space-y-1 text-neutral-400 font-mono text-xs sm:text-sm">
-                  <li>hello@gauravpatil.online (Direct contact &amp; automated receipts)</li>
-                  <li>security@gauravpatil.online (Security alerts &amp; authentication verification)</li>
-                  <li>help@gauravpatil.online (Support &amp; assistance)</li>
-                  <li>no-reply@gauravpatil.online (System notifications)</li>
+                  <li>hello@gauravpatil.site (Direct contact &amp; automated receipts)</li>
+                  <li>security@gauravpatil.site (Security alerts &amp; authentication verification)</li>
+                  <li>help@gauravpatil.site (Support &amp; assistance)</li>
+                  <li>no-reply@gauravpatil.site (System notifications)</li>
                 </ul>
               </li>
               <li>
@@ -515,14 +515,14 @@ function PrivacyContentInner({ initialData }: PrivacyPolicyContentProps) {
                 Custom Mail Domain Support &amp; Verified Communication Channels
               </h3>
               <p className="text-sm text-neutral-300 leading-relaxed">
-                All visitor interactions, assistant support inquiries, and transactional communications are backed by a dedicated, enterprise-grade Brevo email delivery pipeline configured with strict <strong className="text-white">SPF, DKIM, and DMARC</strong> authentication records. Official communication originating from this portfolio is bound to the primary authenticated domain <span className="text-purple font-mono font-semibold">gauravpatil.online</span> (with legacy domain <span className="text-purple font-mono font-semibold">gauravservices.eu.cc</span> supported for backward compatibility):
+                All visitor interactions, assistant support inquiries, and transactional communications are backed by a dedicated, enterprise-grade Brevo email delivery pipeline configured with strict <strong className="text-white">SPF, DKIM, and DMARC</strong> authentication records. Official communication originating from this portfolio is bound to the primary authenticated domain <span className="text-purple font-mono font-semibold">gauravpatil.site</span>:
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">hello@gauravpatil.online</code>
+                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">hello@gauravpatil.site</code>
                   </div>
                   <p className="text-xs text-neutral-400 pl-3.5">
                     Direct portfolio contact, visitor inquiries, developer collaboration, and automated inquiry receipts.
@@ -532,7 +532,7 @@ function PrivacyContentInner({ initialData }: PrivacyPolicyContentProps) {
                 <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple" />
-                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">help@gauravpatil.online</code>
+                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">help@gauravpatil.site</code>
                   </div>
                   <p className="text-xs text-neutral-400 pl-3.5">
                     Assistant technical assistance, bug reports, user feedback, and portfolio navigation support.
@@ -542,7 +542,7 @@ function PrivacyContentInner({ initialData }: PrivacyPolicyContentProps) {
                 <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">security@gauravpatil.online</code>
+                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">security@gauravpatil.site</code>
                   </div>
                   <p className="text-xs text-neutral-400 pl-3.5">
                     Security disclosures, vulnerability reports, 2FA OTP codes, and authentication alerts.
@@ -552,7 +552,7 @@ function PrivacyContentInner({ initialData }: PrivacyPolicyContentProps) {
                 <div className="p-3 rounded-lg bg-black/40 border border-white/[0.08] space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">no-reply@gauravpatil.online</code>
+                    <code className="text-xs sm:text-sm text-purple font-mono font-bold">no-reply@gauravpatil.site</code>
                   </div>
                   <p className="text-xs text-neutral-400 pl-3.5">
                     Non-interactive automated notifications, system passcodes, and mandatory legal announcements only.
@@ -749,10 +749,10 @@ function PrivacyContentInner({ initialData }: PrivacyPolicyContentProps) {
             <p className="text-purple font-medium">
               Email:{" "}
               <a
-                href="mailto:hello@gauravpatil.online"
+                href="mailto:hello@gauravpatil.site"
                 className="hover:underline"
               >
-                hello@gauravpatil.online
+                hello@gauravpatil.site
               </a>
             </p>
           </section>
