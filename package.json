@@ -1,76 +1,21 @@
 {
-  "name": "gaurav-portfolio",
-  "version": "0.0.1",
+  "name": "devlabs",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbo",
-    "dev:webpack": "next dev",
-    "dev:turbo": "next dev --turbo",
-    "clear": "node scripts/clear.js",
-    "clean": "node scripts/clean.js",
-    "dev:clear": "node scripts/clear.js && next dev --turbo",
-    "dev:clean": "node scripts/clean.js && npm install && next dev --turbo",
+    "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "push:notify": "node scripts/notify-push.mjs",
-    "firestore:indexes": "node scripts/deploy-firestore-indexes.mjs"
+    "start": "next start"
   },
   "dependencies": {
-    "@js-sdsl/ordered-map": "^4.4.2",
-    "@react-three/drei": "^10.7.8",
-    "@react-three/fiber": "^9.7.0",
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
-    "clsx": "^2.1.1",
-    "firebase": "^11.4.0",
-    "firebase-admin": "^14.2.0",
-    "framer-motion": "^13.1.1",
-    "hls.js": "^1.7.1",
-    "lottie-react": "^2.4.2",
-    "mini-svg-data-uri": "^1.4.4",
-    "motion": "^12.43.0",
-    "next": "^15.5.23",
-    "next-themes": "^0.4.6",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "react-icons": "^5.7.0",
-    "tailwind-merge": "^3.6.0",
-    "tailwindcss-animate": "^1.0.7",
-    "three": "^0.176.0",
-    "three-globe": "^2.45.2",
-    "zod": "^4.4.3"
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.6",
-    "@playwright/test": "^1.62.1",
-    "@types/node": "^20.19.43",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "@types/three": "^0.176.0",
-    "autoprefixer": "^10.5.4",
-    "eslint": "^9.22.0",
-    "eslint-config-next": "15.5.23",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^3.4.19",
-    "typescript": "^5.9.3"
-  },
-  "overrides": {
-    "node-domexception": "npm:@profoundlogic/node-domexception@^1.0.2",
-    "uuid": "^11.1.1",
-    "glob": "^13.0.6",
-    "brace-expansion": "^1.1.18",
-    "sharp": "^0.35.0",
-    "postcss": "^8.5.3"
-  },
-  "allowScripts": {
-    "@firebase/util@1.15.2": true,
-    "protobufjs@7.6.5": true,
-    "@firebase/util": true,
-    "protobufjs": true,
-    "unrs-resolver": true,
-    "unrs-resolver@1.12.2": true
+    "@types/node": "^20.17.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
   }
 }

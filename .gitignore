@@ -58,6 +58,7 @@
 # Vercel & Deployment
 # ==========================================
 .vercel
+.vercel/
 .netlify
 
 # ==========================================
@@ -137,3 +138,4 @@ desktop.ini
 .eslintcache
 .stylelintcache
 .hintrc
+.env*
